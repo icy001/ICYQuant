@@ -1,0 +1,19 @@
+# Order State Machine
+
+```text
+NEW
+ ↓
+VALIDATED
+ ↓
+RISK_CHECKED
+ ↓
+SENT
+ ↓
+PARTIALLY_FILLED
+ ↓
+FILLED
+
+OR
+
+CANCELLED / REJECTED
+```

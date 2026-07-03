@@ -2,6 +2,16 @@
 
 > Professional Quantitative Trading Platform
 
+## 项目定位（V1）
+
+ICYQuant 是一个面向量化交易学习与工程实践的开源交易平台。
+
+## 一句话介绍
+
+ICYQuant 是一个面向量化交易学习与工程实践的开源交易平台，集行情、订单管理、风险控制、策略回测和因子研究于一体。
+
+
+
 ICYQuant is an open-source quantitative trading platform designed for learning, research, and professional engineering practice.
 
 The project aims to simulate the architecture of modern quantitative trading systems by integrating market data, order management, risk control, backtesting, portfolio analytics, and AI-assisted research into a unified platform.
