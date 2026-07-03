@@ -1,30 +1,67 @@
-# AlphaLens
+# ICYQuant
 
-A Professional Trading Platform Designed for Quantitative Trading Research.
+> Professional Quantitative Trading Platform
 
-Modules
+ICYQuant is an open-source quantitative trading platform designed for learning, research, and professional engineering practice.
 
-- OMS
+The project aims to simulate the architecture of modern quantitative trading systems by integrating market data, order management, risk control, backtesting, portfolio analytics, and AI-assisted research into a unified platform.
+
+## Vision
+
+Build a production-grade quantitative trading platform with engineering best practices.
+
+## Features (Roadmap)
+
+- Order Management System (OMS)
+- Market Data Service
 - Risk Engine
-- Portfolio
+- Portfolio Management
 - Strategy Engine
-- Market Data
-- Backtesting
+- Backtesting Framework
+- Factor Research
+- AI Research Assistant
+- Monitoring & Observability
 
-Tech Stack
+## Technology Stack
 
-Python
+- Python
+- FastAPI
+- PostgreSQL
+- Redis
+- Docker
+- Kafka
+- ClickHouse
+- Pytest
+- GitHub Actions
 
-FastAPI
+## Repository Structure
 
-Redis
+```
+services/
+common/
+docs/
+tests/
+scripts/
+```
 
-PostgreSQL
+## Development Status
 
-Docker
+Current Version:
 
-Kafka
+v0.1.0 (Project Initialization)
 
-ClickHouse
+## Roadmap
 
-GitHub Actions
+Sprint 0
+- Project Initialization
+- Architecture Design
+- Development Standards
+
+Sprint 1
+- Authentication
+- Account Service
+- OMS
+
+## License
+
+See LICENSE file.
