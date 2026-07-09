@@ -1,0 +1,37 @@
+{
+  "title": "ICYQuant Reconciliation Dashboard",
+  "panels": [
+    {
+      "title": "Current Mismatches",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "icyquant_mismatch_total"}
+      ]
+    },
+    {
+      "title": "Repair Success Rate",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "icyquant_repair_success_total / (icyquant_repair_success_total + icyquant_repair_failed_total) * 100"}
+      ]
+    },
+    {
+      "title": "Reconciliation Runs",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "icyquant_reconciliation_total"}
+      ]
+    },
+    {
+      "title": "Replay Latency",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "icyquant_replay_latency"}
+      ]
+    }
+  ]
+}
