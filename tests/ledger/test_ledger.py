@@ -14,6 +14,7 @@ class TestLedgerService:
         entry = LedgerEntry(
             entry_id="e1",
             user_id="u1",
+            event_type="TRADE_FILLED",
             symbol="AAPL",
             ledger_type=LedgerType.POSITION,
             direction=LedgerDirection.CREDIT,
@@ -37,8 +38,8 @@ class TestPositionRebuilder:
     def test_rebuild_positions(self):
         rebuilder = PositionRebuilder()
         entries = [
-            LedgerEntry(entry_id="e1", user_id="u1", symbol="AAPL", ledger_type=LedgerType.POSITION, direction=LedgerDirection.CREDIT, amount=10.0, reference_id="t1", timestamp=datetime.utcnow()),
-            LedgerEntry(entry_id="e2", user_id="u1", symbol="AAPL", ledger_type=LedgerType.POSITION, direction=LedgerDirection.DEBIT, amount=3.0, reference_id="t2", timestamp=datetime.utcnow()),
+            LedgerEntry(entry_id="e1", user_id="u1", event_type="TRADE_FILLED", symbol="AAPL", ledger_type=LedgerType.POSITION, direction=LedgerDirection.CREDIT, amount=10.0, reference_id="t1", timestamp=datetime.utcnow()),
+            LedgerEntry(entry_id="e2", user_id="u1", event_type="TRADE_FILLED", symbol="AAPL", ledger_type=LedgerType.POSITION, direction=LedgerDirection.DEBIT, amount=3.0, reference_id="t2", timestamp=datetime.utcnow()),
         ]
         positions = rebuilder.rebuild(entries)
         assert positions.get("AAPL") == 7.0

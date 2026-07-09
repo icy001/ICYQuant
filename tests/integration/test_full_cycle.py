@@ -3,7 +3,7 @@ import pytest
 from services.execution.adapters.paper import PaperAdapter
 from services.execution.gateway import ExecutionGateway
 from services.oms.models import Order
-from services.oms.service import OrderService
+from services.oms.service import OMSService
 from services.portfolio.portfolio import Portfolio
 from services.risk.dashboard import RiskDashboard
 from services.risk.limits import RiskLimits
@@ -78,7 +78,7 @@ class TestFullCycle:
 
         assert report.allowed is True
 
-        order_service = OrderService()
+        order_service = OMSService()
         order = order_service.create_order("NVDA", "BUY", 100, 480.0)
 
         fill = gateway.send_order(order, TradingMode.PAPER.value)

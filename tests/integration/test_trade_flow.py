@@ -1,7 +1,7 @@
 import pytest
 
 from services.execution.service import ExecutionService
-from services.oms.service import OrderService
+from services.oms.service import OMSService
 from services.portfolio.portfolio import Portfolio
 from services.risk.checker import RiskChecker
 from services.risk.limits import RiskLimits
@@ -14,7 +14,7 @@ class TestTradeFlow:
 
         risk_checker = RiskChecker(RiskLimits())
 
-        order_service = OrderService()
+        order_service = OMSService()
 
         execution_service = ExecutionService()
 
@@ -37,7 +37,7 @@ class TestTradeFlow:
         assert order.status.value == "SUBMITTED"
 
         order = order_service.accept_order(order.order_id)
-        assert order.status.value == "ACCEPTED"
+        assert order.status.value == "ACKNOWLEDGED"
 
         fill = execution_service.execute_order(order)
 
@@ -62,7 +62,7 @@ class TestTradeFlow:
         portfolio.market_prices["NVDA"] = 480.0
 
         risk_checker = RiskChecker(RiskLimits())
-        order_service = OrderService()
+        order_service = OMSService()
         execution_service = ExecutionService()
 
         order = order_service.create_order(
@@ -92,7 +92,7 @@ class TestTradeFlow:
         portfolio.market_prices["NVDA"] = 480.0
 
         risk_checker = RiskChecker(RiskLimits(max_order_quantity=50))
-        order_service = OrderService()
+        order_service = OMSService()
 
         order = order_service.create_order(
             symbol="NVDA",

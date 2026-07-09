@@ -7,6 +7,7 @@ class TradeToLedger:
         cash_entry = LedgerEntry(
             entry_id=f"cash_{trade.trade_id}",
             user_id=trade.user_id,
+            event_type="TRADE_FILLED",
             ledger_type=LedgerType.CASH,
             direction=LedgerDirection.DEBIT,
             amount=trade.price * trade.quantity,
@@ -17,7 +18,10 @@ class TradeToLedger:
         position_entry = LedgerEntry(
             entry_id=f"pos_{trade.trade_id}",
             user_id=trade.user_id,
+            event_type="TRADE_FILLED",
             symbol=trade.symbol,
+            quantity=trade.quantity,
+            price=trade.price,
             ledger_type=LedgerType.POSITION,
             direction=LedgerDirection.CREDIT,
             amount=trade.quantity,
