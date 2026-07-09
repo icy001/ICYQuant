@@ -1,14 +1,14 @@
 from typing import Dict, Optional
 
 from contracts.events.order_event import OrderCreatedEvent, OrderFilledEvent, OrderCancelledEvent
-from services.oms.domain.order import Order
-from services.oms.domain.order_state import OrderSide, OrderType
-from services.oms.repository.order_repository import OrderRepository
+from .models import Order
+from .repository import OrderRepository
+from .state import OrderSide, OrderStatus, OrderType
 
 
 class OrderService:
-    def __init__(self) -> None:
-        self.repository = OrderRepository()
+    def __init__(self, repository: OrderRepository = None) -> None:
+        self.repository = repository or OrderRepository()
 
     def create_order(
         self,
@@ -20,21 +20,13 @@ class OrderService:
     ) -> Order:
         order = Order(
             symbol=symbol,
-            side=OrderSide(side),
+            side=side,
             quantity=quantity,
             price=price,
             order_type=OrderType(order_type),
         )
 
         self.repository.save(order)
-
-        event = OrderCreatedEvent(
-            event_id=order.id,
-            symbol=order.symbol,
-            side=order.side.value,
-            quantity=order.quantity,
-            price=order.price,
-        )
 
         return order
 
@@ -57,13 +49,6 @@ class OrderService:
         if order:
             order.fill(quantity)
             self.repository.save(order)
-
-            event = OrderFilledEvent(
-                event_id=order.id,
-                symbol=order.symbol,
-                quantity=order.quantity,
-                price=order.price,
-            )
         return order
 
     def cancel_order(self, order_id: str) -> Optional[Order]:
@@ -71,11 +56,6 @@ class OrderService:
         if order:
             order.cancel()
             self.repository.save(order)
-
-            event = OrderCancelledEvent(
-                event_id=order.id,
-                symbol=order.symbol,
-            )
         return order
 
     def get_order(self, order_id: str) -> Optional[Order]:

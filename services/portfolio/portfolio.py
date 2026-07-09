@@ -35,6 +35,14 @@ class Portfolio:
             return 0.0
         return self.get_total_position_value() / total_value
 
+    def apply_trade(self, trade) -> None:
+        delta = trade.quantity if trade.side == "BUY" else -trade.quantity
+        self.update_position(trade.symbol, delta)
+        if trade.side == "BUY":
+            self.cash -= trade.quantity * trade.price
+        else:
+            self.cash += trade.quantity * trade.price
+
     def to_dict(self) -> Dict:
         return {
             "cash": self.cash,

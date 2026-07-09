@@ -1,20 +1,25 @@
 import pytest
 
-from services.contracts.events import Event, EventType
-from services.eventbus.publisher import EventPublisher
-from services.execution.service.execution_engine import ExecutionEngine
+from services.execution.service import ExecutionService
+from services.execution.simulator import SimExecution
+from services.oms.models import Order
 
 
-class TestExecutionEngine:
-    def test_on_approved(self):
-        bus = EventPublisher()
-        engine = ExecutionEngine(bus)
+class TestExecutionService:
+    def test_execute_order(self):
+        simulator = SimExecution()
+        engine = ExecutionService(simulator)
 
-        event = Event(
-            event_id="test-event",
-            event_type=EventType.ORDER_APPROVED,
-            order_id="test-order",
-            timestamp=__import__("datetime").datetime.utcnow(),
-            payload={"symbol": "AAPL", "side": "BUY", "quantity": 10.0},
+        order = Order(
+            symbol="NVDA",
+            side="BUY",
+            quantity=100,
+            price=480.0,
         )
-        bus.publish(event)
+
+        fill = engine.execute_order(order)
+
+        assert fill.order_id == order.order_id
+        assert fill.symbol == "NVDA"
+        assert fill.quantity == 100
+        assert fill.price == 480.0

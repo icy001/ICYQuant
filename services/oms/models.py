@@ -2,15 +2,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import uuid4
 
-from .order_state import OrderSide, OrderStatus, OrderType
+from .state import OrderSide, OrderStatus, OrderType
 
 
 @dataclass
 class Order:
-    id: str = field(default_factory=lambda: str(uuid4()))
     symbol: str
-    side: OrderSide
+    side: str
     quantity: float
+    order_id: str = field(default_factory=lambda: str(uuid4()))
     price: float = 0.0
     status: OrderStatus = OrderStatus.NEW
     order_type: OrderType = OrderType.MARKET
@@ -28,11 +28,11 @@ class Order:
             self.updated_at = datetime.utcnow()
 
     def fill(self, quantity: float = None) -> None:
-        if self.status in (OrderStatus.ACCEPTED, OrderStatus.PARTIALLY_FILLED):
+        if self.status in (OrderStatus.ACCEPTED, OrderStatus.PARTIAL_FILLED):
             if quantity is None or quantity >= self.quantity:
                 self.status = OrderStatus.FILLED
             else:
-                self.status = OrderStatus.PARTIALLY_FILLED
+                self.status = OrderStatus.PARTIAL_FILLED
             self.updated_at = datetime.utcnow()
 
     def cancel(self) -> None:
