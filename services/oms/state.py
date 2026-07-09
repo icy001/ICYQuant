@@ -2,13 +2,16 @@ from enum import Enum
 
 
 class OrderStatus(str, Enum):
-    NEW = "NEW"
+    CREATED = "CREATED"
+    RISK_CHECK = "RISK_CHECK"
+    APPROVED = "APPROVED"
     SUBMITTED = "SUBMITTED"
-    ACCEPTED = "ACCEPTED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
     PARTIAL_FILLED = "PARTIAL_FILLED"
     FILLED = "FILLED"
     CANCELLED = "CANCELLED"
     REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class OrderSide(str, Enum):

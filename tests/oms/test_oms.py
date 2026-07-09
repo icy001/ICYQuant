@@ -1,13 +1,13 @@
 import pytest
 
 from services.oms.models import Order
-from services.oms.service import OrderService
+from services.oms.service import OMSService
 from services.oms.state import OrderStatus
 
 
 class TestOMS:
     def test_create_order(self):
-        service = OrderService()
+        service = OMSService()
 
         order = service.create_order(
             symbol="NVDA",
@@ -23,7 +23,7 @@ class TestOMS:
         assert order.price == 480.0
 
     def test_order_state_transitions(self):
-        service = OrderService()
+        service = OMSService()
 
         order = service.create_order(
             symbol="NVDA",
@@ -31,13 +31,13 @@ class TestOMS:
             quantity=100,
         )
 
-        assert order.status == OrderStatus.NEW
+        assert order.status == OrderStatus.CREATED
 
         order = service.submit_order(order.order_id)
         assert order.status == OrderStatus.SUBMITTED
 
         order = service.accept_order(order.order_id)
-        assert order.status == OrderStatus.ACCEPTED
+        assert order.status == OrderStatus.ACKNOWLEDGED
 
         order = service.fill_order(order.order_id)
         assert order.status == OrderStatus.FILLED

@@ -5,7 +5,7 @@ from services.contracts import commands, dto, events, response
 from services.eventbus import EventPublisher, EventSubscriber
 from services.execution import ExecutionService, SimExecution
 from services.ledger import LedgerDirection, LedgerEntry, LedgerService, LedgerType, PositionRebuilder, TradeToLedger
-from services.oms import Order, OrderService, OrderStatus
+from services.oms import Order, OMSService, OrderStatus
 from services.position import PositionService
 from services.risk import RiskEngine
 
@@ -20,7 +20,7 @@ __all__ = [
     "LedgerService",
     "LedgerType",
     "Order",
-    "OrderService",
+    "OMSService",
     "OrderStatus",
     "PositionRebuilder",
     "PositionService",

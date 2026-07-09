@@ -9,6 +9,7 @@ class TradeEvent(BaseEvent):
     symbol: str
     side: str
     quantity: float
+    price: float = 0.0
 
     def __init__(
         self,
@@ -16,6 +17,7 @@ class TradeEvent(BaseEvent):
         symbol: str,
         side: str,
         quantity: float,
+        price: float = 0.0,
         timestamp: datetime = None,
     ) -> None:
         super().__init__(
@@ -25,6 +27,7 @@ class TradeEvent(BaseEvent):
         self.symbol = symbol
         self.side = side
         self.quantity = quantity
+        self.price = price
 
     def apply(
         self,
