@@ -6,7 +6,7 @@ from services.contracts.events import Event, EventType
 EventHandler = Callable[[Event], None]
 
 
-class EventBus:
+class EventPublisher:
     def __init__(self) -> None:
         self.subscribers: dict[EventType, list[EventHandler]] = defaultdict(list)
 

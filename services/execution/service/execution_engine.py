@@ -1,0 +1,39 @@
+from datetime import datetime
+from uuid import uuid4
+
+from services.contracts.events import Event, EventType
+from services.eventbus.publisher import EventPublisher
+
+
+class ExecutionEngine:
+    def __init__(self, bus: EventPublisher) -> None:
+        self.bus = bus
+        self.bus.subscribe(EventType.ORDER_APPROVED, self.on_approved)
+
+    def on_approved(self, event: Event) -> None:
+        order = event.payload
+
+        self.bus.publish(
+            Event(
+                event_id=str(uuid4()),
+                event_type=EventType.ORDER_SENT,
+                order_id=event.order_id,
+                timestamp=datetime.utcnow(),
+                payload=order,
+            )
+        )
+
+        trade_event = Event(
+            event_id=str(uuid4()),
+            event_type=EventType.TRADE_EXECUTED,
+            order_id=event.order_id,
+            timestamp=datetime.utcnow(),
+            payload={
+                "symbol": order.get("symbol"),
+                "side": order.get("side"),
+                "price": order.get("price", 100),
+                "qty": order.get("quantity", 0),
+            },
+        )
+
+        self.bus.publish(trade_event)
