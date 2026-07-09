@@ -1,77 +1,109 @@
 # ICYQuant
 
-> Professional Quantitative Trading Platform
+> Institutional-grade quantitative trading infrastructure.
 
-## 项目定位（V1）
+## Core Positioning
 
-ICYQuant 是一个面向量化交易学习与工程实践的开源交易平台。
+ICYQuant is a production-grade quantitative trading infrastructure designed for institutional-grade trading operations.
 
-## 一句话介绍
+## Current Module
 
-ICYQuant 是一个面向量化交易学习与工程实践的开源交易平台，集行情、订单管理、风险控制、策略回测和因子研究于一体。
+### Reconciliation Engine
 
+**Purpose:** Detect, Analyze, Repair state inconsistency between trading components.
 
+## Features
 
-ICYQuant is an open-source quantitative trading platform designed for learning, research, and professional engineering practice.
+### Reconciliation Engine (v0.2.4-alpha1)
 
-The project aims to simulate the architecture of modern quantitative trading systems by integrating market data, order management, risk control, backtesting, portfolio analytics, and AI-assisted research into a unified platform.
-
-## Vision
-
-Build a production-grade quantitative trading platform with engineering best practices.
-
-## Features (Roadmap)
-
-- Order Management System (OMS)
-- Market Data Service
-- Risk Engine
-- Portfolio Management
-- Strategy Engine
-- Backtesting Framework
-- Factor Research
-- AI Research Assistant
-- Monitoring & Observability
+- **Domain Models**: PositionSnapshot, LedgerSnapshot, ReconciliationResult
+- **Compare Engine**: Ledger vs Position difference detection
+- **Replay Engine**: Event-based position rebuilding
+- **Repair Engine**: RepairCommand pattern for automated fixes
+- **API Layer**: FastAPI with health check endpoint
+- **Testing**: Complete unit test framework
 
 ## Technology Stack
 
-- Python
+- Python 3.9+
 - FastAPI
-- PostgreSQL
-- Redis
-- Docker
-- Kafka
-- ClickHouse
+- PostgreSQL 16
+- Redis 7
+- Docker / Docker Compose
 - Pytest
-- GitHub Actions
+- Ruff
 
 ## Repository Structure
 
 ```
-services/
-common/
-docs/
-tests/
-scripts/
+ICYQuant/
+├── common/              # Base classes and exceptions
+├── contracts/           # Shared event/command contracts
+├── services/
+│   └── reconciliation/  # Reconciliation Engine
+│       ├── api/         # REST API endpoints
+│       ├── compare/     # Comparator framework
+│       ├── models/      # Domain models
+│       ├── repair/      # Repair workflow
+│       ├── replay/      # Event replay engine
+│       ├── scheduler/   # Scheduling
+│       └── snapshot/    # Snapshot management
+├── tests/               # Unit tests
+├── docs/                # Documentation
+├── docker-compose.yml   # Docker environment
+├── Makefile             # Development commands
+└── pyproject.toml       # Project configuration
 ```
 
 ## Development Status
 
-Current Version:
+**Current Version:** v0.2.4-alpha1
 
-v0.1.0 (Project Initialization)
+### Alpha1 Completion Status
+
+| Module | Status |
+|--------|--------|
+| Repository Structure | ✅ |
+| Reconciliation Domain | ✅ |
+| Compare Engine | ✅ |
+| Replay Engine | ✅ |
+| Repair Engine | ✅ |
+| API Health Check | ✅ |
+| Tests | ✅ |
+| Docker Environment | ✅ |
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
+- Docker
+- Docker Compose
+
+### Installation
+
+```bash
+make install
+```
+
+### Run Tests
+
+```bash
+make test
+```
+
+### Start Docker Environment
+
+```bash
+docker-compose up -d
+```
 
 ## Roadmap
 
-Sprint 0
-- Project Initialization
-- Architecture Design
-- Development Standards
-
-Sprint 1
-- Authentication
-- Account Service
-- OMS
+- **Sprint 2.4**: Reconciliation Engine (Current)
+- **Sprint 2.5**: Position Context & Comparator Implementations
+- **Sprint 3.0**: Production Readiness
 
 ## License
 
-See LICENSE file.
+MIT License. See LICENSE file.
