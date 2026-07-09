@@ -14,12 +14,16 @@ ICYQuant is a production-grade quantitative trading infrastructure designed for 
 
 ## Features
 
-### Reconciliation Engine (v0.2.4-alpha1)
+### Reconciliation Engine (v0.2.4-alpha2)
 
 - **Domain Models**: PositionSnapshot, LedgerSnapshot, ReconciliationResult
 - **Compare Engine**: Ledger vs Position difference detection
-- **Replay Engine**: Event-based position rebuilding
-- **Repair Engine**: RepairCommand pattern for automated fixes
+- **Event Store**: Event sourcing abstraction with in-memory storage
+- **Trade Event**: Domain event with apply method for position calculation
+- **Snapshot Engine**: Avoid replaying millions of events
+- **Replay Engine V2**: Rebuild position from snapshot + incremental events
+- **Repair Engine**: RepairCommand pattern + RepairWorkflow with audit trail
+- **Audit Trail**: Track who, when, why, and what changed
 - **API Layer**: FastAPI with health check endpoint
 - **Testing**: Complete unit test framework
 
@@ -39,7 +43,9 @@ ICYQuant is a production-grade quantitative trading infrastructure designed for 
 ICYQuant/
 ├── common/              # Base classes and exceptions
 ├── contracts/           # Shared event/command contracts
+│   └── events/          # Event definitions (BaseEvent, TradeEvent)
 ├── services/
+│   ├── eventstore/      # Event sourcing abstraction
 │   └── reconciliation/  # Reconciliation Engine
 │       ├── api/         # REST API endpoints
 │       ├── compare/     # Comparator framework
@@ -57,20 +63,21 @@ ICYQuant/
 
 ## Development Status
 
-**Current Version:** v0.2.4-alpha1
+**Current Version:** v0.2.4-alpha2
 
-### Alpha1 Completion Status
+### Alpha2 Completion Status
 
-| Module | Status |
-|--------|--------|
-| Repository Structure | ✅ |
-| Reconciliation Domain | ✅ |
-| Compare Engine | ✅ |
-| Replay Engine | ✅ |
-| Repair Engine | ✅ |
-| API Health Check | ✅ |
-| Tests | ✅ |
-| Docker Environment | ✅ |
+| Ability | Status |
+|---------|--------|
+| Mismatch Detection | ✅ |
+| Event Store | ✅ |
+| Trade Event Model | ✅ |
+| Snapshot | ✅ |
+| Replay Rebuild | ✅ |
+| Repair Workflow | ✅ |
+| Audit Trail | ✅ |
+| Persistence Interface | ✅ |
+| Test Suite | ✅ |
 
 ## Getting Started
 

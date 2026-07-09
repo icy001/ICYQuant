@@ -1,20 +1,14 @@
-import pytest
-
-from services.contracts.dto import PositionDTO
-from services.reconciliation.snapshot.snapshot_service import SnapshotService
+from services.reconciliation.snapshot_engine import PositionSnapshot, SnapshotEngine
 
 
-class TestSnapshotService:
-    def test_create_snapshot(self):
-        service = SnapshotService()
-        positions = [PositionDTO(user_id="u1", symbol="AAPL", quantity=100.0)]
-        snapshot = service.create_snapshot(positions, [], [], [])
-        assert snapshot.snapshot_id is not None
-        assert len(snapshot.positions) == 1
+def test_position_snapshot_creation():
+    snapshot = PositionSnapshot(symbol="NVDA", quantity=100)
+    assert snapshot.symbol == "NVDA"
+    assert snapshot.quantity == 100
 
-    def test_get_recent_snapshots(self):
-        service = SnapshotService()
-        for i in range(15):
-            service.create_snapshot([PositionDTO(user_id="u1", symbol=f"SYMBOL{i}", quantity=100.0)], [], [], [])
-        recent = service.get_recent_snapshots(limit=10)
-        assert len(recent) == 10
+
+def test_snapshot_engine_create():
+    engine = SnapshotEngine()
+    snapshot = engine.create("AAPL", 50)
+    assert snapshot.symbol == "AAPL"
+    assert snapshot.quantity == 50

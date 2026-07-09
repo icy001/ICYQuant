@@ -1,3 +1,8 @@
+from typing import Any, List
+
+from .snapshot_engine import PositionSnapshot
+
+
 class ReplayEngine:
     def replay(
         self,
@@ -12,3 +17,15 @@ class ReplayEngine:
                 quantity -= event["quantity"]
 
         return quantity
+
+    def rebuild(
+        self,
+        snapshot: PositionSnapshot,
+        events: List[Any],
+    ) -> float:
+        position = snapshot.quantity
+
+        for event in events:
+            position = event.apply(position)
+
+        return position
