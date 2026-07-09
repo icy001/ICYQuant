@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from services.oms.domain.order import Order
+from .models import Order
 
 
 class OrderRepository:
@@ -8,7 +8,7 @@ class OrderRepository:
         self._orders: Dict[str, Order] = {}
 
     def save(self, order: Order) -> None:
-        self._orders[order.id] = order
+        self._orders[order.order_id] = order
 
     def get(self, order_id: str) -> Optional[Order]:
         return self._orders.get(order_id)

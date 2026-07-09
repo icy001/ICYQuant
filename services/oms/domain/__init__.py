@@ -1,1 +1,0 @@
-"""OMS domain layer."""
