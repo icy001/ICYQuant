@@ -32,6 +32,15 @@ from .health import (
     unhealthy,
 )
 
+from .prometheus import (
+    record_order,
+    record_order_failure,
+    record_ledger_event,
+    set_active_requests,
+    observe_latency,
+    export_metrics,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -49,4 +58,10 @@ __all__ = [
     "HealthCheck",
     "healthy",
     "unhealthy",
+    "record_order",
+    "record_order_failure",
+    "record_ledger_event",
+    "set_active_requests",
+    "observe_latency",
+    "export_metrics",
 ]
