@@ -1,43 +1,13 @@
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Optional
 
-from research.strategy.context import StrategyContext
-
-
-@dataclass
-class Order:
-    order_id: str
-    symbol: str
-    side: str
-    quantity: float
-    price: float = 0.0
-    status: str = "CREATED"
-    created_at: datetime = None
-
-    def __post_init__(self):
-        if self.created_at is None:
-            self.created_at = datetime.utcnow()
-
-
-@dataclass
-class Fill:
-    fill_id: str
-    order_id: str
-    symbol: str
-    side: str
-    quantity: float
-    price: float
-    cash_change: float
-    filled_at: datetime = None
-
-    def __post_init__(self):
-        if self.filled_at is None:
-            self.filled_at = datetime.utcnow()
+from .context import BacktestContext
+from .order import Order
+from .fill import Fill
 
 
 class BacktestBroker:
-    def __init__(self, context: StrategyContext):
+    def __init__(self, context: BacktestContext):
         self.context = context
         self._orders = {}
         self._fills = {}
