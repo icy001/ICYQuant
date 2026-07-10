@@ -64,6 +64,15 @@ from .correlation import (
     update_event,
 )
 
+from .audit import (
+    AuditEvent,
+    create_audit_event,
+)
+
+from .audit_store import (
+    AuditStore,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -98,4 +107,7 @@ __all__ = [
     "get_correlation",
     "update_order",
     "update_event",
+    "AuditEvent",
+    "create_audit_event",
+    "AuditStore",
 ]
