@@ -1,4 +1,4 @@
-from services.database.config import (
+from services.database import (
     load_database_settings,
 )
 
