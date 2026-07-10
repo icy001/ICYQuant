@@ -20,10 +20,26 @@ from .session import (
 )
 
 
+from .base import (
+    Base,
+)
+
+
+from .mixins import (
+    UUIDMixin,
+    TimestampMixin,
+    SoftDeleteMixin,
+)
+
+
 __all__ = [
     "DatabaseSettings",
     "load_database_settings",
     "create_engine",
     "SessionFactory",
     "get_session",
+    "Base",
+    "UUIDMixin",
+    "TimestampMixin",
+    "SoftDeleteMixin",
 ]
