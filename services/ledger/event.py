@@ -1,30 +1,81 @@
+"""
+Ledger event domain model.
+
+A LedgerEvent represents an immutable
+state transition in ICYQuant.
+
+Examples:
+
+ORDER_FILLED
+CASH_DEPOSITED
+COMMISSION_CHARGED
+
+The ledger never stores current state.
+It stores facts about what happened.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
-
-class LedgerEventType(Enum):
-    DEPOSIT = "DEPOSIT"
-    WITHDRAWAL = "WITHDRAWAL"
-    ORDER_CREATED = "ORDER_CREATED"
-    ORDER_FILLED = "ORDER_FILLED"
-    ORDER_PARTIALLY_FILLED = "ORDER_PARTIALLY_FILLED"
-    ORDER_CANCELLED = "ORDER_CANCELLED"
-    ORDER_REJECTED = "ORDER_REJECTED"
-    COMMISSION_CHARGED = "COMMISSION_CHARGED"
-    DIVIDEND_RECEIVED = "DIVIDEND_RECEIVED"
-    CASH_ADJUSTED = "CASH_ADJUSTED"
-    MARKET_PRICE_UPDATED = "MARKET_PRICE_UPDATED"
-    POSITION_OPENED = "POSITION_OPENED"
-    POSITION_CLOSED = "POSITION_CLOSED"
+from .event_type import LedgerEventType
+from .exceptions import EventValidationError
 
 
-@dataclass
+@dataclass(frozen=True)
 class LedgerEvent:
+    """
+    Immutable ledger event.
+
+    Once written into ledger,
+    it must never be modified.
+    """
+
     event_type: LedgerEventType
+    payload: Mapping[str, Any]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_id: UUID = field(default_factory=uuid4)
-    timestamp: datetime = field(default_factory=lambda: datetime.utcnow())
-    payload: Dict = field(default_factory=dict)
-    stream_id: str = "default"
+    aggregate_id: str | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate event integrity.
+        """
+        if not isinstance(self.payload, Mapping):
+            raise EventValidationError("payload must be mapping")
+
+        if not self.payload:
+            raise EventValidationError("event payload cannot be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Serialize event.
+
+        Used by:
+        - SQLite storage
+        - API transport
+        - Debugging
+        """
+        return {
+            "event_id": str(self.event_id),
+            "event_type": self.event_type.value,
+            "timestamp": self.timestamp.isoformat(),
+            "aggregate_id": self.aggregate_id,
+            "payload": dict(self.payload),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "LedgerEvent":
+        """
+        Deserialize event.
+        """
+        return cls(
+            event_id=UUID(data["event_id"]),
+            event_type=LedgerEventType(data["event_type"]),
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            aggregate_id=data.get("aggregate_id"),
+            payload=data["payload"],
+        )

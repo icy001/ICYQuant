@@ -1,32 +1,47 @@
-from .event import LedgerEvent, LedgerEventType
-from .store import EventStore, InMemoryEventStore
+"""
+ICYQuant Ledger Service.
+
+Event sourced accounting core.
+
+The ledger is the single source
+of truth for trading state.
+"""
+
+from .event import LedgerEvent
+from .event_type import LedgerEventType
+from .exceptions import (
+    DuplicateEventError,
+    EventStoreError,
+    EventValidationError,
+    LedgerError,
+)
 from .ledger import Ledger
-from .projector import Projection
-from .cash_projection import CashProjection
-from .position_projection import PositionProjection
-from .pnl_projection import PnLProjection
-from .snapshot import Snapshot, SnapshotManager
-from .models.entry import LedgerDirection, LedgerEntry, LedgerType
-from .service.service import LedgerService
-from .service.rebuilder import PositionRebuilder
-from .service.transformer import TradeToLedger
+from .memory_store import MemoryEventStore
+from .models import LedgerDirection, LedgerEntry, LedgerType
+from .repository import EventRepository, LedgerRepository
+from .service import CashRebuilder, LedgerService, PositionRebuilder, TradeToLedger
+from .sqlite_store import SQLiteEventStore
+from .store import EventStore, InMemoryEventStore
 
 __all__ = [
     "LedgerEvent",
     "LedgerEventType",
+    "MemoryEventStore",
+    "SQLiteEventStore",
+    "LedgerRepository",
+    "LedgerError",
+    "EventValidationError",
+    "EventStoreError",
+    "DuplicateEventError",
     "EventStore",
     "InMemoryEventStore",
+    "EventRepository",
     "Ledger",
-    "Projection",
-    "CashProjection",
-    "PositionProjection",
-    "PnLProjection",
-    "Snapshot",
-    "SnapshotManager",
+    "LedgerService",
+    "TradeToLedger",
+    "PositionRebuilder",
+    "CashRebuilder",
     "LedgerDirection",
     "LedgerEntry",
-    "LedgerService",
     "LedgerType",
-    "PositionRebuilder",
-    "TradeToLedger",
 ]

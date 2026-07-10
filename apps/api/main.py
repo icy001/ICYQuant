@@ -16,6 +16,22 @@ from apps.api.middleware.logging import (
     LoggingMiddleware,
 )
 
+from apps.api.middleware.otel import (
+    OpenTelemetryMiddleware,
+)
+
+from apps.api.exception_handler import (
+    global_exception_handler,
+)
+
+from apps.api.health import (
+    router as health_router,
+)
+
+from apps.api.metrics import (
+    router as metrics_router,
+)
+
 
 app = FastAPI(
     title="ICYQuant API",
@@ -30,6 +46,27 @@ app.add_middleware(
 
 app.add_middleware(
     LoggingMiddleware
+)
+
+
+app.add_middleware(
+    OpenTelemetryMiddleware
+)
+
+
+app.add_exception_handler(
+    Exception,
+    global_exception_handler
+)
+
+
+app.include_router(
+    health_router
+)
+
+
+app.include_router(
+    metrics_router
 )
 
 

@@ -8,6 +8,36 @@ ICYQuant is a production-grade quantitative trading infrastructure designed for 
 
 ## Current Module
 
+### Ledger Service (v0.3.0-beta2)
+
+ICYQuant Ledger uses an event sourced architecture.
+
+The ledger stores facts, not state.
+
+Example:
+
+```
+ExecutionReport
+    ↓
+LedgerEvent
+    ↓
+EventStore
+    ↓
+Projection
+    ↓
+Portfolio State
+```
+
+Supported stores:
+
+- MemoryEventStore
+- SQLiteEventStore
+
+Future:
+
+- PostgreSQL Event Store
+- Kafka Event Stream
+
 ### Reconciliation Engine (v0.2.4)
 
 **Purpose:** Detect, Analyze, Replay, Repair, Verify, Audit state inconsistency between trading components.

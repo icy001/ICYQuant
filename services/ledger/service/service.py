@@ -1,52 +1,107 @@
 from datetime import datetime
-from uuid import uuid4
+from typing import List, Optional
+from uuid import UUID
 
-from services.ledger.models.entry import LedgerEntry, LedgerType, LedgerDirection
+from services.contracts.dto import TradeDTO
+
+from ..event import LedgerEvent
+from ..event_type import LedgerEventType
+from ..exceptions import EventValidationError
+from ..repository import EventRepository
 
 
 class LedgerService:
-    def __init__(self) -> None:
-        self.entries: list[LedgerEntry] = []
+    def __init__(self, event_repository: EventRepository) -> None:
+        self._event_repository = event_repository
 
-    def record(self, entry: LedgerEntry) -> None:
-        self.entries.append(entry)
+    def record_event(self, event: LedgerEvent) -> None:
+        self._validate_event(event)
+        self._event_repository.save(event)
 
-    def record_trade(self, trade_event, user_id: str = "default") -> LedgerEntry:
-        cash_change = -trade_event.quantity * trade_event.price if trade_event.side == "BUY" else trade_event.quantity * trade_event.price
-        direction = LedgerDirection.DEBIT if trade_event.side == "BUY" else LedgerDirection.CREDIT
-
-        entry = LedgerEntry(
-            entry_id=str(uuid4()),
-            user_id=user_id,
-            event_type="TRADE_FILLED",
-            symbol=trade_event.symbol,
-            quantity=trade_event.quantity,
-            price=trade_event.price,
-            cash_change=cash_change,
-            ledger_type=LedgerType.TRADE,
-            direction=direction,
-            amount=abs(cash_change),
-            reference_id=trade_event.event_id,
-            timestamp=trade_event.timestamp or datetime.utcnow(),
+    def record_deposit(self, user_id: str, amount: float) -> LedgerEvent:
+        event = LedgerEvent(
+            event_type=LedgerEventType.CASH_DEPOSITED,
+            aggregate_id=user_id,
+            payload={
+                "user_id": user_id,
+                "amount": amount,
+                "currency": "USD",
+            },
         )
+        self.record_event(event)
+        return event
 
-        self.entries.append(entry)
-        return entry
+    def record_withdrawal(self, user_id: str, amount: float) -> LedgerEvent:
+        event = LedgerEvent(
+            event_type=LedgerEventType.CASH_WITHDRAWN,
+            aggregate_id=user_id,
+            payload={
+                "user_id": user_id,
+                "amount": amount,
+                "currency": "USD",
+            },
+        )
+        self.record_event(event)
+        return event
 
-    def get_all(self, user_id: str) -> list[LedgerEntry]:
-        return [entry for entry in self.entries if entry.user_id == user_id]
+    def record_order_created(self, user_id: str, order_id: str, symbol: str, side: str, quantity: float) -> LedgerEvent:
+        event = LedgerEvent(
+            event_type=LedgerEventType.ORDER_CREATED,
+            aggregate_id=user_id,
+            payload={
+                "user_id": user_id,
+                "order_id": order_id,
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+            },
+        )
+        self.record_event(event)
+        return event
 
-    def get_by_symbol(self, symbol: str) -> list[LedgerEntry]:
-        return [entry for entry in self.entries if entry.symbol == symbol]
+    def record_order_filled(self, user_id: str, order_id: str, symbol: str, side: str, quantity: float, price: float) -> LedgerEvent:
+        cash_change = -quantity * price if side == "BUY" else quantity * price
+        event = LedgerEvent(
+            event_type=LedgerEventType.ORDER_FILLED,
+            aggregate_id=user_id,
+            payload={
+                "user_id": user_id,
+                "order_id": order_id,
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+                "price": price,
+                "cash_change": cash_change,
+            },
+        )
+        self.record_event(event)
+        return event
 
-    def get_by_event_type(self, event_type: str) -> list[LedgerEntry]:
-        return [entry for entry in self.entries if entry.event_type == event_type]
+    def record_commission(self, user_id: str, amount: float, reference_id: str) -> LedgerEvent:
+        event = LedgerEvent(
+            event_type=LedgerEventType.COMMISSION_CHARGED,
+            aggregate_id=user_id,
+            payload={
+                "user_id": user_id,
+                "amount": amount,
+                "reference_id": reference_id,
+            },
+        )
+        self.record_event(event)
+        return event
 
-    def get_balance(self, user_id: str) -> float:
-        balance = 0.0
-        for entry in self.get_all(user_id):
-            if entry.direction == LedgerDirection.CREDIT:
-                balance += entry.amount
-            else:
-                balance -= entry.amount
-        return balance
+    def get_events(self, user_id: str) -> List[LedgerEvent]:
+        return self._event_repository.get_by_stream(user_id)
+
+    def get_event(self, event_id: UUID) -> Optional[LedgerEvent]:
+        return self._event_repository.get_by_id(event_id)
+
+    def get_all_events(self) -> List[LedgerEvent]:
+        return self._event_repository.get_all()
+
+    def replay(self) -> List[LedgerEvent]:
+        return self._event_repository.replay()
+
+    def _validate_event(self, event: LedgerEvent) -> None:
+        if not event.event_type:
+            raise EventValidationError("Event type is required")

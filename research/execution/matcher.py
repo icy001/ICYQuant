@@ -34,7 +34,8 @@ class MatchingEngine:
             quantity=order.quantity,
             fill_price=adjusted_price,
             commission=commission,
-            slippage=slippage_amount
+            slippage=slippage_amount,
+            side=order.side
         )
 
         return fill
