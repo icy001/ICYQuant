@@ -1,64 +1,74 @@
 import pytest
 
-from services.portfolio.portfolio import Portfolio
-from services.risk.limits import RiskLimits
-from services.risk.monitor import RiskMonitor
+from services.risk.drawdown import MaxDrawdownRule
+from services.risk.context import RiskContext
+from services.risk.result import RiskDecision
+from research.execution.order import Order, Side, OrderType
+from research.portfolio.portfolio import Portfolio
 
 
-class TestDrawdown:
-    def test_risk_monitor_initial(self):
-        limits = RiskLimits(max_drawdown=0.03)
-        monitor = RiskMonitor(limits)
+class TestMaxDrawdownRule:
 
-        account = {"cash": 100000.0}
-        portfolio = Portfolio(cash=100000.0)
+    def test_drawdown_within_limit(self):
+        rule = MaxDrawdownRule(max_drawdown=0.10)
 
-        monitor.update(account, portfolio)
+        order = Order(symbol="NVDA", side=Side.BUY, quantity=100, order_type=OrderType.MARKET)
+        portfolio = Portfolio(initial_cash=95000.0)
+        portfolio.max_equity = 100000.0
 
-        assert monitor.metrics.drawdown == 0.0
-        assert monitor.allow_trade(account) is True
+        context = RiskContext(
+            portfolio=portfolio,
+            account_equity=95000.0
+        )
 
-    def test_risk_monitor_drawdown_within_limit(self):
-        limits = RiskLimits(max_drawdown=0.03)
-        monitor = RiskMonitor(limits)
+        result = rule.evaluate(order, context)
 
-        account = {"cash": 100000.0}
-        portfolio = Portfolio(cash=100000.0)
-        monitor.update(account, portfolio)
+        assert result.decision == RiskDecision.PASS
 
-        account = {"cash": 98000.0}
-        portfolio = Portfolio(cash=98000.0)
-        monitor.update(account, portfolio)
+    def test_drawdown_exceeds_limit(self):
+        rule = MaxDrawdownRule(max_drawdown=0.10)
 
-        assert monitor.metrics.drawdown == 0.02
-        assert monitor.allow_trade(account) is True
+        order = Order(symbol="NVDA", side=Side.BUY, quantity=100, order_type=OrderType.MARKET)
+        portfolio = Portfolio(initial_cash=88000.0)
+        portfolio.max_equity = 100000.0
 
-    def test_risk_monitor_drawdown_exceeds_limit(self):
-        limits = RiskLimits(max_drawdown=0.03)
-        monitor = RiskMonitor(limits)
+        context = RiskContext(
+            portfolio=portfolio,
+            account_equity=88000.0
+        )
 
-        account = {"cash": 100000.0}
-        portfolio = Portfolio(cash=100000.0)
-        monitor.update(account, portfolio)
+        result = rule.evaluate(order, context)
 
-        account = {"cash": 96000.0}
-        portfolio = Portfolio(cash=96000.0)
-        monitor.update(account, portfolio)
+        assert result.decision == RiskDecision.REJECT
+        assert "Drawdown" in result.message
 
-        assert monitor.metrics.drawdown == 0.04
-        assert monitor.allow_trade(account) is False
+    def test_drawdown_at_limit(self):
+        rule = MaxDrawdownRule(max_drawdown=0.10)
 
-    def test_risk_monitor_exposure(self):
-        limits = RiskLimits(max_exposure=0.5)
-        monitor = RiskMonitor(limits)
+        order = Order(symbol="NVDA", side=Side.BUY, quantity=100, order_type=OrderType.MARKET)
+        portfolio = Portfolio(initial_cash=90000.0)
+        portfolio.max_equity = 100000.0
 
-        portfolio = Portfolio(cash=100000.0)
-        portfolio.market_prices["NVDA"] = 480.0
-        portfolio.positions["NVDA"] = 100
+        context = RiskContext(
+            portfolio=portfolio,
+            account_equity=90000.0
+        )
 
-        account = {"cash": 100000.0}
-        monitor.update(account, portfolio)
+        result = rule.evaluate(order, context)
 
-        expected_exposure = (100 * 480) / (100000 + 100 * 480)
-        assert monitor.metrics.exposure == pytest.approx(expected_exposure)
-        assert monitor.allow_trade(account) is True
+        assert result.decision == RiskDecision.REJECT
+
+    def test_drawdown_no_max_equity(self):
+        rule = MaxDrawdownRule(max_drawdown=0.10)
+
+        order = Order(symbol="NVDA", side=Side.BUY, quantity=100, order_type=OrderType.MARKET)
+        portfolio = Portfolio(initial_cash=100000.0)
+
+        context = RiskContext(
+            portfolio=portfolio,
+            account_equity=100000.0
+        )
+
+        result = rule.evaluate(order, context)
+
+        assert result.decision == RiskDecision.PASS

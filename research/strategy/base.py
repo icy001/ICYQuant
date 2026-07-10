@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict, List
+
+from research.data.bar import Bar
+
+from .signal import Signal, SignalType
 
 
 class Strategy(ABC):
@@ -15,13 +19,20 @@ class Strategy(ABC):
         self._data_provider = data_provider
         self._initialized = True
 
-    @abstractmethod
     def on_start(self):
         pass
 
     @abstractmethod
-    def on_bar(self, bar):
+    def on_bar(self, bar: Bar) -> Signal:
         pass
+
+    def on_market(self, market_data: Dict[str, Bar]) -> List[Signal]:
+        signals = []
+        for symbol, bar in market_data.items():
+            signal = self.on_bar(bar)
+            if signal:
+                signals.append(signal)
+        return signals
 
     def on_order(self, order):
         pass
@@ -29,7 +40,6 @@ class Strategy(ABC):
     def on_fill(self, fill):
         pass
 
-    @abstractmethod
     def on_finish(self):
         pass
 

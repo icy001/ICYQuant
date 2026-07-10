@@ -1,8 +1,13 @@
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
+from .context import RiskContext
+from .result import RiskResult
 
-class RiskRule:
-    def check(self, order, portfolio) -> Dict[str, bool]:
+
+class RiskRule(ABC):
+    @abstractmethod
+    def evaluate(self, order, context: RiskContext) -> RiskResult:
         pass
 
 
@@ -18,6 +23,9 @@ class PositionSizeRule(RiskRule):
             "reason": f"Position {order.symbol} would exceed max size {self.max_size}" if abs(new_position) > self.max_size else "",
         }
 
+    def evaluate(self, order, context: RiskContext) -> RiskResult:
+        return self.check(order, context.portfolio)
+
 
 class CashBalanceRule(RiskRule):
     def __init__(self, min_balance: float):
@@ -31,6 +39,9 @@ class CashBalanceRule(RiskRule):
             "reason": f"Insufficient cash for order" if not has_enough_cash else "",
         }
 
+    def evaluate(self, order, context: RiskContext) -> RiskResult:
+        return self.check(order, context.portfolio)
+
 
 class OrderQuantityRule(RiskRule):
     def __init__(self, max_quantity: float):
@@ -41,6 +52,9 @@ class OrderQuantityRule(RiskRule):
             "order_quantity": order.quantity <= self.max_quantity,
             "reason": f"Order quantity exceeds max {self.max_quantity}" if order.quantity > self.max_quantity else "",
         }
+
+    def evaluate(self, order, context: RiskContext) -> RiskResult:
+        return self.check(order, context.portfolio)
 
 
 class ExposureRule(RiskRule):
@@ -55,3 +69,6 @@ class ExposureRule(RiskRule):
             "exposure": new_exposure <= self.max_exposure,
             "reason": f"Exposure would exceed {self.max_exposure}" if new_exposure > self.max_exposure else "",
         }
+
+    def evaluate(self, order, context: RiskContext) -> RiskResult:
+        return self.check(order, context.portfolio)
