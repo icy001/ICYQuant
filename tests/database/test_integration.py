@@ -110,6 +110,16 @@ async def test_transaction_commit(
         )
 
 
+    async with session_factory() as session:
+        result = await session.execute(
+            select(UserModel).where(
+                UserModel.name == "commit_user"
+            )
+        )
+        users = result.scalars().all()
+        assert len(users) == 1
+
+
 @pytest.mark.asyncio
 async def test_transaction_rollback(
     session_factory,
@@ -139,3 +149,13 @@ async def test_transaction_rollback(
             raise ValueError(
                 "rollback"
             )
+
+
+    async with session_factory() as session:
+        result = await session.execute(
+            select(UserModel).where(
+                UserModel.name == "rollback_user"
+            )
+        )
+        users = result.scalars().all()
+        assert len(users) == 0
