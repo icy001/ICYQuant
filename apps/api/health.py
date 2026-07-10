@@ -6,26 +6,29 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from services.observability.health import (
-    healthy,
+from services.database import (
+    DatabaseHealth,
+    create_engine,
+    load_database_settings,
 )
 
 
 router = APIRouter()
 
 
-@router.get(
-    "/health"
+engine = create_engine(
+    load_database_settings()
 )
-async def health_check():
-    result = healthy(
-        "icyquant-api"
-    )
-    return {
-        "service":
-        result.service,
-        "status":
-        result.status.value,
-        "message":
-        result.message,
-    }
+
+
+database_health = DatabaseHealth(
+    engine
+)
+
+
+@router.get(
+    "/health/database"
+)
+async def database_health_check():
+
+    return await database_health.check()
