@@ -37,6 +37,11 @@ from .repository import (
 )
 
 
+from .transaction import (
+    TransactionManager,
+)
+
+
 __all__ = [
     "DatabaseSettings",
     "load_database_settings",
@@ -48,4 +53,5 @@ __all__ = [
     "TimestampMixin",
     "SoftDeleteMixin",
     "Repository",
+    "TransactionManager",
 ]
