@@ -15,8 +15,7 @@ from .engine import (
 
 
 from .session import (
-    get_engine,
-    get_session_factory,
+    SessionFactory,
     get_session,
 )
 
@@ -25,7 +24,6 @@ __all__ = [
     "DatabaseSettings",
     "load_database_settings",
     "create_engine",
-    "get_engine",
-    "get_session_factory",
+    "SessionFactory",
     "get_session",
 ]
