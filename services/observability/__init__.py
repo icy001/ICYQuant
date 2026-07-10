@@ -55,6 +55,15 @@ from .config import (
     ObservabilityConfig,
 )
 
+from .correlation import (
+    CorrelationContext,
+    create_correlation,
+    set_correlation,
+    get_correlation,
+    update_order,
+    update_event,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -83,4 +92,10 @@ __all__ = [
     "ObservabilitySettings",
     "load_settings",
     "ObservabilityConfig",
+    "CorrelationContext",
+    "create_correlation",
+    "set_correlation",
+    "get_correlation",
+    "update_order",
+    "update_event",
 ]
