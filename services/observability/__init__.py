@@ -46,6 +46,15 @@ from .tracing import (
     SpanContext,
 )
 
+from .settings import (
+    ObservabilitySettings,
+    load_settings,
+)
+
+from .config import (
+    ObservabilityConfig,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -71,4 +80,7 @@ __all__ = [
     "export_metrics",
     "Tracer",
     "SpanContext",
+    "ObservabilitySettings",
+    "load_settings",
+    "ObservabilityConfig",
 ]
