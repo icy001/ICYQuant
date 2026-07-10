@@ -1,0 +1,3 @@
+"""
+ICYQuant background worker.
+"""

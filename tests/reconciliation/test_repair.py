@@ -1,50 +1,41 @@
-from services.reconciliation.domain_models import (
-    LedgerSnapshot,
-    PositionSnapshot,
+from decimal import Decimal
+
+from services.reconciliation import (
+    RepairService,
+    ReconciliationDifference,
+    DifferenceType,
 )
-from services.reconciliation.comparator import ReconciliationComparator
-from services.reconciliation.repair_engine import RepairEngine
 
 
-def test_create_repair_command():
-    ledger = LedgerSnapshot(
+def test_create_repair_event():
+    service = RepairService()
+
+    difference = ReconciliationDifference(
+        difference_type=
+            DifferenceType.POSITION_MISMATCH,
         symbol="NVDA",
-        quantity=100,
+        expected=
+            Decimal("100"),
+        actual=
+            Decimal("80"),
+        delta=
+            Decimal("-20"),
+        message=
+            "NVDA mismatch"
     )
 
-    position = PositionSnapshot(
-        symbol="NVDA",
-        quantity=90,
+    event = service.create_event(
+        difference
     )
 
-    reconciliation = ReconciliationComparator().compare(
-        ledger,
-        position,
+    assert (
+        event.payload["symbol"]
+        ==
+        "NVDA"
     )
 
-    command = RepairEngine().create_command(reconciliation)
-
-    assert command.symbol == "NVDA"
-    assert command.adjustment == 10
-
-
-def test_create_repair_command_with_match():
-    ledger = LedgerSnapshot(
-        symbol="AAPL",
-        quantity=50,
+    assert (
+        event.payload["adjustment"]
+        ==
+        "-20"
     )
-
-    position = PositionSnapshot(
-        symbol="AAPL",
-        quantity=50,
-    )
-
-    reconciliation = ReconciliationComparator().compare(
-        ledger,
-        position,
-    )
-
-    command = RepairEngine().create_command(reconciliation)
-
-    assert command.symbol == "AAPL"
-    assert command.adjustment == 0

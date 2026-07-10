@@ -1,7 +1,9 @@
 import pytest
 
 from services.execution.gateway import ExecutionGateway
+from services.ledger.repository import EventRepository
 from services.ledger.service.service import LedgerService
+from services.ledger.store import InMemoryEventStore
 from services.oms.service import OMSService
 from services.oms.state import OrderStatus
 from services.portfolio.portfolio import Portfolio
@@ -19,7 +21,10 @@ class TestProductionCycle:
         gateway.connect()
 
         oms = OMSService(risk_checker=risk_checker, execution_gateway=gateway)
-        ledger = LedgerService()
+
+        store = InMemoryEventStore()
+        repo = EventRepository(store)
+        ledger = LedgerService(repo)
 
         order = oms.create_order(
             symbol="NVDA",
@@ -41,23 +46,20 @@ class TestProductionCycle:
         assert portfolio.positions["NVDA"] == 100
         assert portfolio.cash == 100000.0 - 48000.0
 
-        from contracts.events.trade_event import TradeEvent
-
-        trade_event = TradeEvent(
-            event_id=order.order_id,
+        event = ledger.record_order_filled(
+            user_id="default",
+            order_id=order.order_id,
             symbol=order.symbol,
             side=order.side,
             quantity=order.quantity,
             price=order.price,
         )
 
-        ledger_entry = ledger.record_trade(trade_event)
-
-        assert ledger_entry.event_type == "TRADE_FILLED"
-        assert ledger_entry.symbol == "NVDA"
-        assert ledger_entry.quantity == 100
-        assert ledger_entry.price == 480.0
-        assert ledger_entry.cash_change == -48000.0
+        assert event.event_type.value == "ORDER_FILLED"
+        assert event.payload["symbol"] == "NVDA"
+        assert event.payload["quantity"] == 100
+        assert event.payload["price"] == 480.0
+        assert event.payload["cash_change"] == -48000.0
 
     def test_risk_rejects_order(self):
         portfolio = Portfolio(cash=1000.0)

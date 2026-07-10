@@ -1,7 +1,8 @@
 from typing import Dict
 
+from .event import LedgerEvent
+from .event_type import LedgerEventType
 from .projector import Projection
-from .event import LedgerEvent, LedgerEventType
 
 
 class PositionProjection(Projection):
@@ -37,16 +38,22 @@ class PositionProjection(Projection):
             if new_qty == 0:
                 del self.state[symbol]
 
-        elif event.event_type == LedgerEventType.POSITION_OPENED:
+        elif event.event_type == LedgerEventType.POSITION_ADJUSTED:
             symbol = event.payload.get("symbol", "")
-            self.state[symbol] = {
-                "quantity": event.payload.get("quantity", 0.0),
-                "avg_cost": event.payload.get("avg_cost", 0.0)
-            }
+            adjustment = event.payload.get("quantity", 0.0)
+            price = event.payload.get("price", 0.0)
 
-        elif event.event_type == LedgerEventType.POSITION_CLOSED:
-            symbol = event.payload.get("symbol", "")
-            if symbol in self.state:
+            if symbol not in self.state:
+                self.state[symbol] = {"quantity": 0.0, "avg_cost": 0.0}
+
+            self.state[symbol]["quantity"] += adjustment
+            if price > 0:
+                current_qty = self.state[symbol]["quantity"]
+                current_cost = self.state[symbol]["avg_cost"]
+                if current_qty != 0:
+                    self.state[symbol]["avg_cost"] = ((current_qty - adjustment) * current_cost + adjustment * price) / current_qty
+
+            if self.state[symbol]["quantity"] == 0:
                 del self.state[symbol]
 
     def reset(self) -> None:

@@ -6,13 +6,13 @@ from research.data.provider import MarketDataProvider
 from research.data.types import TimeFrame
 from research.strategy.base import Strategy
 from research.tradebook.tradebook import TradeBook
+from research.execution.broker import SimulatedBroker
+from research.execution.order import Order, Side, OrderStatus
+from research.execution.fill import Fill as ExecutionFill
 
 from .event import Event, BarEvent, SignalEvent, OrderEvent, FillEvent
 from .queue import EventQueue
-from .broker import BacktestBroker
 from .context import BacktestContext
-from .order import Order
-from .fill import Fill
 
 
 class BacktestEngine:
@@ -20,7 +20,7 @@ class BacktestEngine:
         self.data_provider: Optional[MarketDataProvider] = None
         self.strategy: Optional[Strategy] = None
         self.context: Optional[BacktestContext] = None
-        self.broker: Optional[BacktestBroker] = None
+        self.broker: Optional[SimulatedBroker] = None
         self.queue: Optional[EventQueue] = None
         self.tradebook: Optional[TradeBook] = None
         self.handlers: Dict[type, List[Callable]] = {}
@@ -41,7 +41,7 @@ class BacktestEngine:
             initial_capital=initial_capital,
             cash=initial_capital,
         )
-        self.broker = BacktestBroker(self.context)
+        self.broker = SimulatedBroker()
         self.queue = EventQueue()
         self.tradebook = TradeBook()
         
@@ -92,15 +92,15 @@ class BacktestEngine:
         )
 
     def _on_signal_event(self, event: SignalEvent) -> None:
-        order = self.broker.submit_order(
+        order = Order(
             symbol=event.symbol,
-            side=event.side,
+            side=Side(event.side),
             quantity=event.quantity,
         )
         
         order_event = OrderEvent(
             timestamp=event.timestamp,
-            order_id=order.order_id,
+            order_id=str(order.order_id),
             symbol=event.symbol,
             side=event.side,
             quantity=event.quantity,
@@ -108,7 +108,37 @@ class BacktestEngine:
         self.queue.publish(order_event)
 
     def _on_order_event(self, event: OrderEvent) -> None:
-        pass
+        from research.data.snapshot import MarketSnapshot
+        
+        order = Order(
+            symbol=event.symbol,
+            side=Side(event.side),
+            quantity=event.quantity,
+        )
+        
+        snapshot = MarketSnapshot(
+            timestamp=event.timestamp,
+            bars={event.symbol: self._get_current_bar(event.symbol)}
+        )
+        
+        execution_report = self.broker.execute(order, snapshot)
+        
+        for fill in execution_report.fills:
+            if fill:
+                fill_event = FillEvent(
+                    timestamp=event.timestamp,
+                    fill_id=str(fill.fill_id),
+                    order_id=str(fill.order_id),
+                    symbol=fill.symbol,
+                    side=fill.side.value if hasattr(fill.side, 'value') else fill.side,
+                    quantity=fill.quantity,
+                    price=fill.fill_price,
+                    cash_change=self._calculate_cash_change(fill),
+                    commission=fill.commission,
+                    slippage=fill.slippage,
+                )
+                self.queue.publish(fill_event)
+                self._process_queue()
 
     def _on_fill_event(self, event: FillEvent) -> None:
         self.strategy.on_fill(event)
@@ -124,25 +154,19 @@ class BacktestEngine:
         self.context.portfolio.apply_fill(event)
 
     def _process_open_orders(self, bar: Bar) -> None:
-        open_orders = [
-            o for o in self.broker.get_all_orders().values() 
-            if o.status == "SUBMITTED"
-        ]
-        for order in open_orders:
-            fill = self.broker.execute_order(order, bar.close)
-            if fill:
-                fill_event = FillEvent(
-                    timestamp=bar.timestamp,
-                    fill_id=fill.fill_id,
-                    order_id=fill.order_id,
-                    symbol=fill.symbol,
-                    side=fill.side,
-                    quantity=fill.quantity,
-                    price=fill.price,
-                    cash_change=fill.cash_change,
-                )
-                self.queue.publish(fill_event)
-                self._process_queue()
+        pass
+
+    def _get_current_bar(self, symbol: str) -> Optional[Bar]:
+        for b in reversed(self._bars):
+            if b.symbol == symbol:
+                return b
+        return None
+
+    def _calculate_cash_change(self, fill: ExecutionFill) -> float:
+        if fill.side == Side.BUY:
+            return -(fill.fill_price * fill.quantity + fill.commission)
+        else:
+            return fill.fill_price * fill.quantity - fill.commission
 
     def _calculate_quantity(self, signal, current_price: float) -> float:
         if signal.signal_type == "BUY":

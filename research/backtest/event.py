@@ -42,3 +42,5 @@ class FillEvent(Event):
     quantity: float
     price: float
     cash_change: float
+    commission: float = 0.0
+    slippage: float = 0.0

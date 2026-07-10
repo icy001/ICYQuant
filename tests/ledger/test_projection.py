@@ -1,6 +1,7 @@
 import pytest
 
-from services.ledger.event import LedgerEvent, LedgerEventType
+from services.ledger.event import LedgerEvent
+from services.ledger.event_type import LedgerEventType
 from services.ledger.cash_projection import CashProjection
 from services.ledger.position_projection import PositionProjection
 from services.ledger.pnl_projection import PnLProjection
@@ -10,7 +11,7 @@ class TestCashProjection:
 
     def test_deposit(self):
         projection = CashProjection()
-        event = LedgerEvent(event_type=LedgerEventType.DEPOSIT, payload={"amount": 100000.0})
+        event = LedgerEvent(event_type=LedgerEventType.CASH_DEPOSITED, payload={"amount": 100000.0})
 
         projection.apply(event)
 
@@ -19,7 +20,7 @@ class TestCashProjection:
     def test_buy_order_filled(self):
         projection = CashProjection()
         projection.state["cash"] = 100000.0
-        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"side": "BUY", "price": 100.0, "quantity": 100})
+        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"side": "BUY", "price": 100.0, "quantity": 100, "cash_change": -10000.0})
 
         projection.apply(event)
 
@@ -28,7 +29,7 @@ class TestCashProjection:
     def test_sell_order_filled(self):
         projection = CashProjection()
         projection.state["cash"] = 90000.0
-        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"side": "SELL", "price": 110.0, "quantity": 100})
+        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"side": "SELL", "price": 110.0, "quantity": 100, "cash_change": 11000.0})
 
         projection.apply(event)
 
@@ -105,7 +106,8 @@ class TestPnLProjection:
 
     def test_sell_realized_pnl(self):
         projection = PnLProjection()
-        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"side": "SELL", "price": 110.0, "quantity": 100, "avg_cost": 100.0})
+        projection.state["positions"]["NVDA"] = {"quantity": 100, "avg_cost": 100.0}
+        event = LedgerEvent(event_type=LedgerEventType.ORDER_FILLED, payload={"symbol": "NVDA", "side": "SELL", "price": 110.0, "quantity": 100})
 
         projection.apply(event)
 
@@ -113,7 +115,7 @@ class TestPnLProjection:
 
     def test_deposit_initial_equity(self):
         projection = PnLProjection()
-        event = LedgerEvent(event_type=LedgerEventType.DEPOSIT, payload={"amount": 100000.0})
+        event = LedgerEvent(event_type=LedgerEventType.CASH_DEPOSITED, payload={"amount": 100000.0})
 
         projection.apply(event)
 

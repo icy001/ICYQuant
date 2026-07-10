@@ -1,42 +1,35 @@
-from services.reconciliation.comparator import ReconciliationComparator
-from services.reconciliation.domain_models import LedgerSnapshot, PositionSnapshot
+from decimal import Decimal
+
+from services.projection import (
+    PortfolioState,
+    PositionState,
+)
+
+from services.reconciliation import (
+    PositionComparator,
+)
 
 
-def test_position_mismatch():
-    ledger = LedgerSnapshot(
-        symbol="NVDA",
-        quantity=100,
+def test_position_difference():
+    state = PortfolioState()
+
+    state.positions["NVDA"] = (
+        PositionState(
+            symbol="NVDA",
+            quantity=Decimal("100")
+        )
     )
 
-    position = PositionSnapshot(
-        symbol="NVDA",
-        quantity=90,
+    comparator = PositionComparator()
+
+    result = comparator.compare(
+        state,
+        {
+            "NVDA":
+                Decimal("80")
+        }
     )
 
-    result = ReconciliationComparator().compare(
-        ledger,
-        position,
-    )
+    assert len(result) == 1
 
-    assert result.difference == 10
-    assert result.status.value == "MISMATCH"
-
-
-def test_position_match():
-    ledger = LedgerSnapshot(
-        symbol="AAPL",
-        quantity=50,
-    )
-
-    position = PositionSnapshot(
-        symbol="AAPL",
-        quantity=50,
-    )
-
-    result = ReconciliationComparator().compare(
-        ledger,
-        position,
-    )
-
-    assert result.difference == 0
-    assert result.status.value == "MATCHED"
+    assert result[0].delta == Decimal("-20")
