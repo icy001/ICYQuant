@@ -42,6 +42,11 @@ from .transaction import (
 )
 
 
+from .health import (
+    DatabaseHealth,
+)
+
+
 __all__ = [
     "DatabaseSettings",
     "load_database_settings",
@@ -54,4 +59,5 @@ __all__ = [
     "SoftDeleteMixin",
     "Repository",
     "TransactionManager",
+    "DatabaseHealth",
 ]
