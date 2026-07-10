@@ -41,6 +41,11 @@ from .prometheus import (
     export_metrics,
 )
 
+from .tracing import (
+    Tracer,
+    SpanContext,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -64,4 +69,6 @@ __all__ = [
     "set_active_requests",
     "observe_latency",
     "export_metrics",
+    "Tracer",
+    "SpanContext",
 ]
