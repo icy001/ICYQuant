@@ -20,6 +20,18 @@ from .errors import (
     create_error_context,
 )
 
+from .metrics import (
+    MetricsCollector,
+    Metric,
+)
+
+from .health import (
+    HealthStatus,
+    HealthCheck,
+    healthy,
+    unhealthy,
+)
+
 
 __all__ = [
     "TraceContext",
@@ -31,4 +43,10 @@ __all__ = [
     "ErrorTracker",
     "ErrorContext",
     "create_error_context",
+    "MetricsCollector",
+    "Metric",
+    "HealthStatus",
+    "HealthCheck",
+    "healthy",
+    "unhealthy",
 ]
