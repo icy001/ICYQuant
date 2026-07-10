@@ -8,17 +8,14 @@ from fastapi import APIRouter
 
 from services.database import (
     DatabaseHealth,
-    create_engine,
-    load_database_settings,
+)
+
+from services.database.session import (
+    engine,
 )
 
 
 router = APIRouter()
-
-
-engine = create_engine(
-    load_database_settings()
-)
 
 
 database_health = DatabaseHealth(

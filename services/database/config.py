@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import os
 
+from urllib.parse import quote_plus
+
 
 @dataclass(
     frozen=True,
@@ -24,10 +26,11 @@ class DatabaseSettings:
 
     @property
     def url(self) -> str:
+        encoded_password = quote_plus(self.password)
         return (
             "postgresql+asyncpg://"
             f"{self.username}:"
-            f"{self.password}@"
+            f"{encoded_password}@"
             f"{self.host}:"
             f"{self.port}/"
             f"{self.database}"
