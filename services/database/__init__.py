@@ -32,6 +32,11 @@ from .mixins import (
 )
 
 
+from .repository import (
+    Repository,
+)
+
+
 __all__ = [
     "DatabaseSettings",
     "load_database_settings",
@@ -42,4 +47,5 @@ __all__ = [
     "UUIDMixin",
     "TimestampMixin",
     "SoftDeleteMixin",
+    "Repository",
 ]
