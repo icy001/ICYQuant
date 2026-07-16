@@ -3,9 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from services.trade import (
-    TradeService,
-)
+from services.trade import TradeService
 
 
 class FakeRepository:
@@ -18,12 +16,23 @@ class FakeRepository:
     ):
         return None
 
-    async def create(
+    async def save(
         self,
-        model,
+        trade,
     ):
-        self.saved = model
-        return model
+        self.saved = trade
+
+        class FakeModel:
+            id = trade.trade_id
+            order_id = str(trade.order_id)
+            symbol = trade.symbol
+            quantity = trade.quantity
+            price = trade.price
+            execution_id = trade.execution_id
+            commission = trade.commission
+            created_at = trade.executed_at
+
+        return FakeModel()
 
 
 @pytest.mark.asyncio

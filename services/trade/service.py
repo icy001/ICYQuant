@@ -48,13 +48,7 @@ class TradeService:
             order,
         )
 
-        model = TradeMapper.to_model(
-            trade
-        )
-
-        await self.repository.create(
-            model
-        )
+        model = await self.repository.save(trade)
 
         await self.publisher.publish(
             TradeCreated(
@@ -63,6 +57,4 @@ class TradeService:
             )
         )
 
-        return TradeMapper.to_domain(
-            model
-        )
+        return TradeMapper.to_domain(model)
