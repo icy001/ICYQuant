@@ -77,3 +77,21 @@ class OrderRepository(
         raise NotImplementedError(
             "Production implementation: PostgreSQL UNIQUE(client_order_id)"
         )
+
+    async def update_with_version(
+        self,
+        order,
+    ):
+
+        """
+        Placeholder for optimistic locking.
+
+        Production implementation
+        should execute:
+
+        UPDATE ...
+
+        WHERE version=...
+        """
+
+        await self.session.flush()
