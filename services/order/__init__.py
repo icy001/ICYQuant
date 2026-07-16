@@ -30,6 +30,7 @@ from .events import (
     OrderCreated,
     OrderCancelled,
     OrderFilled,
+    OrderTransition,
 )
 
 from .publisher import (
@@ -61,6 +62,7 @@ __all__ = [
     "OrderCreated",
     "OrderCancelled",
     "OrderFilled",
+    "OrderTransition",
     "EventPublisher",
     "OrderStateMachine",
     "InvalidStateTransition",

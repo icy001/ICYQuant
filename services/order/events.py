@@ -6,7 +6,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from uuid import UUID
+
+
+class OrderTransition(str, Enum):
+    SUBMIT = "SUBMIT"
+    ACCEPT = "ACCEPT"
+    PARTIAL_FILL = "PARTIAL_FILL"
+    FILL = "FILL"
+    CANCEL = "CANCEL"
+    REJECT = "REJECT"
+    EXPIRE = "EXPIRE"
+    REPLACE = "REPLACE"
 
 
 @dataclass(frozen=True)
