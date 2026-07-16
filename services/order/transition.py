@@ -8,6 +8,7 @@ from .events import OrderTransition
 
 TRANSITIONS = {
     (OrderStatus.NEW, OrderTransition.SUBMIT): OrderStatus.PENDING,
+    (OrderStatus.NEW, OrderTransition.ACCEPT): OrderStatus.PENDING,
     (OrderStatus.NEW, OrderTransition.CANCEL): OrderStatus.CANCELLED,
     (OrderStatus.NEW, OrderTransition.REJECT): OrderStatus.REJECTED,
     (OrderStatus.PENDING, OrderTransition.PARTIAL_FILL): OrderStatus.PARTIALLY_FILLED,

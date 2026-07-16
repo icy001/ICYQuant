@@ -60,6 +60,12 @@ class InMemoryOrderRepository(OrderRepository):
 
         ]
 
+    async def update_with_version(
+        self,
+        model,
+    ):
+        pass
+
 
 @pytest.fixture
 def repository():
