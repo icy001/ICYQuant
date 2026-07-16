@@ -1,23 +1,29 @@
-from .rules import RiskRule
+"""
+Exposure calculation.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+
 from .context import RiskContext
-from .result import RiskResult, RiskDecision
+from .model import RiskRequest
 
 
-class DailyLossRule(RiskRule):
-    def __init__(self, max_daily_loss: float = 0.03):
-        self.max_daily_loss = max_daily_loss
+class ExposureCalculator:
+    def projected_exposure(
+        self,
+        request: RiskRequest,
+        context: RiskContext,
+    ) -> Decimal:
+        current = (
+            context.current_position
+            * request.price
+        )
 
-    def evaluate(self, order, context: RiskContext) -> RiskResult:
-        if context.account_equity <= 0:
-            return RiskResult(RiskDecision.PASS)
+        incoming = (
+            request.quantity
+            * request.price
+        )
 
-        daily_pnl = context.daily_pnl
-        daily_return = daily_pnl / context.account_equity if context.account_equity > 0 else 0
-
-        if daily_return <= -self.max_daily_loss:
-            return RiskResult(
-                decision=RiskDecision.REJECT,
-                message=f"Daily loss {daily_return:.2%} exceeds max {self.max_daily_loss:.2%}"
-            )
-
-        return RiskResult(RiskDecision.PASS)
+        return current + incoming

@@ -1,30 +1,30 @@
-from typing import List
+"""
+Risk rule engine.
+"""
 
-from .rules import RiskRule
+from __future__ import annotations
+
 from .context import RiskContext
-from .result import RiskResult, RiskDecision
+from .decision import RiskResult
+from .enums import RiskDecision
 
 
 class RiskEngine:
-    def __init__(self, rules: List[RiskRule] = None):
-        self.rules = rules or []
+    def __init__(
+        self,
+        rules,
+    ):
+        self.rules = list(rules)
 
-    def evaluate(self, order, context: RiskContext) -> RiskResult:
-        current_order = order
-
+    def evaluate(
+        self,
+        request,
+        context: RiskContext,
+    ) -> RiskResult:
         for rule in self.rules:
-            result = rule.evaluate(current_order, context)
-
-            if result.decision == RiskDecision.MODIFY and result.modified_order:
-                current_order = result.modified_order
-
-            if result.decision != RiskDecision.PASS:
+            result = rule.evaluate(request, context)
+            if result is not None:
                 return result
-
         return RiskResult(
-            decision=RiskDecision.PASS,
-            message="All risk rules passed"
+            decision=RiskDecision.APPROVE
         )
-
-    def evaluate_all(self, orders: List, context: RiskContext) -> List[RiskResult]:
-        return [self.evaluate(order, context) for order in orders]
