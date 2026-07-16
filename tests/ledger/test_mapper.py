@@ -3,35 +3,26 @@ from decimal import Decimal
 from services.ledger import (
     EntrySide,
     Journal,
-    LedgerReplayService,
+    JournalMapper,
 )
 
 
-def test_replay():
+def test_journal_mapper():
     journal = Journal()
-
     journal.add_entry(
         "CASH",
         EntrySide.DEBIT,
         Decimal("100"),
     )
-
     journal.add_entry(
         "BROKER",
         EntrySide.CREDIT,
         Decimal("100"),
     )
 
-    replay = LedgerReplayService()
+    model = JournalMapper.to_model(journal)
 
-    snapshot = replay.replay(
-        [journal]
-    )
-
-    assert snapshot.balances[
-        "CASH"
-    ] == Decimal("100")
-
-    assert snapshot.balances[
-        "BROKER"
-    ] == Decimal("-100")
+    assert model.id == journal.journal_id
+    assert len(model.entries) == 2
+    assert model.entries[0].account_code == "CASH"
+    assert model.entries[0].side == "DEBIT"
