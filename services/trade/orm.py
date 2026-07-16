@@ -60,3 +60,9 @@ class TradeModel(
         nullable=False,
         default=Decimal("0"),
     )
+
+    liquidity: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="UNKNOWN",
+    )
