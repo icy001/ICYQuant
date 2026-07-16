@@ -68,3 +68,12 @@ class OrderRepository(
         order.status = status
 
         await self.session.flush()
+
+    async def find_by_client_order_id(
+        self,
+        client_order_id: str,
+    ):
+
+        raise NotImplementedError(
+            "Production implementation: PostgreSQL UNIQUE(client_order_id)"
+        )
