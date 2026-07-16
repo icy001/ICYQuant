@@ -49,6 +49,10 @@ from .idempotency import IdempotencyRegistry
 
 from .version import Version
 
+from .execution_report import ExecutionReport
+
+from .execution_handler import ExecutionReportHandler
+
 __all__ = [
     "Order",
     "OrderSide",
@@ -77,4 +81,6 @@ __all__ = [
     "ClientOrderId",
     "IdempotencyRegistry",
     "Version",
+    "ExecutionReport",
+    "ExecutionReportHandler",
 ]
