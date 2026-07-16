@@ -1,5 +1,5 @@
 """
-Risk evaluation context.
+Risk request model.
 """
 
 from __future__ import annotations
@@ -7,12 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .account import AccountRiskInfo
-
 
 @dataclass
-class RiskContext:
+class RiskRequest:
     account_id: str
     symbol: str
-    current_position: Decimal
-    account: AccountRiskInfo
+    quantity: Decimal
+    price: Decimal
