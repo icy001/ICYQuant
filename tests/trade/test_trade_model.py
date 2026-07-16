@@ -7,6 +7,7 @@ from services.trade import Trade
 def test_trade_model():
     trade = Trade(
         order_id=uuid4(),
+        account_id="ACC-001",
         symbol="AAPL",
         quantity=Decimal("100"),
         price=Decimal("185.25"),
@@ -15,3 +16,4 @@ def test_trade_model():
     assert trade.symbol == "AAPL"
     assert trade.quantity == Decimal("100")
     assert trade.price == Decimal("185.25")
+    assert trade.account_id == "ACC-001"

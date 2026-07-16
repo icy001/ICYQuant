@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.database import Repository
 
+from ..exceptions import PositionNotFoundError
 from ..mapper import PositionMapper
 from ..model import Position
 from ..orm import PositionModel
@@ -49,5 +50,21 @@ class PositionRepository(
         self,
         position: Position,
     ) -> None:
-        model = PositionMapper.to_model(position)
-        await self.create(model)
+        existing = await self.session.execute(
+            select(PositionModel).where(
+                PositionModel.account_id == position.account_id,
+                PositionModel.symbol == position.symbol,
+            )
+        )
+
+        model = existing.scalar_one_or_none()
+
+        if model is not None:
+            model.quantity = position.quantity
+            model.average_cost = position.average_cost
+            model.realized_pnl = position.realized_pnl
+            model.version = model.version + 1
+            await self.session.flush()
+        else:
+            model = PositionMapper.to_model(position)
+            await self.create(model)

@@ -7,6 +7,7 @@ from services.trade import Trade, TradeMapper, TradeModel
 def test_mapper_to_model():
     trade = Trade(
         order_id=uuid4(),
+        account_id="ACC-001",
         symbol="AAPL",
         quantity=Decimal("100"),
         price=Decimal("185.25"),
@@ -21,6 +22,7 @@ def test_mapper_to_model():
     assert model.price == trade.price
     assert model.execution_id == trade.execution_id
     assert model.commission == trade.commission
+    assert model.account_id == trade.account_id
 
 
 def test_mapper_to_domain():
@@ -28,6 +30,7 @@ def test_mapper_to_domain():
 
     trade = Trade(
         order_id=uuid4(),
+        account_id="ACC-001",
         symbol="MSFT",
         quantity=Decimal("50"),
         price=Decimal("300.50"),
@@ -46,3 +49,4 @@ def test_mapper_to_domain():
     assert domain.execution_id == trade.execution_id
     assert domain.commission == trade.commission
     assert domain.executed_at == model.created_at
+    assert domain.account_id == trade.account_id

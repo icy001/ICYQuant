@@ -32,6 +32,12 @@ class TradeModel(
         index=True,
     )
 
+    account_id: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+    )
+
     execution_id: Mapped[Optional[str]] = mapped_column(
         String(64),
         nullable=True,
