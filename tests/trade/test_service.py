@@ -25,6 +25,7 @@ class FakeRepository:
         class FakeModel:
             id = trade.trade_id
             order_id = str(trade.order_id)
+            account_id = trade.account_id
             symbol = trade.symbol
             quantity = trade.quantity
             price = trade.price
@@ -50,6 +51,7 @@ async def test_trade_service_create():
 
     class Order:
         order_id = uuid4()
+        account_id = "ACC-001"
         symbol = "AAPL"
 
     trade = await service.create_from_execution(
@@ -58,3 +60,4 @@ async def test_trade_service_create():
     )
 
     assert trade.symbol == "AAPL"
+    assert trade.account_id == "ACC-001"

@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 @dataclass
 class Trade:
     order_id: UUID
+    account_id: str
     symbol: str
     quantity: Decimal
     price: Decimal

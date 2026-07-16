@@ -13,6 +13,7 @@ class TradeMapper:
     def from_execution_report(report, order) -> Trade:
         return Trade(
             order_id=order.order_id,
+            account_id=getattr(order, "account_id", ""),
             symbol=order.symbol,
             quantity=report.filled_quantity,
             price=report.average_price,
@@ -24,6 +25,7 @@ class TradeMapper:
         return TradeModel(
             id=trade.trade_id,
             order_id=str(trade.order_id),
+            account_id=trade.account_id,
             execution_id=trade.execution_id,
             symbol=trade.symbol,
             quantity=trade.quantity,
@@ -37,6 +39,7 @@ class TradeMapper:
 
         trade = Trade(
             order_id=UUID(model.order_id),
+            account_id=model.account_id,
             symbol=model.symbol,
             quantity=model.quantity,
             price=model.price,
