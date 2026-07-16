@@ -7,7 +7,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ..engine import PositionEngine
-from ..events import PositionUpdated
+from ..events import create_position_updated
 from ..model import Position
 from ..publisher import PositionEventPublisher
 
@@ -16,9 +16,11 @@ class PositionService:
     def __init__(
         self,
         repository,
+        trade_repository,
         publisher=None,
     ):
         self.repository = repository
+        self.trade_repository = trade_repository
         self.engine = PositionEngine()
         self.publisher = (
             publisher
@@ -46,14 +48,24 @@ class PositionService:
             trade.price,
         )
 
-        await self.repository.save(position)
+        await self.repository.upsert(position)
 
         await self.publisher.publish(
-            PositionUpdated(
+            create_position_updated(
                 account_id=position.account_id,
                 symbol=position.symbol,
                 quantity=str(position.quantity),
+                version=position.version,
             )
         )
 
         return position
+
+    async def apply_trade_by_id(
+        self,
+        trade_id,
+    ):
+        trade = await self.trade_repository.get_trade(
+            trade_id
+        )
+        return await self.apply_trade(trade)

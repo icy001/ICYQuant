@@ -14,11 +14,15 @@ class FakeRepository:
     ):
         return None
 
-    async def save(
+    async def upsert(
         self,
         position,
     ):
         self.position = position
+
+
+class FakeTradeRepository:
+    pass
 
 
 class Trade:
@@ -33,9 +37,11 @@ async def test_apply_trade():
     from services.position import PositionService
 
     repository = FakeRepository()
+    trade_repository = FakeTradeRepository()
 
     service = PositionService(
-        repository
+        repository,
+        trade_repository,
     )
 
     position = await service.apply_trade(

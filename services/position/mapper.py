@@ -17,6 +17,7 @@ class PositionMapper:
             quantity=position.quantity,
             average_cost=position.average_cost,
             realized_pnl=position.realized_pnl,
+            version=position.version,
         )
 
     @staticmethod
@@ -27,4 +28,5 @@ class PositionMapper:
             quantity=model.quantity,
             average_cost=model.average_cost,
             realized_pnl=model.realized_pnl,
+            version=model.version,
         )

@@ -17,3 +17,4 @@ class Position:
     realized_pnl: Decimal = Decimal("0")
     unrealized_pnl: Decimal = Decimal("0")
     side: str = "FLAT"
+    version: int = 1
