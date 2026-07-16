@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Optional
 from uuid import UUID, uuid4
 
@@ -39,3 +40,27 @@ class SnapshotManager:
 
     def record_event(self) -> None:
         self._event_count += 1
+
+
+@dataclass
+class LedgerSnapshot:
+    balances: dict[
+        str,
+        Decimal,
+    ] = field(
+        default_factory=dict
+    )
+
+    def apply(
+        self,
+        account: str,
+        delta: Decimal,
+    ) -> None:
+        current = self.balances.get(
+            account,
+            Decimal("0"),
+        )
+
+        self.balances[
+            account
+        ] = current + delta

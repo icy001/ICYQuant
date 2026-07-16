@@ -28,3 +28,9 @@ class DuplicateEventError(EventStoreError):
     Raised when duplicated
     event id is detected.
     """
+
+
+class UnbalancedJournalError(
+    RuntimeError,
+):
+    """Journal is not balanced."""

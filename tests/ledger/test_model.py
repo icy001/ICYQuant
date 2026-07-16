@@ -3,11 +3,10 @@ from decimal import Decimal
 from services.ledger import (
     EntrySide,
     Journal,
-    LedgerReplayService,
 )
 
 
-def test_replay():
+def test_balanced_journal():
     journal = Journal()
 
     journal.add_entry(
@@ -22,16 +21,4 @@ def test_replay():
         Decimal("100"),
     )
 
-    replay = LedgerReplayService()
-
-    snapshot = replay.replay(
-        [journal]
-    )
-
-    assert snapshot.balances[
-        "CASH"
-    ] == Decimal("100")
-
-    assert snapshot.balances[
-        "BROKER"
-    ] == Decimal("-100")
+    assert journal.is_balanced()
