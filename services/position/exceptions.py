@@ -9,3 +9,9 @@ class PositionNotFoundError(
     LookupError,
 ):
     """Position not found."""
+
+
+class PositionConflictError(
+    RuntimeError,
+):
+    """Optimistic lock conflict."""

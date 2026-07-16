@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from sqlalchemy import Numeric
 from sqlalchemy import String
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
@@ -24,6 +25,14 @@ class PositionModel(
     Base,
 ):
     __tablename__ = "positions"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id",
+            "symbol",
+            name="uq_position_account_symbol",
+        ),
+    )
 
     account_id: Mapped[str] = mapped_column(
         String(64),
