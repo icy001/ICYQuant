@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from .enums import OrderStatus
 from .events import (
     OrderCancelled,
     OrderCreated,
+    OrderTransition,
 )
 from .mapper import OrderMapper
 from .model import Order
@@ -96,9 +96,9 @@ class OrderService:
         if model is None:
             return None
 
-        new_status = OrderStateMachine.transition(
+        new_status = OrderStateMachine.apply(
             model.status,
-            OrderStatus.CANCELLED,
+            OrderTransition.CANCEL,
         )
 
         await self.repository.update_status(
