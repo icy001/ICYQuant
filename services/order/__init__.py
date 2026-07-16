@@ -7,6 +7,8 @@ from .enums import (
 
 from .model import Order
 
+from .client_order import ClientOrderId
+
 from .validator import OrderValidator
 
 from .exceptions import (
@@ -42,6 +44,8 @@ from .state_machine import (
     OrderStateMachine,
 )
 
+from .idempotency import IdempotencyRegistry
+
 __all__ = [
     "Order",
     "OrderSide",
@@ -66,4 +70,6 @@ __all__ = [
     "EventPublisher",
     "OrderStateMachine",
     "InvalidStateTransition",
+    "ClientOrderId",
+    "IdempotencyRegistry",
 ]
