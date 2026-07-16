@@ -23,3 +23,7 @@ class InvalidSymbol(OrderValidationError):
 
 class InvalidOrderType(OrderValidationError):
     """Order type is invalid."""
+
+
+class OptimisticLockError(RuntimeError):
+    """Version conflict."""

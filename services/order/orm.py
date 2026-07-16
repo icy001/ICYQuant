@@ -88,3 +88,8 @@ class OrderModel(
         Numeric(20, 8),
         nullable=True,
     )
+
+    version: Mapped[int] = mapped_column(
+        nullable=False,
+        default=1,
+    )

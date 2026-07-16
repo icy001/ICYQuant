@@ -17,6 +17,7 @@ from .exceptions import (
     InvalidPrice,
     InvalidSymbol,
     InvalidOrderType,
+    OptimisticLockError,
 )
 
 from .orm import OrderModel
@@ -46,6 +47,8 @@ from .state_machine import (
 
 from .idempotency import IdempotencyRegistry
 
+from .version import Version
+
 __all__ = [
     "Order",
     "OrderSide",
@@ -58,6 +61,7 @@ __all__ = [
     "InvalidPrice",
     "InvalidSymbol",
     "InvalidOrderType",
+    "OptimisticLockError",
     "OrderModel",
     "OrderRepository",
     "OrderMapper",
@@ -72,4 +76,5 @@ __all__ = [
     "InvalidStateTransition",
     "ClientOrderId",
     "IdempotencyRegistry",
+    "Version",
 ]
