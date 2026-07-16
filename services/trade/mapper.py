@@ -24,25 +24,27 @@ class TradeMapper:
         return TradeModel(
             id=trade.trade_id,
             order_id=str(trade.order_id),
+            execution_id=trade.execution_id,
             symbol=trade.symbol,
             quantity=trade.quantity,
             price=trade.price,
-            execution_id=trade.execution_id,
             commission=trade.commission,
-            liquidity=trade.liquidity,
         )
 
     @staticmethod
     def to_domain(model: TradeModel) -> Trade:
         from uuid import UUID
 
-        return Trade(
-            trade_id=model.id,
+        trade = Trade(
             order_id=UUID(model.order_id),
             symbol=model.symbol,
             quantity=model.quantity,
             price=model.price,
-            execution_id=model.execution_id,
-            commission=model.commission,
-            liquidity=model.liquidity,
         )
+
+        trade.trade_id = model.id
+        trade.execution_id = model.execution_id
+        trade.commission = model.commission
+        trade.executed_at = model.created_at
+
+        return trade

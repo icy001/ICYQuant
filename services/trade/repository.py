@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.database import Repository
 
+from .model import Trade
 from .orm import TradeModel
+from .mapper import TradeMapper
 
 
 class TradeRepository(
@@ -47,3 +49,18 @@ class TradeRepository(
         )
 
         return result.scalar_one_or_none()
+
+    async def save(
+        self,
+        trade: Trade,
+    ):
+        model = TradeMapper.to_model(trade)
+        await self.create(model)
+        return model
+
+    async def get_trade(
+        self,
+        trade_id,
+    ):
+        model = await self.get(trade_id)
+        return TradeMapper.to_domain(model)
