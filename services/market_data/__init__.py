@@ -4,8 +4,10 @@ from .cache import InMemoryMarketCache
 from .candle import Candle
 from .enums import InstrumentType
 from .exceptions import QuoteNotFoundError
+from .facade import MarketDataFacade
 from .feed import MarketFeedEngine
 from .gateway import MarketGateway
+from .health import MarketHealthMonitor
 from .history import HistoricalMarketDataService
 from .history_repository import HistoricalRepository
 from .instrument import Instrument
@@ -23,6 +25,8 @@ from .repository import MarketDataRepository
 from .replay import MarketReplay
 from .service import MarketDataService
 from .snapshot import MarketSnapshot
+from .statistics import MarketStatistics
+from .status import MarketStatus
 from .subscriber import MarketSubscriber
 from .subscription import Subscription
 from .subscription_manager import SubscriptionManager
@@ -60,4 +64,8 @@ __all__ = [
     "MarketRecorder",
     "RecordingMetrics",
     "RecordingRepository",
+    "MarketDataFacade",
+    "MarketHealthMonitor",
+    "MarketStatistics",
+    "MarketStatus",
 ]
