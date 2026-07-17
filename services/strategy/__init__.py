@@ -13,9 +13,12 @@ from .generator import SignalGenerator
 from .lifecycle import StrategyLifecycle
 from .model import Strategy
 from .order_mapper import OrderMapper
+from .position_sizer import PositionSizer
 from .result import StrategyResult
+from .risk_budget import RiskBudget
 from .risk_filter import RiskSignalValidator
 from .runtime import StrategyRuntime
+from .sizing_result import PositionSizeResult
 from .signal import StrategySignal
 from .signal_bus import SignalBus
 from .signal_event import SignalEvent
@@ -47,4 +50,7 @@ __all__ = [
     "StrategyExecutionAdapter",
     "ExecutionResult",
     "OrderMapper",
+    "PositionSizer",
+    "RiskBudget",
+    "PositionSizeResult",
 ]
