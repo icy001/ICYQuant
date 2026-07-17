@@ -1,4 +1,5 @@
 from .adapter import MarketGatewayAdapter
+from .batch_writer import BatchWriter
 from .cache import InMemoryMarketCache
 from .candle import Candle
 from .enums import InstrumentType
@@ -15,6 +16,9 @@ from .publisher import MarketPublisher
 from .provider import MarketProvider
 from .query import HistoryQuery
 from .quote import Quote
+from .recorder import MarketRecorder
+from .recording_metrics import RecordingMetrics
+from .recording_repository import RecordingRepository
 from .repository import MarketDataRepository
 from .replay import MarketReplay
 from .service import MarketDataService
@@ -52,4 +56,8 @@ __all__ = [
     "HistoricalRepository",
     "HistoryQuery",
     "MarketReplay",
+    "BatchWriter",
+    "MarketRecorder",
+    "RecordingMetrics",
+    "RecordingRepository",
 ]
