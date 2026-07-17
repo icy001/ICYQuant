@@ -1,9 +1,13 @@
+from .adapter import MarketGatewayAdapter
 from .cache import InMemoryMarketCache
 from .candle import Candle
 from .enums import InstrumentType
 from .exceptions import QuoteNotFoundError
+from .gateway import MarketGateway
 from .instrument import Instrument
+from .normalizer import QuoteNormalizer
 from .publisher import MarketPublisher
+from .provider import MarketProvider
 from .quote import Quote
 from .repository import MarketDataRepository
 from .service import MarketDataService
@@ -28,4 +32,8 @@ __all__ = [
     "MarketSubscriber",
     "Subscription",
     "SubscriptionManager",
+    "MarketGatewayAdapter",
+    "MarketGateway",
+    "QuoteNormalizer",
+    "MarketProvider",
 ]
