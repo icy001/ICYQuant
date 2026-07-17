@@ -10,7 +10,7 @@ from .exceptions import StrategyError, StrategyStoppedError
 from .execution import StrategyExecutionAdapter
 from .execution_result import ExecutionResult
 from .generator import SignalGenerator
-from .lifecycle import StrategyLifecycle
+from .lifecycle_status import StrategyLifecycle
 from .model import Strategy
 from .order_mapper import OrderMapper
 from .position_sizer import PositionSizer

@@ -4,7 +4,7 @@ Strategy engine.
 
 from __future__ import annotations
 
-from .lifecycle import StrategyLifecycle
+from .lifecycle_status import StrategyLifecycle
 
 
 class StrategyEngine:
