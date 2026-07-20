@@ -50,6 +50,13 @@ from .slippage import SlippageModel
 from .spread import SpreadModel
 from .cost_engine import TransactionCostEngine
 from .cost_service import CostService
+from .risk_rule import RiskRule
+from .risk_result import RiskResult
+from .position_limit import PositionLimitChecker
+from .exposure import ExposureChecker
+from .drawdown_guard import DrawdownGuard
+from .risk_engine import BacktestRiskEngine
+from .risk_service import RiskService
 
 __all__ = [
     "BacktestSession",
@@ -104,4 +111,11 @@ __all__ = [
     "SpreadModel",
     "TransactionCostEngine",
     "CostService",
+    "RiskRule",
+    "RiskResult",
+    "PositionLimitChecker",
+    "ExposureChecker",
+    "DrawdownGuard",
+    "BacktestRiskEngine",
+    "RiskService",
 ]
