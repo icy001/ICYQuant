@@ -44,6 +44,12 @@ from .order_factory import VirtualOrderFactory
 from .execution_feedback import ExecutionFeedback
 from .strategy_runner import StrategyRunner
 from .execution_service import ExecutionService
+from .cost import TransactionCost
+from .commission import CommissionCalculator
+from .slippage import SlippageModel
+from .spread import SpreadModel
+from .cost_engine import TransactionCostEngine
+from .cost_service import CostService
 
 __all__ = [
     "BacktestSession",
@@ -92,4 +98,10 @@ __all__ = [
     "ExecutionFeedback",
     "StrategyRunner",
     "ExecutionService",
+    "TransactionCost",
+    "CommissionCalculator",
+    "SlippageModel",
+    "SpreadModel",
+    "TransactionCostEngine",
+    "CostService",
 ]
