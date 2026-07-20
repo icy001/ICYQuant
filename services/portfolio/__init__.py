@@ -85,6 +85,15 @@ from .performance_report import PerformanceReportGenerator
 from .report_engine import PortfolioReportEngine
 from .report_service import PortfolioReportService
 from .report_repository import ReportRepository
+from .compliance import ComplianceRule, ComplianceViolation
+from .compliance_type import ComplianceType
+from .compliance_rule import PortfolioLimitRule
+from .limit_checker import LimitChecker
+from .risk_rule_monitor import RiskRuleMonitor
+from .breach_detector import BreachDetector
+from .compliance_engine import PortfolioComplianceEngine
+from .compliance_alert import ComplianceAlert
+from .compliance_service import ComplianceService
 
 __all__ = [
     "Portfolio",
@@ -171,4 +180,14 @@ __all__ = [
     "PortfolioReportEngine",
     "PortfolioReportService",
     "ReportRepository",
+    "ComplianceRule",
+    "ComplianceViolation",
+    "ComplianceType",
+    "PortfolioLimitRule",
+    "LimitChecker",
+    "RiskRuleMonitor",
+    "BreachDetector",
+    "PortfolioComplianceEngine",
+    "ComplianceAlert",
+    "ComplianceService",
 ]
