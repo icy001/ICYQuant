@@ -1,21 +1,21 @@
 """
-Allocation drift calculation.
+Portfolio drift detector.
 """
-
-from __future__ import annotations
 
 from decimal import Decimal
 
-from .allocation import Allocation
 
-
-class DriftCalculator:
+class DriftDetector:
     def calculate(
         self,
-        allocation: Allocation,
-    ) -> Decimal:
-        return abs(
-            allocation.current_weight
-            -
-            allocation.target_weight
-        )
+        current,
+        target,
+    ):
+        return target - current
+
+    def exceed_threshold(
+        self,
+        drift,
+        threshold,
+    ):
+        return abs(drift) >= threshold
