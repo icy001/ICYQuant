@@ -1,16 +1,14 @@
 """
-Portfolio report model.
+Portfolio report models.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-
-from .analytics_snapshot import PortfolioAnalyticsSnapshot
-from .summary import PortfolioSummary
+from datetime import datetime
 
 
 @dataclass(frozen=True)
 class PortfolioReport:
-    summary: PortfolioSummary
-    analytics: PortfolioAnalyticsSnapshot
+    report_id: str
+    report_type: str
+    created_at: datetime
+    content: dict

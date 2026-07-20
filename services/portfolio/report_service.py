@@ -1,23 +1,18 @@
 """
-Portfolio reporting service.
+Reporting service.
 """
-
-from __future__ import annotations
-
-from .report_builder import PortfolioReportBuilder
 
 
 class PortfolioReportService:
-    def __init__(self):
-        self.builder = PortfolioReportBuilder()
-
-    def generate(
+    def __init__(
         self,
-        *,
-        account_id: str,
-        analytics,
+        engine,
     ):
-        return self.builder.build(
-            account_id=account_id,
-            analytics=analytics,
-        )
+        self.engine = engine
+
+    def create(
+        self,
+        report_type,
+        data,
+    ):
+        return self.engine.generate(report_type, data)

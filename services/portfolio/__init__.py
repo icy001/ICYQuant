@@ -77,6 +77,14 @@ from .performance_metrics import PerformanceMetric
 from .analytics_engine import PortfolioAnalyticsEngine
 from .analytics_service import PortfolioAnalyticsService
 from .dashboard_snapshot import DashboardSnapshot
+from .report import PortfolioReport
+from .report_type import ReportType
+from .daily_report import DailyReportGenerator
+from .risk_report import RiskReportGenerator
+from .performance_report import PerformanceReportGenerator
+from .report_engine import PortfolioReportEngine
+from .report_service import PortfolioReportService
+from .report_repository import ReportRepository
 
 __all__ = [
     "Portfolio",
@@ -155,4 +163,12 @@ __all__ = [
     "PortfolioAnalyticsEngine",
     "PortfolioAnalyticsService",
     "DashboardSnapshot",
+    "PortfolioReport",
+    "ReportType",
+    "DailyReportGenerator",
+    "RiskReportGenerator",
+    "PerformanceReportGenerator",
+    "PortfolioReportEngine",
+    "PortfolioReportService",
+    "ReportRepository",
 ]
