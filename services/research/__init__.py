@@ -44,6 +44,12 @@ from .snapshot_manager import SnapshotManager
 from .reproducibility import ReproducibilityValidator
 from .manifest import ExperimentManifest
 from .reproducibility_service import ReproducibilityService
+from .search_space import SearchSpace
+from .trial import OptimizationTrial
+from .objective import ObjectiveFunction
+from .optimizer import Optimizer
+from .optimization_result import OptimizationResult
+from .optimization_service import OptimizationService
 
 __all__ = [
     "Experiment",
@@ -92,4 +98,10 @@ __all__ = [
     "ReproducibilityValidator",
     "ExperimentManifest",
     "ReproducibilityService",
+    "SearchSpace",
+    "OptimizationTrial",
+    "ObjectiveFunction",
+    "Optimizer",
+    "OptimizationResult",
+    "OptimizationService",
 ]
