@@ -62,6 +62,12 @@ from .alpha import AlphaCalculator
 from .beta import BetaCalculator
 from .attribution import AttributionAnalyzer
 from .benchmark_service import BenchmarkService
+from .window import AnalysisWindow
+from .splitter import RollingWindowSplitter
+from .trainer import StrategyTrainer
+from .validator import StrategyValidator
+from .walk_forward import WalkForwardEngine
+from .walk_forward_service import WalkForwardService
 
 __all__ = [
     "BacktestSession",
@@ -128,4 +134,10 @@ __all__ = [
     "BetaCalculator",
     "AttributionAnalyzer",
     "BenchmarkService",
+    "AnalysisWindow",
+    "RollingWindowSplitter",
+    "StrategyTrainer",
+    "StrategyValidator",
+    "WalkForwardEngine",
+    "WalkForwardService",
 ]
