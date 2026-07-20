@@ -74,6 +74,12 @@ from .tag import KnowledgeTag
 from .repository import KnowledgeRepository
 from .search import KnowledgeSearch
 from .knowledge_service import KnowledgeService
+from .event import ResearchEvent
+from .publisher import ResearchEventPublisher
+from .subscriber import ResearchEventSubscriber
+from .event_handler import ResearchEventHandler
+from .audit import ResearchEventAudit
+from .event_service import EventService
 
 __all__ = [
     "Experiment",
@@ -152,4 +158,10 @@ __all__ = [
     "KnowledgeRepository",
     "KnowledgeSearch",
     "KnowledgeService",
+    "ResearchEvent",
+    "ResearchEventPublisher",
+    "ResearchEventSubscriber",
+    "ResearchEventHandler",
+    "ResearchEventAudit",
+    "EventService",
 ]
