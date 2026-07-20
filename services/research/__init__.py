@@ -50,6 +50,12 @@ from .objective import ObjectiveFunction
 from .optimizer import Optimizer
 from .optimization_result import OptimizationResult
 from .optimization_service import OptimizationService
+from .window import WalkForwardWindow
+from .generator import WindowGenerator
+from .walk_forward import WalkForwardExecutor
+from .aggregator import WalkForwardAggregator
+from .robustness import RobustnessEvaluator
+from .walk_forward_service import WalkForwardService
 
 __all__ = [
     "Experiment",
@@ -104,4 +110,10 @@ __all__ = [
     "Optimizer",
     "OptimizationResult",
     "OptimizationService",
+    "WalkForwardWindow",
+    "WindowGenerator",
+    "WalkForwardExecutor",
+    "WalkForwardAggregator",
+    "RobustnessEvaluator",
+    "WalkForwardService",
 ]
