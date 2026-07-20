@@ -27,7 +27,12 @@ from .cash_snapshot import CashSnapshot
 from .allocation import AllocationTarget
 from .allocation_snapshot import AllocationSnapshot
 from .allocation_validator import AllocationValidator
-from .rebalance import RebalanceCalculator
+from .rebalance import RebalanceRequest, RebalanceCalculator
+from .drift import DriftDetector
+from .rebalance_policy import RebalancePolicy
+from .rebalance_engine import RebalanceEngine
+from .order_generator import RebalanceOrderGenerator
+from .rebalance_service import RebalanceService
 from .allocation_engine import AssetAllocationEngine
 from .allocation_service import AllocationService
 from .capital import CapitalAllocation
@@ -76,7 +81,13 @@ __all__ = [
     "AllocationTarget",
     "AllocationSnapshot",
     "AllocationValidator",
+    "RebalanceRequest",
     "RebalanceCalculator",
+    "DriftDetector",
+    "RebalancePolicy",
+    "RebalanceEngine",
+    "RebalanceOrderGenerator",
+    "RebalanceService",
     "AssetAllocationEngine",
     "AllocationService",
     "CapitalAllocation",
