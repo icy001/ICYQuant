@@ -18,6 +18,12 @@ from .nav import NAVCalculator
 from .valuation_engine import ValuationEngine
 from .equity_snapshot import EquitySnapshot
 from .valuation_service import ValuationService
+from .cash import CashAccount
+from .cash_transaction import CashTransaction
+from .cash_repository import CashRepository
+from .cash_engine import CashManagementEngine
+from .cash_service import CashService
+from .cash_snapshot import CashSnapshot
 
 __all__ = [
     "Portfolio",
@@ -36,4 +42,10 @@ __all__ = [
     "ValuationEngine",
     "EquitySnapshot",
     "ValuationService",
+    "CashAccount",
+    "CashTransaction",
+    "CashRepository",
+    "CashManagementEngine",
+    "CashService",
+    "CashSnapshot",
 ]
