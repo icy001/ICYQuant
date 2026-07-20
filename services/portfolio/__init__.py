@@ -24,6 +24,12 @@ from .cash_repository import CashRepository
 from .cash_engine import CashManagementEngine
 from .cash_service import CashService
 from .cash_snapshot import CashSnapshot
+from .allocation import AllocationTarget
+from .allocation_snapshot import AllocationSnapshot
+from .allocation_validator import AllocationValidator
+from .rebalance import RebalanceCalculator
+from .allocation_engine import AssetAllocationEngine
+from .allocation_service import AllocationService
 
 __all__ = [
     "Portfolio",
@@ -48,4 +54,10 @@ __all__ = [
     "CashManagementEngine",
     "CashService",
     "CashSnapshot",
+    "AllocationTarget",
+    "AllocationSnapshot",
+    "AllocationValidator",
+    "RebalanceCalculator",
+    "AssetAllocationEngine",
+    "AllocationService",
 ]
