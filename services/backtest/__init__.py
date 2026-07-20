@@ -68,6 +68,12 @@ from .trainer import StrategyTrainer
 from .validator import StrategyValidator
 from .walk_forward import WalkForwardEngine
 from .walk_forward_service import WalkForwardService
+from .parameter import ParameterRange
+from .search_space import SearchSpace
+from .optimizer_result import OptimizationResult
+from .evaluator import StrategyEvaluator
+from .optimizer import ParameterOptimizer
+from .optimization_service import OptimizationService
 
 __all__ = [
     "BacktestSession",
@@ -140,4 +146,10 @@ __all__ = [
     "StrategyValidator",
     "WalkForwardEngine",
     "WalkForwardService",
+    "ParameterRange",
+    "SearchSpace",
+    "OptimizationResult",
+    "StrategyEvaluator",
+    "ParameterOptimizer",
+    "OptimizationService",
 ]
