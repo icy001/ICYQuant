@@ -1,23 +1,20 @@
 """
-Portfolio repository abstraction.
+Portfolio repository.
 """
 
-from __future__ import annotations
 
-from typing import Protocol
+class PortfolioRepository:
+    def __init__(self):
+        self.storage = {}
 
-from .model import Portfolio
-
-
-class PortfolioRepository(Protocol):
-    async def save(
+    def save(
         self,
-        portfolio: Portfolio,
-    ) -> None:
-        ...
+        portfolio,
+    ):
+        self.storage[portfolio.portfolio_id] = portfolio
 
-    async def load(
+    def get(
         self,
-        account_id: str,
-    ) -> Portfolio | None:
-        ...
+        portfolio_id,
+    ):
+        return self.storage.get(portfolio_id)
