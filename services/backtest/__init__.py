@@ -74,6 +74,12 @@ from .optimizer_result import OptimizationResult
 from .evaluator import StrategyEvaluator
 from .optimizer import ParameterOptimizer
 from .optimization_service import OptimizationService
+from .experiment import BacktestExperiment
+from .experiment_config import ExperimentConfig
+from .experiment_result import ExperimentResult
+from .experiment_repository import ExperimentRepository
+from .experiment_service import ExperimentService
+from .comparison import ExperimentComparator
 
 __all__ = [
     "BacktestSession",
@@ -152,4 +158,10 @@ __all__ = [
     "StrategyEvaluator",
     "ParameterOptimizer",
     "OptimizationService",
+    "BacktestExperiment",
+    "ExperimentConfig",
+    "ExperimentResult",
+    "ExperimentRepository",
+    "ExperimentService",
+    "ExperimentComparator",
 ]
