@@ -54,6 +54,13 @@ from .optimizer import PortfolioOptimizer
 from .optimization_validator import OptimizationValidator
 from .optimization_engine import PortfolioOptimizationEngine
 from .optimization_service import OptimizationService
+from .strategy_portfolio import StrategyPortfolio
+from .master_portfolio import MasterPortfolio
+from .strategy_allocation import StrategyAllocation
+from .strategy_registry import StrategyRegistry
+from .strategy_aggregator import StrategyExposureAggregator
+from .multi_strategy_engine import MultiStrategyPortfolioEngine
+from .multi_strategy_service import MultiStrategyService
 
 __all__ = [
     "Portfolio",
@@ -109,4 +116,11 @@ __all__ = [
     "OptimizationValidator",
     "PortfolioOptimizationEngine",
     "OptimizationService",
+    "StrategyPortfolio",
+    "MasterPortfolio",
+    "StrategyAllocation",
+    "StrategyRegistry",
+    "StrategyExposureAggregator",
+    "MultiStrategyPortfolioEngine",
+    "MultiStrategyService",
 ]
