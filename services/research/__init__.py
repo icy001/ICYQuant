@@ -80,6 +80,12 @@ from .subscriber import ResearchEventSubscriber
 from .event_handler import ResearchEventHandler
 from .audit import ResearchEventAudit
 from .event_service import EventService
+from .bootstrap import ResearchBootstrap
+from .container import ResearchContainer
+from .service_registry import ResearchServiceRegistry
+from .initializer import ResearchInitializer
+from .platform import ResearchPlatform
+from .health import ResearchHealthCheck
 
 __all__ = [
     "Experiment",
@@ -164,4 +170,10 @@ __all__ = [
     "ResearchEventHandler",
     "ResearchEventAudit",
     "EventService",
+    "ResearchBootstrap",
+    "ResearchContainer",
+    "ResearchServiceRegistry",
+    "ResearchInitializer",
+    "ResearchPlatform",
+    "ResearchHealthCheck",
 ]
