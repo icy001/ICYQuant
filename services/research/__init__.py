@@ -68,6 +68,12 @@ from .scheduler import WorkflowScheduler
 from .orchestrator import WorkflowOrchestrator
 from .dependency import DependencyResolver
 from .workflow_service import WorkflowService
+from .knowledge import ResearchKnowledge
+from .note import ResearchNote
+from .tag import KnowledgeTag
+from .repository import KnowledgeRepository
+from .search import KnowledgeSearch
+from .knowledge_service import KnowledgeService
 
 __all__ = [
     "Experiment",
@@ -140,4 +146,10 @@ __all__ = [
     "WorkflowOrchestrator",
     "DependencyResolver",
     "WorkflowService",
+    "ResearchKnowledge",
+    "ResearchNote",
+    "KnowledgeTag",
+    "KnowledgeRepository",
+    "KnowledgeSearch",
+    "KnowledgeService",
 ]
