@@ -20,6 +20,12 @@ from .order_simulator import OrderSimulator
 from .execution_pipeline import ExecutionPipeline
 from .result_collector import ResultCollector
 from .integration_service import IntegrationService
+from .metrics import PerformanceMetrics
+from .drawdown import DrawdownAnalyzer
+from .statistics import TradeStatistics
+from .benchmark import BenchmarkComparator
+from .summary import PerformanceSummary
+from .metrics_service import MetricsService
 
 __all__ = [
     "Experiment",
@@ -44,4 +50,10 @@ __all__ = [
     "ExecutionPipeline",
     "ResultCollector",
     "IntegrationService",
+    "PerformanceMetrics",
+    "DrawdownAnalyzer",
+    "TradeStatistics",
+    "BenchmarkComparator",
+    "PerformanceSummary",
+    "MetricsService",
 ]
