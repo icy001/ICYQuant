@@ -15,6 +15,12 @@ from .order_book import VirtualOrderBook
 from .fill import Fill
 from .execution_report import ExecutionReport
 from .exchange_service import ExchangeService
+from .order import VirtualOrder
+from .order_state import VirtualOrderStatus
+from .order_repository import VirtualOrderRepository
+from .router import VirtualOrderRouter
+from .virtual_oms import VirtualOMS
+from .oms_service import OMSService
 
 __all__ = [
     "BacktestSession",
@@ -34,4 +40,10 @@ __all__ = [
     "Fill",
     "ExecutionReport",
     "ExchangeService",
+    "VirtualOrder",
+    "VirtualOrderStatus",
+    "VirtualOrderRepository",
+    "VirtualOrderRouter",
+    "VirtualOMS",
+    "OMSService",
 ]
