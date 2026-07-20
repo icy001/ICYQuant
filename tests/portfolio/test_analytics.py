@@ -1,72 +1,117 @@
 from decimal import Decimal
 
 from services.portfolio import (
-    CashBalance,
-    Portfolio,
+    KPICalculator,
+    AnalyticsMetric,
+    PortfolioKPI,
+    RiskMetric,
+    PerformanceMetric,
+    PortfolioAnalyticsEngine,
     PortfolioAnalyticsService,
-    PortfolioPosition,
-    PortfolioStatus,
+    DashboardSnapshot,
 )
 
 
-def test_analytics_snapshot():
-    portfolio = Portfolio(
-        account_id="ACC001",
-        status=PortfolioStatus.ACTIVE,
-        cash=CashBalance(
-            currency="USD",
-            available=Decimal("1000"),
-            frozen=Decimal("0"),
-        ),
-        positions=[],
+def test_return_metric():
+    calculator = KPICalculator()
+
+    result = calculator.calculate_return(
+        Decimal("100"),
+        Decimal("110"),
     )
 
-    snapshot = PortfolioAnalyticsService().snapshot(
-        portfolio=portfolio,
-        cost_value=Decimal("0"),
-        realized_pnl=Decimal("0"),
-        beginning_value=Decimal("1000"),
-        peak_value=Decimal("1000"),
-        trough_value=Decimal("1000"),
-        volatility=Decimal("0"),
-        sharpe_ratio=Decimal("0"),
+    assert result == Decimal("0.1")
+
+
+def test_return_metric_zero_start():
+    calculator = KPICalculator()
+
+    result = calculator.calculate_return(
+        Decimal("0"),
+        Decimal("100"),
     )
 
-    assert snapshot.valuation.cash_value == Decimal("1000")
+    assert result == Decimal("0")
 
 
-def test_analytics_full_snapshot():
-    portfolio = Portfolio(
-        account_id="ACC002",
-        status=PortfolioStatus.ACTIVE,
-        cash=CashBalance(
-            currency="USD",
-            available=Decimal("5000"),
-            frozen=Decimal("0"),
-        ),
-        positions=[
-            PortfolioPosition(
-                symbol="AAPL",
-                quantity=Decimal("10"),
-                market_value=Decimal("2500"),
-            ),
-        ],
+def test_analytics_metric():
+    metric = AnalyticsMetric(
+        name="return",
+        value=Decimal("0.1"),
+        category="performance",
     )
 
-    snapshot = PortfolioAnalyticsService().snapshot(
-        portfolio=portfolio,
-        cost_value=Decimal("2000"),
-        realized_pnl=Decimal("300"),
-        beginning_value=Decimal("7000"),
-        peak_value=Decimal("8000"),
-        trough_value=Decimal("6500"),
-        volatility=Decimal("0.20"),
-        sharpe_ratio=Decimal("1.5"),
+    assert metric.name == "return"
+    assert metric.value == Decimal("0.1")
+    assert metric.category == "performance"
+
+
+def test_portfolio_kpi():
+    kpi = PortfolioKPI(
+        nav=Decimal("100000"),
+        return_rate=Decimal("0.1"),
+        risk=Decimal("0.05"),
+        sharpe=Decimal("2"),
     )
 
-    assert snapshot.valuation.market_value == Decimal("2500")
-    assert snapshot.valuation.cash_value == Decimal("5000")
-    assert snapshot.valuation.net_asset_value == Decimal("7500")
-    assert snapshot.pnl.unrealized_pnl == Decimal("500")
-    assert snapshot.pnl.realized_pnl == Decimal("300")
-    assert snapshot.pnl.total_pnl == Decimal("800")
+    assert kpi.nav == Decimal("100000")
+    assert kpi.return_rate == Decimal("0.1")
+    assert kpi.risk == Decimal("0.05")
+    assert kpi.sharpe == Decimal("2")
+
+
+def test_risk_metric():
+    risk = RiskMetric(
+        var=Decimal("0.02"),
+        volatility=Decimal("0.15"),
+        drawdown=Decimal("0.1"),
+    )
+
+    assert risk.var == Decimal("0.02")
+    assert risk.volatility == Decimal("0.15")
+    assert risk.drawdown == Decimal("0.1")
+
+
+def test_performance_metric():
+    performance = PerformanceMetric(
+        total_return=Decimal("0.15"),
+        win_rate=Decimal("0.6"),
+        sharpe_ratio=Decimal("1.8"),
+    )
+
+    assert performance.total_return == Decimal("0.15")
+    assert performance.win_rate == Decimal("0.6")
+    assert performance.sharpe_ratio == Decimal("1.8")
+
+
+def test_analytics_engine():
+    calculator = KPICalculator()
+    engine = PortfolioAnalyticsEngine(calculator)
+
+    result = engine.generate([Decimal("100"), Decimal("110")])
+
+    assert "return" in result
+    assert "current_nav" in result
+    assert result["return"] == Decimal("0.1")
+
+
+def test_analytics_service():
+    calculator = KPICalculator()
+    engine = PortfolioAnalyticsEngine(calculator)
+    service = PortfolioAnalyticsService(engine)
+
+    result = service.snapshot([Decimal("100"), Decimal("110")])
+
+    assert "return" in result
+
+
+def test_dashboard_snapshot():
+    snapshot = DashboardSnapshot(
+        performance={"return": Decimal("0.1")},
+        risk={"volatility": Decimal("0.15")},
+        strategy={"alpha": Decimal("0.05")},
+    )
+
+    assert isinstance(snapshot.performance, dict)
+    assert isinstance(snapshot.risk, dict)
+    assert isinstance(snapshot.strategy, dict)

@@ -69,6 +69,14 @@ from .alpha_beta import AlphaBetaCalculator
 from .performance_engine import PerformanceAttributionEngine
 from .performance_service import PerformanceService
 from .performance_snapshot import PerformanceSnapshot
+from .analytics_metric import AnalyticsMetric
+from .kpi import PortfolioKPI
+from .kpi_calculator import KPICalculator
+from .risk_metrics import RiskMetric
+from .performance_metrics import PerformanceMetric
+from .analytics_engine import PortfolioAnalyticsEngine
+from .analytics_service import PortfolioAnalyticsService
+from .dashboard_snapshot import DashboardSnapshot
 
 __all__ = [
     "Portfolio",
@@ -139,4 +147,12 @@ __all__ = [
     "PerformanceAttributionEngine",
     "PerformanceService",
     "PerformanceSnapshot",
+    "AnalyticsMetric",
+    "PortfolioKPI",
+    "KPICalculator",
+    "RiskMetric",
+    "PerformanceMetric",
+    "PortfolioAnalyticsEngine",
+    "PortfolioAnalyticsService",
+    "DashboardSnapshot",
 ]
