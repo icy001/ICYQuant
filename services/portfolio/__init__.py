@@ -30,6 +30,12 @@ from .allocation_validator import AllocationValidator
 from .rebalance import RebalanceCalculator
 from .allocation_engine import AssetAllocationEngine
 from .allocation_service import AllocationService
+from .capital import CapitalAllocation
+from .capital_pool import CapitalPool
+from .capital_validator import CapitalValidator
+from .capital_engine import CapitalAllocationEngine
+from .capital_service import CapitalService
+from .capital_snapshot import CapitalSnapshot
 
 __all__ = [
     "Portfolio",
@@ -60,4 +66,10 @@ __all__ = [
     "RebalanceCalculator",
     "AssetAllocationEngine",
     "AllocationService",
+    "CapitalAllocation",
+    "CapitalPool",
+    "CapitalValidator",
+    "CapitalAllocationEngine",
+    "CapitalService",
+    "CapitalSnapshot",
 ]
