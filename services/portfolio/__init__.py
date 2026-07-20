@@ -36,6 +36,12 @@ from .capital_validator import CapitalValidator
 from .capital_engine import CapitalAllocationEngine
 from .capital_service import CapitalService
 from .capital_snapshot import CapitalSnapshot
+from .risk_budget import RiskBudget
+from .risk_snapshot import RiskSnapshot
+from .risk_calculator import RiskCalculator
+from .risk_validator import RiskBudgetValidator
+from .risk_budget_engine import RiskBudgetEngine
+from .risk_budget_service import RiskBudgetService
 
 __all__ = [
     "Portfolio",
@@ -72,4 +78,10 @@ __all__ = [
     "CapitalAllocationEngine",
     "CapitalService",
     "CapitalSnapshot",
+    "RiskBudget",
+    "RiskSnapshot",
+    "RiskCalculator",
+    "RiskBudgetValidator",
+    "RiskBudgetEngine",
+    "RiskBudgetService",
 ]
