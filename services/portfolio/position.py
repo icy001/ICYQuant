@@ -1,15 +1,13 @@
 """
-Portfolio position snapshot.
+Portfolio position model.
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
 
 
 @dataclass
-class PortfolioPosition:
+class Position:
     symbol: str
     quantity: Decimal
-    market_value: Decimal
+    average_price: Decimal
