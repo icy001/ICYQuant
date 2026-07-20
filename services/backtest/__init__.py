@@ -80,6 +80,11 @@ from .experiment_result import ExperimentResult
 from .experiment_repository import ExperimentRepository
 from .experiment_service import ExperimentService
 from .comparison import ExperimentComparator
+from .platform import BacktestPlatform
+from .orchestrator import BacktestOrchestrator
+from .component_registry import BacktestComponentRegistry
+from .bootstrap import BacktestBootstrap
+from .health import BacktestHealthCheck
 
 __all__ = [
     "BacktestSession",
@@ -164,4 +169,9 @@ __all__ = [
     "ExperimentRepository",
     "ExperimentService",
     "ExperimentComparator",
+    "BacktestPlatform",
+    "BacktestOrchestrator",
+    "BacktestComponentRegistry",
+    "BacktestBootstrap",
+    "BacktestHealthCheck",
 ]
