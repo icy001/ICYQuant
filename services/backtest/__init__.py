@@ -57,6 +57,11 @@ from .exposure import ExposureChecker
 from .drawdown_guard import DrawdownGuard
 from .risk_engine import BacktestRiskEngine
 from .risk_service import RiskService
+from .benchmark_model import Benchmark
+from .alpha import AlphaCalculator
+from .beta import BetaCalculator
+from .attribution import AttributionAnalyzer
+from .benchmark_service import BenchmarkService
 
 __all__ = [
     "BacktestSession",
@@ -118,4 +123,9 @@ __all__ = [
     "DrawdownGuard",
     "BacktestRiskEngine",
     "RiskService",
+    "Benchmark",
+    "AlphaCalculator",
+    "BetaCalculator",
+    "AttributionAnalyzer",
+    "BenchmarkService",
 ]
