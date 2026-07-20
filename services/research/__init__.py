@@ -32,6 +32,12 @@ from .experiment_snapshot import ExperimentSnapshot
 from .report import ComparisonReport
 from .experiment_comparator import ExperimentComparator
 from .comparison_service import ComparisonService
+from .report_builder import ReportBuilder
+from .report_template import ReportTemplate
+from .report_section import ReportSection
+from .report_model import ResearchReport
+from .report_service import ReportService
+from .exporter import ReportExporter
 
 __all__ = [
     "Experiment",
@@ -68,4 +74,10 @@ __all__ = [
     "ComparisonReport",
     "ExperimentComparator",
     "ComparisonService",
+    "ReportBuilder",
+    "ReportTemplate",
+    "ReportSection",
+    "ResearchReport",
+    "ReportService",
+    "ReportExporter",
 ]
