@@ -56,6 +56,12 @@ from .walk_forward import WalkForwardExecutor
 from .aggregator import WalkForwardAggregator
 from .robustness import RobustnessEvaluator
 from .walk_forward_service import WalkForwardService
+from .artifact import ResearchArtifact
+from .artifact_metadata import ArtifactMetadata
+from .artifact_storage import ArtifactStorage
+from .artifact_registry import ArtifactRegistry
+from .artifact_service import ArtifactService
+from .lifecycle import ArtifactLifecycle
 
 __all__ = [
     "Experiment",
@@ -116,4 +122,10 @@ __all__ = [
     "WalkForwardAggregator",
     "RobustnessEvaluator",
     "WalkForwardService",
+    "ResearchArtifact",
+    "ArtifactMetadata",
+    "ArtifactStorage",
+    "ArtifactRegistry",
+    "ArtifactService",
+    "ArtifactLifecycle",
 ]
