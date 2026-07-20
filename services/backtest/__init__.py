@@ -27,6 +27,12 @@ from .cash import CashManager
 from .equity import EquityCalculator
 from .simulator import PortfolioSimulator
 from .portfolio_service import PortfolioService
+from .metrics import PerformanceMetrics
+from .drawdown import DrawdownAnalyzer
+from .benchmark import BenchmarkComparator
+from .statistics import TradeStatistics
+from .performance import PerformanceAnalyzer
+from .analytics_service import AnalyticsService
 
 __all__ = [
     "BacktestSession",
@@ -58,4 +64,10 @@ __all__ = [
     "EquityCalculator",
     "PortfolioSimulator",
     "PortfolioService",
+    "PerformanceMetrics",
+    "DrawdownAnalyzer",
+    "BenchmarkComparator",
+    "TradeStatistics",
+    "PerformanceAnalyzer",
+    "AnalyticsService",
 ]
