@@ -61,6 +61,14 @@ from .strategy_registry import StrategyRegistry
 from .strategy_aggregator import StrategyExposureAggregator
 from .multi_strategy_engine import MultiStrategyPortfolioEngine
 from .multi_strategy_service import MultiStrategyService
+from .performance import PerformanceContribution
+from .return_calculator import ReturnCalculator
+from .pnl_attribution import PnLAttributionCalculator
+from .strategy_attribution import StrategyAttribution
+from .alpha_beta import AlphaBetaCalculator
+from .performance_engine import PerformanceAttributionEngine
+from .performance_service import PerformanceService
+from .performance_snapshot import PerformanceSnapshot
 
 __all__ = [
     "Portfolio",
@@ -123,4 +131,12 @@ __all__ = [
     "StrategyExposureAggregator",
     "MultiStrategyPortfolioEngine",
     "MultiStrategyService",
+    "PerformanceContribution",
+    "ReturnCalculator",
+    "PnLAttributionCalculator",
+    "StrategyAttribution",
+    "AlphaBetaCalculator",
+    "PerformanceAttributionEngine",
+    "PerformanceService",
+    "PerformanceSnapshot",
 ]
