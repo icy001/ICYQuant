@@ -26,6 +26,12 @@ from .statistics import TradeStatistics
 from .benchmark import BenchmarkComparator
 from .summary import PerformanceSummary
 from .metrics_service import MetricsService
+from .comparison import ExperimentComparison
+from .ranking import ExperimentRanking
+from .experiment_snapshot import ExperimentSnapshot
+from .report import ComparisonReport
+from .experiment_comparator import ExperimentComparator
+from .comparison_service import ComparisonService
 
 __all__ = [
     "Experiment",
@@ -56,4 +62,10 @@ __all__ = [
     "BenchmarkComparator",
     "PerformanceSummary",
     "MetricsService",
+    "ExperimentComparison",
+    "ExperimentRanking",
+    "ExperimentSnapshot",
+    "ComparisonReport",
+    "ExperimentComparator",
+    "ComparisonService",
 ]
