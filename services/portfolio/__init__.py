@@ -42,6 +42,13 @@ from .risk_calculator import RiskCalculator
 from .risk_validator import RiskBudgetValidator
 from .risk_budget_engine import RiskBudgetEngine
 from .risk_budget_service import RiskBudgetService
+from .optimization import OptimizationResult
+from .optimization_objective import OptimizationObjective
+from .constraint import AllocationConstraint
+from .optimizer import PortfolioOptimizer
+from .optimization_validator import OptimizationValidator
+from .optimization_engine import PortfolioOptimizationEngine
+from .optimization_service import OptimizationService
 
 __all__ = [
     "Portfolio",
@@ -84,4 +91,11 @@ __all__ = [
     "RiskBudgetValidator",
     "RiskBudgetEngine",
     "RiskBudgetService",
+    "OptimizationResult",
+    "OptimizationObjective",
+    "AllocationConstraint",
+    "PortfolioOptimizer",
+    "OptimizationValidator",
+    "PortfolioOptimizationEngine",
+    "OptimizationService",
 ]
