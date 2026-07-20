@@ -38,6 +38,12 @@ from .report_section import ReportSection
 from .report_model import ResearchReport
 from .report_service import ReportService
 from .exporter import ReportExporter
+from .environment import EnvironmentSnapshot
+from .configuration import ExperimentConfiguration
+from .snapshot_manager import SnapshotManager
+from .reproducibility import ReproducibilityValidator
+from .manifest import ExperimentManifest
+from .reproducibility_service import ReproducibilityService
 
 __all__ = [
     "Experiment",
@@ -80,4 +86,10 @@ __all__ = [
     "ResearchReport",
     "ReportService",
     "ReportExporter",
+    "EnvironmentSnapshot",
+    "ExperimentConfiguration",
+    "SnapshotManager",
+    "ReproducibilityValidator",
+    "ExperimentManifest",
+    "ReproducibilityService",
 ]
