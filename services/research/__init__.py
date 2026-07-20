@@ -62,6 +62,12 @@ from .artifact_storage import ArtifactStorage
 from .artifact_registry import ArtifactRegistry
 from .artifact_service import ArtifactService
 from .lifecycle import ArtifactLifecycle
+from .workflow import ResearchWorkflow
+from .task import WorkflowTask
+from .scheduler import WorkflowScheduler
+from .orchestrator import WorkflowOrchestrator
+from .dependency import DependencyResolver
+from .workflow_service import WorkflowService
 
 __all__ = [
     "Experiment",
@@ -128,4 +134,10 @@ __all__ = [
     "ArtifactRegistry",
     "ArtifactService",
     "ArtifactLifecycle",
+    "ResearchWorkflow",
+    "WorkflowTask",
+    "WorkflowScheduler",
+    "WorkflowOrchestrator",
+    "DependencyResolver",
+    "WorkflowService",
 ]
