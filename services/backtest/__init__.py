@@ -33,6 +33,12 @@ from .benchmark import BenchmarkComparator
 from .statistics import TradeStatistics
 from .performance import PerformanceAnalyzer
 from .analytics_service import AnalyticsService
+from .event import BacktestEvent
+from .queue import EventQueue
+from .dispatcher import EventDispatcher
+from .processor import EventProcessor
+from .event_loop import EventLoop
+from .engine import BacktestEngine
 
 __all__ = [
     "BacktestSession",
@@ -70,4 +76,10 @@ __all__ = [
     "TradeStatistics",
     "PerformanceAnalyzer",
     "AnalyticsService",
+    "BacktestEvent",
+    "EventQueue",
+    "EventDispatcher",
+    "EventProcessor",
+    "EventLoop",
+    "BacktestEngine",
 ]
