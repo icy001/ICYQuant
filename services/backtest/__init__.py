@@ -39,6 +39,11 @@ from .dispatcher import EventDispatcher
 from .processor import EventProcessor
 from .event_loop import EventLoop
 from .engine import BacktestEngine
+from .execution import ExecutionSimulator
+from .order_factory import VirtualOrderFactory
+from .execution_feedback import ExecutionFeedback
+from .strategy_runner import StrategyRunner
+from .execution_service import ExecutionService
 
 __all__ = [
     "BacktestSession",
@@ -82,4 +87,9 @@ __all__ = [
     "EventProcessor",
     "EventLoop",
     "BacktestEngine",
+    "ExecutionSimulator",
+    "VirtualOrderFactory",
+    "ExecutionFeedback",
+    "StrategyRunner",
+    "ExecutionService",
 ]
