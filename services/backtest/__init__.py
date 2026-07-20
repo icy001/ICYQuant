@@ -21,6 +21,12 @@ from .order_repository import VirtualOrderRepository
 from .router import VirtualOrderRouter
 from .virtual_oms import VirtualOMS
 from .oms_service import OMSService
+from .portfolio import Portfolio
+from .position import Position
+from .cash import CashManager
+from .equity import EquityCalculator
+from .simulator import PortfolioSimulator
+from .portfolio_service import PortfolioService
 
 __all__ = [
     "BacktestSession",
@@ -46,4 +52,10 @@ __all__ = [
     "VirtualOrderRouter",
     "VirtualOMS",
     "OMSService",
+    "Portfolio",
+    "Position",
+    "CashManager",
+    "EquityCalculator",
+    "PortfolioSimulator",
+    "PortfolioService",
 ]
