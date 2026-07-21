@@ -1,21 +1,18 @@
 """
-Portfolio recovery service.
+Portfolio recovery models.
 """
 
-from __future__ import annotations
+from dataclasses import dataclass
+from datetime import datetime
 
-from .repository import PortfolioRepository
 
+@dataclass(frozen=True)
+class RecoveryRecord:
 
-class PortfolioRecoveryService:
-    def __init__(
-        self,
-        repository: PortfolioRepository,
-    ):
-        self.repository = repository
+    recovery_id: str
 
-    async def recover(
-        self,
-        account_id: str,
-    ):
-        return await self.repository.load(account_id)
+    snapshot_id: str
+
+    created_at: datetime
+
+    status: str

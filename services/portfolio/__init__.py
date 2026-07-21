@@ -134,6 +134,14 @@ from .snapshot_engine import PortfolioSnapshotEngine
 from .snapshot_restore import SnapshotRestore
 from .snapshot_service import PortfolioSnapshotService
 from .snapshot_lifecycle import SnapshotLifecycle
+from .recovery import RecoveryRecord
+from .recovery_repository import RecoveryRepository
+from .recovery_validator import RecoveryValidator
+from .recovery_executor import RecoveryExecutor
+from .recovery_engine import PortfolioRecoveryEngine
+from .recovery_service import PortfolioRecoveryService
+from .recovery_history import RecoveryHistory
+from .recovery_status import RecoveryStatus
 
 __all__ = [
     "Portfolio",
@@ -271,4 +279,12 @@ __all__ = [
     "SnapshotRestore",
     "PortfolioSnapshotService",
     "SnapshotLifecycle",
+    "RecoveryRecord",
+    "RecoveryRepository",
+    "RecoveryValidator",
+    "RecoveryExecutor",
+    "PortfolioRecoveryEngine",
+    "PortfolioRecoveryService",
+    "RecoveryHistory",
+    "RecoveryStatus",
 ]
