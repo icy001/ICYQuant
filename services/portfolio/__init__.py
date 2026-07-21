@@ -110,6 +110,14 @@ from .version_query import VersionQuery
 from .version_rollback import VersionRollback
 from .version_service import PortfolioVersionService
 from .version_snapshot import VersionSnapshot
+from .persistence_snapshot import PortfolioSnapshotRecord
+from .persistence_snapshot_repository import SnapshotRepository
+from .persistence_snapshot_archive import SnapshotArchive
+from .persistence_snapshot_compressor import SnapshotCompressor
+from .persistence_snapshot_engine import PortfolioSnapshotEngine
+from .persistence_snapshot_restore import SnapshotRestore
+from .persistence_snapshot_service import PortfolioSnapshotService
+from .persistence_snapshot_lifecycle import SnapshotLifecycle
 
 __all__ = [
     "Portfolio",
@@ -222,4 +230,12 @@ __all__ = [
     "VersionRollback",
     "PortfolioVersionService",
     "VersionSnapshot",
+    "PortfolioSnapshotRecord",
+    "SnapshotRepository",
+    "SnapshotArchive",
+    "SnapshotCompressor",
+    "PortfolioSnapshotEngine",
+    "SnapshotRestore",
+    "PortfolioSnapshotService",
+    "SnapshotLifecycle",
 ]
