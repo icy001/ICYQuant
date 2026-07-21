@@ -126,6 +126,14 @@ from .audit_engine import PortfolioAuditEngine
 from .audit_service import PortfolioAuditService
 from .audit_snapshot import AuditSnapshot
 from .audit_query import AuditQuery
+from .snapshot import PortfolioSnapshot, ValuationSnapshot
+from .snapshot_repository import SnapshotRepository
+from .snapshot_archive import SnapshotArchive
+from .snapshot_compressor import SnapshotCompressor
+from .snapshot_engine import PortfolioSnapshotEngine
+from .snapshot_restore import SnapshotRestore
+from .snapshot_service import PortfolioSnapshotService
+from .snapshot_lifecycle import SnapshotLifecycle
 
 __all__ = [
     "Portfolio",
@@ -254,4 +262,13 @@ __all__ = [
     "PortfolioAuditService",
     "AuditSnapshot",
     "AuditQuery",
+    "PortfolioSnapshot",
+    "ValuationSnapshot",
+    "SnapshotRepository",
+    "SnapshotArchive",
+    "SnapshotCompressor",
+    "PortfolioSnapshotEngine",
+    "SnapshotRestore",
+    "PortfolioSnapshotService",
+    "SnapshotLifecycle",
 ]
