@@ -190,6 +190,14 @@ from .event_recovery import EventRecovery
 from .event_sourcing_engine import PortfolioEventSourcingEngine
 from .event_service import PortfolioEventService
 from .event_query import EventQuery
+from .projection import PortfolioProjection
+from .projection_repository import ProjectionRepository
+from .projection_builder import ProjectionBuilder
+from .materialized_view import MaterializedView
+from .projection_rebuilder import ProjectionRebuilder
+from .projection_engine import PortfolioProjectionEngine
+from .projection_service import PortfolioProjectionService
+from .projection_query import ProjectionQuery
 
 __all__ = [
     "Portfolio",
@@ -383,4 +391,12 @@ __all__ = [
     "PortfolioEventSourcingEngine",
     "PortfolioEventService",
     "EventQuery",
+    "PortfolioProjection",
+    "ProjectionRepository",
+    "ProjectionBuilder",
+    "MaterializedView",
+    "ProjectionRebuilder",
+    "PortfolioProjectionEngine",
+    "PortfolioProjectionService",
+    "ProjectionQuery",
 ]
