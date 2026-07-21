@@ -1,26 +1,31 @@
+from datetime import datetime
+
 from services.portfolio import (
-    EventPublisher,
-    EventRepository,
+    EventReplay,
+    PortfolioEvent,
     PortfolioEventSourcingEngine,
+    PortfolioEventStore,
 )
 
 
-def test_event_sourcing():
-    repository = EventRepository()
-    publisher = EventPublisher()
+def test_event_rebuild():
+    store = PortfolioEventStore()
+
     engine = PortfolioEventSourcingEngine(
-        repository,
-        publisher,
+        store,
+        EventReplay(),
     )
 
-    event = engine.record(
-        "EVENT-001",
-        "PORTFOLIO_CREATED",
-        "PORT-001",
-        {"cash": 100000},
+    engine.append(
+        PortfolioEvent(
+            "EVT-001",
+            "PORT-001",
+            "CASH",
+            datetime.utcnow(),
+            {"cash": 100000},
+        )
     )
 
-    assert event.event_id == "EVENT-001"
-    assert event.event_type == "PORTFOLIO_CREATED"
-    assert event.portfolio_id == "PORT-001"
-    assert len(repository.list_all()) == 1
+    state = engine.rebuild()
+
+    assert state["cash"] == 100000

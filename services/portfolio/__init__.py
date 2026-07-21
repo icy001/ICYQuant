@@ -182,14 +182,14 @@ from .consensus_state import ConsensusState
 from .consensus_engine import PortfolioConsensusEngine
 from .consensus_service import PortfolioConsensusService
 from .consensus_monitor import ConsensusMonitor
-from .event import PortfolioEvent
-from .event_type import EventType
-from .event_repository import EventRepository
-from .event_publisher import EventPublisher
-from .event_subscriber import EventSubscriber
+from .event_record import PortfolioEvent
+from .event_store import PortfolioEventStore
+from .event_replay import EventReplay
+from .event_snapshot import EventSnapshot
+from .event_recovery import EventRecovery
 from .event_sourcing_engine import PortfolioEventSourcingEngine
 from .event_service import PortfolioEventService
-from .event_monitor import EventMonitor
+from .event_query import EventQuery
 
 __all__ = [
     "Portfolio",
@@ -376,11 +376,11 @@ __all__ = [
     "PortfolioConsensusService",
     "ConsensusMonitor",
     "PortfolioEvent",
-    "EventType",
-    "EventRepository",
-    "EventPublisher",
-    "EventSubscriber",
+    "PortfolioEventStore",
+    "EventReplay",
+    "EventSnapshot",
+    "EventRecovery",
     "PortfolioEventSourcingEngine",
     "PortfolioEventService",
-    "EventMonitor",
+    "EventQuery",
 ]

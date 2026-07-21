@@ -1,5 +1,5 @@
 """
-Event service.
+Portfolio event service.
 """
 
 
@@ -12,13 +12,15 @@ class PortfolioEventService:
 
         self.engine = engine
 
-    def record(
+    def append(
         self,
-        *args,
-        **kwargs,
+        event,
     ):
 
-        return self.engine.record(
-            *args,
-            **kwargs,
+        self.engine.append(
+            event,
         )
+
+    def rebuild(self):
+
+        return self.engine.rebuild()
