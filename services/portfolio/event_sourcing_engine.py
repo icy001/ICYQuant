@@ -2,45 +2,30 @@
 Portfolio event sourcing engine.
 """
 
-from datetime import datetime
-
-from .event import PortfolioEvent
-
 
 class PortfolioEventSourcingEngine:
 
     def __init__(
         self,
-        repository,
-        publisher,
+        store,
+        replay,
     ):
 
-        self.repository = repository
+        self.store = store
 
-        self.publisher = publisher
+        self.replay = replay
 
-    def record(
+    def append(
         self,
-        event_id,
-        event_type,
-        portfolio_id,
-        payload,
+        event,
     ):
 
-        event = PortfolioEvent(
-            event_id=event_id,
-            event_type=event_type,
-            portfolio_id=portfolio_id,
-            occurred_at=datetime.utcnow(),
-            payload=payload,
+        self.store.append(
+            event,
         )
 
-        self.repository.save(
-            event
-        )
+    def rebuild(self):
 
-        self.publisher.publish(
-            event
+        return self.replay.replay(
+            self.store.all_events()
         )
-
-        return event
