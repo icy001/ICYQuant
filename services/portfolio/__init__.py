@@ -142,6 +142,14 @@ from .recovery_engine import PortfolioRecoveryEngine
 from .recovery_service import PortfolioRecoveryService
 from .recovery_history import RecoveryHistory
 from .recovery_status import RecoveryStatus
+from .cluster_node import ClusterNode
+from .cluster_repository import ClusterRepository
+from .leader_election import LeaderElection
+from .heartbeat_monitor import HeartbeatMonitor
+from .cluster_coordinator import PortfolioClusterCoordinator
+from .cluster_service import ClusterService
+from .cluster_health import ClusterHealth
+from .node_role import NodeRole
 
 __all__ = [
     "Portfolio",
@@ -287,4 +295,12 @@ __all__ = [
     "PortfolioRecoveryService",
     "RecoveryHistory",
     "RecoveryStatus",
+    "ClusterNode",
+    "ClusterRepository",
+    "LeaderElection",
+    "HeartbeatMonitor",
+    "PortfolioClusterCoordinator",
+    "ClusterService",
+    "ClusterHealth",
+    "NodeRole",
 ]
