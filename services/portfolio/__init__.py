@@ -150,6 +150,14 @@ from .cluster_coordinator import PortfolioClusterCoordinator
 from .cluster_service import ClusterService
 from .cluster_health import ClusterHealth
 from .node_role import NodeRole
+from .scheduler_job import SchedulerJob
+from .job_queue import JobQueue
+from .load_balancer import LoadBalancer
+from .task_dispatcher import TaskDispatcher
+from .task_failover import TaskFailover
+from .distributed_scheduler import DistributedScheduler
+from .scheduler_service import SchedulerService
+from .scheduler_monitor import SchedulerMonitor
 
 __all__ = [
     "Portfolio",
@@ -303,4 +311,12 @@ __all__ = [
     "ClusterService",
     "ClusterHealth",
     "NodeRole",
+    "SchedulerJob",
+    "JobQueue",
+    "LoadBalancer",
+    "TaskDispatcher",
+    "TaskFailover",
+    "DistributedScheduler",
+    "SchedulerService",
+    "SchedulerMonitor",
 ]
