@@ -118,6 +118,14 @@ from .persistence_snapshot_engine import PortfolioSnapshotEngine
 from .persistence_snapshot_restore import SnapshotRestore
 from .persistence_snapshot_service import PortfolioSnapshotService
 from .persistence_snapshot_lifecycle import SnapshotLifecycle
+from .audit import AuditRecord
+from .audit_type import AuditType
+from .audit_repository import AuditRepository
+from .audit_recorder import AuditRecorder
+from .audit_engine import PortfolioAuditEngine
+from .audit_service import PortfolioAuditService
+from .audit_snapshot import AuditSnapshot
+from .audit_query import AuditQuery
 
 __all__ = [
     "Portfolio",
@@ -238,4 +246,12 @@ __all__ = [
     "SnapshotRestore",
     "PortfolioSnapshotService",
     "SnapshotLifecycle",
+    "AuditRecord",
+    "AuditType",
+    "AuditRepository",
+    "AuditRecorder",
+    "PortfolioAuditEngine",
+    "PortfolioAuditService",
+    "AuditSnapshot",
+    "AuditQuery",
 ]
