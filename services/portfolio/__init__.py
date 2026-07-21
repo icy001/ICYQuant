@@ -94,6 +94,14 @@ from .breach_detector import BreachDetector
 from .compliance_engine import PortfolioComplianceEngine
 from .compliance_alert import ComplianceAlert
 from .compliance_service import ComplianceService
+from .replication import ReplicationRecord
+from .replication_status import ReplicationStatus
+from .replication_repository import ReplicationRepository
+from .replication_executor import ReplicationExecutor
+from .replication_health import ReplicationHealthChecker
+from .replication_engine import PortfolioReplicationEngine
+from .replication_service import PortfolioReplicationService
+from .failover import FailoverManager
 
 __all__ = [
     "Portfolio",
@@ -190,4 +198,12 @@ __all__ = [
     "PortfolioComplianceEngine",
     "ComplianceAlert",
     "ComplianceService",
+    "ReplicationRecord",
+    "ReplicationStatus",
+    "ReplicationRepository",
+    "ReplicationExecutor",
+    "ReplicationHealthChecker",
+    "PortfolioReplicationEngine",
+    "PortfolioReplicationService",
+    "FailoverManager",
 ]
