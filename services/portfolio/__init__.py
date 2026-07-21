@@ -166,6 +166,14 @@ from .retry_engine import RetryEngine
 from .distributed_execution_engine import DistributedExecutionEngine
 from .execution_service import ExecutionService
 from .execution_monitor import ExecutionMonitor
+from .state import PortfolioState
+from .state_repository import StateRepository
+from .state_synchronizer import StateSynchronizer
+from .state_validator import StateValidator
+from .state_health import StateHealth
+from .state_manager import PortfolioStateManager
+from .state_service import PortfolioStateService
+from .state_recovery import StateRecovery
 
 __all__ = [
     "Portfolio",
@@ -335,4 +343,12 @@ __all__ = [
     "DistributedExecutionEngine",
     "ExecutionService",
     "ExecutionMonitor",
+    "PortfolioState",
+    "StateRepository",
+    "StateSynchronizer",
+    "StateValidator",
+    "StateHealth",
+    "PortfolioStateManager",
+    "PortfolioStateService",
+    "StateRecovery",
 ]
