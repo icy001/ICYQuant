@@ -102,6 +102,14 @@ from .replication_health import ReplicationHealthChecker
 from .replication_engine import PortfolioReplicationEngine
 from .replication_service import PortfolioReplicationService
 from .failover import FailoverManager
+from .version import PortfolioVersion
+from .version_repository import VersionRepository
+from .version_diff import VersionDiff
+from .version_engine import PortfolioVersionEngine
+from .version_query import VersionQuery
+from .version_rollback import VersionRollback
+from .version_service import PortfolioVersionService
+from .version_snapshot import VersionSnapshot
 
 __all__ = [
     "Portfolio",
@@ -206,4 +214,12 @@ __all__ = [
     "PortfolioReplicationEngine",
     "PortfolioReplicationService",
     "FailoverManager",
+    "PortfolioVersion",
+    "VersionRepository",
+    "VersionDiff",
+    "PortfolioVersionEngine",
+    "VersionQuery",
+    "VersionRollback",
+    "PortfolioVersionService",
+    "VersionSnapshot",
 ]
