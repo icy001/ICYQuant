@@ -174,6 +174,14 @@ from .state_health import StateHealth
 from .state_manager import PortfolioStateManager
 from .state_service import PortfolioStateService
 from .state_recovery import StateRecovery
+from .consensus_record import ConsensusRecord
+from .quorum import QuorumValidator
+from .log_replication import LogReplication
+from .leader_commit import LeaderCommit
+from .consensus_state import ConsensusState
+from .consensus_engine import PortfolioConsensusEngine
+from .consensus_service import PortfolioConsensusService
+from .consensus_monitor import ConsensusMonitor
 
 __all__ = [
     "Portfolio",
@@ -351,4 +359,12 @@ __all__ = [
     "PortfolioStateManager",
     "PortfolioStateService",
     "StateRecovery",
+    "ConsensusRecord",
+    "QuorumValidator",
+    "LogReplication",
+    "LeaderCommit",
+    "ConsensusState",
+    "PortfolioConsensusEngine",
+    "PortfolioConsensusService",
+    "ConsensusMonitor",
 ]
