@@ -158,6 +158,14 @@ from .task_failover import TaskFailover
 from .distributed_scheduler import DistributedScheduler
 from .scheduler_service import SchedulerService
 from .scheduler_monitor import SchedulerMonitor
+from .execution_task import ExecutionTask
+from .execution_result import ExecutionResult
+from .task_executor import TaskExecutor
+from .result_aggregator import ResultAggregator
+from .retry_engine import RetryEngine
+from .distributed_execution_engine import DistributedExecutionEngine
+from .execution_service import ExecutionService
+from .execution_monitor import ExecutionMonitor
 
 __all__ = [
     "Portfolio",
@@ -319,4 +327,12 @@ __all__ = [
     "DistributedScheduler",
     "SchedulerService",
     "SchedulerMonitor",
+    "ExecutionTask",
+    "ExecutionResult",
+    "TaskExecutor",
+    "ResultAggregator",
+    "RetryEngine",
+    "DistributedExecutionEngine",
+    "ExecutionService",
+    "ExecutionMonitor",
 ]
