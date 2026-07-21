@@ -198,6 +198,38 @@ from .projection_rebuilder import ProjectionRebuilder
 from .projection_engine import PortfolioProjectionEngine
 from .projection_service import PortfolioProjectionService
 from .projection_query import ProjectionQuery
+from .cache_entry import CacheEntry
+from .cache_repository import CacheRepository
+from .cache_synchronizer import CacheSynchronizer
+from .cache_statistics import CacheStatistics
+from .cache_refresher import CacheRefresher
+from .read_model_cache import ReadModelCache
+from .cache_service import CacheService
+from .cache_monitor import CacheMonitor
+from .query_request import QueryRequest
+from .query_response import QueryResponse
+from .query_router import QueryRouter
+from .query_authorizer import QueryAuthorizer
+from .query_aggregator import QueryAggregator
+from .query_gateway import PortfolioQueryGateway
+from .query_gateway_service import QueryGatewayService
+from .query_metrics import QueryMetrics
+from .domain import PortfolioDomain
+from .domain_facade import PortfolioDomainFacade
+from .lifecycle_manager import LifecycleManager
+from .domain_health import DomainHealth
+from .domain_registry import DomainRegistry
+from .domain_bootstrap import PortfolioBootstrap
+from .domain_service import PortfolioDomainService
+from .domain_metrics import DomainMetrics
+from .metrics import PortfolioMetrics
+from .tracing import TraceContext
+from .logger import PortfolioLogger
+from .alert_rule import AlertRule
+from .health_dashboard import HealthDashboard
+from .telemetry import Telemetry
+from .observability_service import ObservabilityService
+from .observability_metrics import ObservabilityMetrics
 
 __all__ = [
     "Portfolio",
@@ -399,4 +431,36 @@ __all__ = [
     "PortfolioProjectionEngine",
     "PortfolioProjectionService",
     "ProjectionQuery",
+    "CacheEntry",
+    "CacheRepository",
+    "CacheSynchronizer",
+    "CacheStatistics",
+    "CacheRefresher",
+    "ReadModelCache",
+    "CacheService",
+    "CacheMonitor",
+    "QueryRequest",
+    "QueryResponse",
+    "QueryRouter",
+    "QueryAuthorizer",
+    "QueryAggregator",
+    "PortfolioQueryGateway",
+    "QueryGatewayService",
+    "QueryMetrics",
+    "PortfolioDomain",
+    "PortfolioDomainFacade",
+    "LifecycleManager",
+    "DomainHealth",
+    "DomainRegistry",
+    "PortfolioBootstrap",
+    "PortfolioDomainService",
+    "DomainMetrics",
+    "PortfolioMetrics",
+    "TraceContext",
+    "PortfolioLogger",
+    "AlertRule",
+    "HealthDashboard",
+    "Telemetry",
+    "ObservabilityService",
+    "ObservabilityMetrics",
 ]
