@@ -1,15 +1,19 @@
 from services.backtest import (
     EquityCalculator,
     Portfolio,
-    PortfolioSimulator,
     Position,
     CashManager,
     PortfolioService,
+    CashLedger,
+    PositionLedger,
+    NavEngine,
 )
+from services.backtest.simulator import PortfolioSimulator as LegacyPortfolioSimulator
+from services.backtest.portfolio_simulator import PortfolioSimulator
 
 
 def test_equity_update():
-    simulator = PortfolioSimulator(EquityCalculator())
+    simulator = LegacyPortfolioSimulator(EquityCalculator())
 
     portfolio = Portfolio(
         cash=100000,
@@ -71,7 +75,7 @@ def test_equity_calculator():
 
 def test_portfolio_service():
     calculator = EquityCalculator()
-    simulator = PortfolioSimulator(calculator)
+    simulator = LegacyPortfolioSimulator(calculator)
     service = PortfolioService(simulator)
 
     portfolio = Portfolio(
@@ -82,3 +86,20 @@ def test_portfolio_service():
     result = service.refresh(portfolio, market_value=10000)
 
     assert result.equity == 60000
+
+
+def test_portfolio_snapshot():
+    simulator = PortfolioSimulator(
+        CashLedger(
+            100000,
+        ),
+        PositionLedger(),
+        NavEngine(),
+    )
+
+    snapshot = simulator.snapshot(
+        25000,
+    )
+
+    assert snapshot.equity == 125000
+    assert snapshot.nav == 125000

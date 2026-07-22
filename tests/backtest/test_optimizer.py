@@ -5,6 +5,8 @@ from services.backtest import (
     SearchSpace,
     OptimizationResult,
     OptimizationService,
+    ParameterSpace,
+    GridSearchOptimizer,
 )
 
 
@@ -65,18 +67,16 @@ def test_optimization_result():
 
 
 def test_optimization_service():
-    optimizer = ParameterOptimizer(StrategyEvaluator())
-    service = OptimizationService(optimizer)
+    from services.backtest.optimization_repository import OptimizationRepository
+    from services.backtest.optimization_runner import OptimizationRunner
+    
+    runner = OptimizationRunner(OptimizationRepository())
+    service = OptimizationService(runner)
 
-    candidates = [
-        {"score": 0.3},
-        {"score": 0.6},
-        {"score": 0.9},
-    ]
-
-    result = service.run(candidates)
+    result = service.evaluate({"alpha": 0.1}, 0.9)
 
     assert result.score == 0.9
+    assert result.parameters == {"alpha": 0.1}
 
 
 def test_optimizer_empty():
@@ -85,3 +85,31 @@ def test_optimizer_empty():
     result = optimizer.optimize([])
 
     assert result is None
+
+
+def test_grid_search():
+
+    space = ParameterSpace(
+        {
+            "ma": [
+                5,
+                10,
+            ],
+            "stop": [
+                1,
+                2,
+            ],
+        }
+    )
+
+
+    result = list(
+        GridSearchOptimizer().generate(
+            space
+        )
+    )
+
+
+    assert len(
+        result
+    ) == 4

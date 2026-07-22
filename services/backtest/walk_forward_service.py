@@ -1,18 +1,25 @@
 """
-Walk forward service.
+Walk-forward service.
 """
 
 
 class WalkForwardService:
+
     def __init__(
         self,
-        engine,
+        runner,
     ):
-        self.engine = engine
 
-    def analyze(
+        self.runner = runner
+
+
+    def execute(
         self,
-        strategy,
-        dataset,
+        *args,
+        **kwargs,
     ):
-        return self.engine.run(strategy, dataset)
+
+        return self.runner.run(
+            *args,
+            **kwargs,
+        )

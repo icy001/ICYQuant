@@ -5,6 +5,7 @@ from services.backtest import (
     WalkForwardEngine,
     WalkForwardService,
     AnalysisWindow,
+    DatasetSplitter,
 )
 
 
@@ -55,19 +56,32 @@ def test_walk_forward_engine():
 
 
 def test_walk_forward_service():
-    splitter = RollingWindowSplitter()
-    trainer = StrategyTrainer()
-    validator = StrategyValidator()
-
-    engine = WalkForwardEngine(splitter, trainer, validator)
-    service = WalkForwardService(engine)
-
-    strategy = {"name": "test_strategy"}
-    dataset = [1, 2, 3, 4]
-
-    result = service.analyze(strategy, dataset)
-
-    assert result is True
+    from services.backtest.rolling_optimizer import RollingOptimizer
+    from services.backtest.out_of_sample_analyzer import OutOfSampleAnalyzer
+    from services.backtest.walk_forward_runner import WalkForwardRunner
+    from services.backtest.grid_search_optimizer import GridSearchOptimizer
+    from services.backtest.parameter_space import ParameterSpace
+    
+    splitter = DatasetSplitter()
+    optimizer = RollingOptimizer()
+    analyzer = OutOfSampleAnalyzer()
+    
+    runner = WalkForwardRunner(splitter, optimizer, analyzer)
+    service = WalkForwardService(runner)
+    
+    grid_search = GridSearchOptimizer()
+    parameter_space = ParameterSpace({"ma": [5, 10]})
+    
+    result = service.execute(
+        list(range(10)),
+        0.7,
+        grid_search,
+        parameter_space,
+        {"sharpe": 1.5},
+    )
+    
+    assert result.parameters is not None
+    assert result.performance["train_size"] == 7
 
 
 def test_analysis_window():
@@ -80,3 +94,15 @@ def test_analysis_window():
 
     assert window.training_start == "2024-01-01"
     assert window.validation_end == "2024-12-31"
+
+
+def test_dataset_splitter():
+
+    train, test = DatasetSplitter().split(
+        list(range(10)),
+        0.7,
+    )
+
+    assert len(train) == 7
+
+    assert len(test) == 3

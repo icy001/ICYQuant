@@ -4,9 +4,20 @@ Strategy runner.
 
 
 class StrategyRunner:
-    async def run(
+
+    def __init__(
         self,
         strategy,
-        market_event,
     ):
-        return strategy.on_event(market_event)
+
+        self.strategy = strategy
+
+
+    def run(
+        self,
+        tick,
+    ):
+
+        return self.strategy.on_tick(
+            tick
+        )
