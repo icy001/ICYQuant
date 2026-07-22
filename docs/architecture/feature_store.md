@@ -1,17 +1,18 @@
-# Feature Store
+# Institutional Feature Store
 
 ```text
 Raw Data
     │
     ▼
-Feature Engineering
+ Feature Pipeline
     │
     ▼
-Feature Registry
+ Feature Store
     │
-    ▼
-Feature Storage
-    │
-    ▼
-Feature Query Service
+  ┌──┴──┐
+  ▼     ▼
+ Cache Registry
+  │
+  ▼
+ Research / Strategy / AI
 ```
