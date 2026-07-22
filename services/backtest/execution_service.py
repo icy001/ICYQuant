@@ -1,18 +1,25 @@
 """
-Execution simulation service.
+Execution service.
 """
 
 
 class ExecutionService:
+
     def __init__(
         self,
-        simulator,
+        engine,
     ):
-        self.simulator = simulator
 
-    async def execute(
+        self.engine = engine
+
+
+    def execute(
         self,
-        signal,
-        oms,
+        *args,
+        **kwargs,
     ):
-        return await self.simulator.execute(signal, oms)
+
+        return self.engine.execute(
+            *args,
+            **kwargs,
+        )

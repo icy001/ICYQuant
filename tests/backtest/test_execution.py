@@ -4,6 +4,10 @@ from services.backtest import (
     StrategyRunner,
     VirtualOrderFactory,
     ExecutionFeedback,
+    VirtualOrder,
+    SlippageModel,
+    CommissionModel,
+    FillSimulator,
 )
 
 
@@ -44,3 +48,25 @@ def test_execution_feedback():
 
     assert feedback.order_id == "order-001"
     assert feedback.status == "FILLED"
+
+
+def test_fill_simulator():
+    simulator = FillSimulator(
+        SlippageModel(),
+        CommissionModel(),
+    )
+
+    result = simulator.execute(
+        VirtualOrder(
+            "ORDER-001",
+            "AAPL",
+            "BUY",
+            100,
+            100.0,
+        ),
+        0.001,
+        0.0005,
+    )
+
+    assert result.filled_quantity == 100
+    assert result.average_price == 100.1

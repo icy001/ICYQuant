@@ -4,14 +4,22 @@ Optimization service.
 
 
 class OptimizationService:
+
     def __init__(
         self,
-        optimizer,
+        runner,
     ):
-        self.optimizer = optimizer
 
-    def run(
+        self.runner = runner
+
+
+    def evaluate(
         self,
-        candidates,
+        parameters,
+        score,
     ):
-        return self.optimizer.optimize(candidates)
+
+        return self.runner.evaluate(
+            parameters,
+            score,
+        )

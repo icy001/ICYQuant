@@ -1,37 +1,24 @@
 from services.backtest import (
-    BacktestPlatform,
-    BacktestComponentRegistry,
-    BacktestBootstrap,
-    BacktestHealthCheck,
+    DependencyValidator,
+    ModuleHealthChecker,
 )
 
 
-def test_platform():
-    platform = BacktestPlatform({})
+def test_platform_bootstrap():
 
-    assert platform.start() is True
+    validator = DependencyValidator()
 
+    checker = ModuleHealthChecker()
 
-def test_component_registry():
-    registry = BacktestComponentRegistry()
+    assert validator.validate(
+        [1, 2, 3]
+    )
 
-    registry.register("exchange", {"name": "virtual"})
+    result = checker.check(
+        [
+            "Replay",
+            "Execution",
+        ]
+    )
 
-    assert registry.get("exchange") == {"name": "virtual"}
-
-
-def test_bootstrap():
-    registry = BacktestComponentRegistry()
-    bootstrap = BacktestBootstrap()
-
-    result = bootstrap.initialize(registry)
-
-    assert result == registry
-
-
-def test_health_check():
-    health = BacktestHealthCheck()
-
-    result = health.check()
-
-    assert result["status"] == "UP"
+    assert result["Replay"] == "HEALTHY"

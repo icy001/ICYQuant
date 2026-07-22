@@ -2,19 +2,16 @@
 Replay service.
 """
 
-from .replay import MarketReplay
-
 
 class ReplayService:
+
     def __init__(
         self,
-        replay: MarketReplay,
+        engine,
     ):
-        self.replay = replay
 
-    async def execute(
-        self,
-        timeline,
-    ):
-        async for event in self.replay.replay(timeline.events):
-            yield event
+        self.engine = engine
+
+    def next_tick(self):
+
+        return self.engine.next_tick()
