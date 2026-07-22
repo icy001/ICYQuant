@@ -3,7 +3,7 @@ Institutional research platform.
 """
 
 
-class ResearchPlatform:
+class LegacyResearchPlatform:
     def __init__(
         self,
         container,
