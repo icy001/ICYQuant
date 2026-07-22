@@ -2,19 +2,34 @@
 Artifact service.
 """
 
-from .artifact_registry import ArtifactRegistry
-
 
 class ArtifactService:
+
     def __init__(
         self,
-        registry: ArtifactRegistry,
+        registry=None,
+        lifecycle=None,
     ):
+
         self.registry = registry
+        self.lifecycle = lifecycle
+
+    def publish(
+        self,
+        artifact,
+        content,
+    ):
+
+        return self.lifecycle.publish(
+            artifact,
+            content,
+        )
 
     def register(
         self,
         artifact,
     ):
-        self.registry.register(artifact)
+
+        if self.registry:
+            self.registry.register(artifact)
         return artifact

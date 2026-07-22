@@ -2,19 +2,23 @@
 Research report service.
 """
 
-from .report_builder import ReportBuilder
-
 
 class ReportService:
+
     def __init__(
         self,
-        builder,
+        pipeline,
     ):
-        self.builder = builder
+
+        self.pipeline = pipeline
 
     def generate(
         self,
-        title,
-        sections,
+        *args,
+        **kwargs,
     ):
-        return self.builder.build(title, sections)
+
+        return self.pipeline.generate(
+            *args,
+            **kwargs,
+        )

@@ -35,7 +35,8 @@ from .comparison_service import ComparisonService
 from .report_builder import ReportBuilder
 from .report_template import ReportTemplate
 from .report_section import ReportSection
-from .report_model import ResearchReport
+from .report_model import SectionedResearchReport
+from .report import ResearchReport
 from .report_service import ReportService
 from .exporter import ReportExporter
 from .environment import EnvironmentSnapshot
@@ -84,8 +85,62 @@ from .bootstrap import ResearchBootstrap
 from .container import ResearchContainer
 from .service_registry import ResearchServiceRegistry
 from .initializer import ResearchInitializer
-from .platform import ResearchPlatform
+from .platform import LegacyResearchPlatform
+from .research_platform import UnifiedResearchPlatform as ResearchPlatform
 from .health import ResearchHealthCheck
+from .research_project import ResearchProject
+from .project_status import ProjectStatus
+from .research_dataset import ResearchDataset
+from .dataset_registry import DatasetRegistry
+from .research_workspace import ResearchWorkspace
+from .research_repository import ResearchRepository
+from .research_service import ResearchService
+from .feature import Feature
+from .feature_metadata import FeatureMetadata
+from .feature_registry import FeatureRegistry
+from .feature_storage import FeatureStorage
+from .feature_query_service import FeatureQueryService
+from .feature_version_manager import FeatureVersionManager
+from .factor import Factor
+from .factor_registry import FactorRegistry
+from .factor_calculator import FactorCalculator
+from .ic_analyzer import ICAnalyzer
+from .rank_ic_analyzer import RankICAnalyzer
+from .factor_evaluation_pipeline import FactorEvaluationPipeline
+from .alpha import Alpha
+from .alpha_signal import AlphaSignal
+from .alpha_signal_generator import AlphaSignalGenerator
+from .alpha_validator import AlphaValidator
+from .alpha_registry import AlphaRegistry
+from .alpha_pipeline import AlphaPipeline
+from .alpha_research_service import AlphaResearchService
+from .experiment_metrics import ExperimentMetrics
+from .experiment_tracker import ExperimentTracker
+from .model_artifact import ModelArtifact
+from .model_registry import ModelRegistry
+from .research_notebook import ResearchNotebook
+from .notebook_runtime import NotebookRuntime
+from .notebook_executor import NotebookExecutor
+from .research_pipeline import ResearchPipeline
+from .research_workflow_service import ResearchWorkflowService
+from .artifact_repository import ArtifactRepository
+from .artifact_version_manager import ArtifactVersionManager
+from .artifact_sharing_service import ArtifactSharingService
+from .visualization_generator import VisualizationGenerator
+from .report_pipeline import ReportPipeline
+from .research_team import ResearchTeam
+from .workspace_member import WorkspaceMember
+from .permission_manager import PermissionManager
+from .comment import Comment
+from .comment_service import CommentService
+from .review_workflow import ReviewWorkflow
+from .collaborative_workspace import CollaborativeWorkspace
+from .platform_config import ResearchPlatformConfig
+from .module_health import ResearchModuleHealthChecker
+from .dependency_validator import ResearchDependencyValidator
+from .platform_bootstrap import ResearchPlatformBootstrap
+from .research_platform import UnifiedResearchPlatform
+from .research_api import ResearchAPI
 
 __all__ = [
     "Experiment",
@@ -125,6 +180,7 @@ __all__ = [
     "ReportBuilder",
     "ReportTemplate",
     "ReportSection",
+    "SectionedResearchReport",
     "ResearchReport",
     "ReportService",
     "ReportExporter",
@@ -176,4 +232,57 @@ __all__ = [
     "ResearchInitializer",
     "ResearchPlatform",
     "ResearchHealthCheck",
+    "ResearchProject",
+    "ProjectStatus",
+    "ResearchDataset",
+    "DatasetRegistry",
+    "ResearchWorkspace",
+    "ResearchRepository",
+    "ResearchService",
+    "Feature",
+    "FeatureMetadata",
+    "FeatureRegistry",
+    "FeatureStorage",
+    "FeatureQueryService",
+    "FeatureVersionManager",
+    "Factor",
+    "FactorRegistry",
+    "FactorCalculator",
+    "ICAnalyzer",
+    "RankICAnalyzer",
+    "FactorEvaluationPipeline",
+    "Alpha",
+    "AlphaSignal",
+    "AlphaSignalGenerator",
+    "AlphaValidator",
+    "AlphaRegistry",
+    "AlphaPipeline",
+    "AlphaResearchService",
+    "ExperimentMetrics",
+    "ExperimentTracker",
+    "ModelArtifact",
+    "ModelRegistry",
+    "ResearchNotebook",
+    "NotebookRuntime",
+    "NotebookExecutor",
+    "ResearchPipeline",
+    "ResearchWorkflowService",
+    "ArtifactRepository",
+    "ArtifactVersionManager",
+    "ArtifactSharingService",
+    "VisualizationGenerator",
+    "ReportPipeline",
+    "ResearchTeam",
+    "WorkspaceMember",
+    "PermissionManager",
+    "Comment",
+    "CommentService",
+    "ReviewWorkflow",
+    "CollaborativeWorkspace",
+    "ResearchPlatformConfig",
+    "ResearchModuleHealthChecker",
+    "ResearchDependencyValidator",
+    "ResearchPlatformBootstrap",
+    "LegacyResearchPlatform",
+    "ResearchAPI",
 ]
