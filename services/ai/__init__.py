@@ -130,6 +130,13 @@ from .portfolio_learning_agent import PortfolioLearningAgent
 from .reinforcement_feedback_loop import ReinforcementFeedbackLoop
 from .ai_evolution_center import AIEvolutionCenter
 from .self_learning_platform import SelfLearningPlatform
+from .agent_capability import AgentCapability
+from .agent_message import AgentMessage
+from .agent_message_bus import AgentMessageBus
+from .shared_context import SharedContext
+from .task_scheduler import TaskScheduler
+from .collaboration_coordinator import CollaborationCoordinator
+from .multi_agent_runtime import MultiAgentRuntime
 
 __all__ = [
     "AIProvider",
@@ -264,4 +271,11 @@ __all__ = [
     "ReinforcementFeedbackLoop",
     "AIEvolutionCenter",
     "SelfLearningPlatform",
+    "AgentCapability",
+    "AgentMessage",
+    "AgentMessageBus",
+    "SharedContext",
+    "TaskScheduler",
+    "CollaborationCoordinator",
+    "MultiAgentRuntime",
 ]
