@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+
+  name: agent-runtime
+
+  namespace: icyquant
+
+
+spec:
+
+  replicas: 3
+
+
+  selector:
+
+    matchLabels:
+
+      app: agent-runtime
+
+
+  template:
+
+    metadata:
+
+      labels:
+
+        app: agent-runtime
+
+
+    spec:
+
+      containers:
+
+      - name: agent
+
+        image: icyquant/agent-runtime:latest
+
+        ports:
+
+        - containerPort: 8000
