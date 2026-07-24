@@ -1,22 +1,82 @@
-# AI Workflow Orchestration
+# Workflow Orchestration Framework
 
-```text
-                Workflow Service
-                      │
-                      ▼
-               Workflow Runtime
-                      │
-                      ▼
-         Task Dependency Engine
-                      │
-                      ▼
-               Workflow DAG
-                      │
-              ┌───────┴───────┐
-              ▼               ▼
-         Workflow         Workflow
-           Node             Edge
-              │
-              ▼
-         Agent Collaboration
+
+## Workflow Execution
+
+
+```
+Workflow Definition
+
+        |
+
+        v
+
+Task DAG
+
+        |
+
+        v
+
+Execution Engine
+
+        |
+
+        v
+
+State Machine
+
+        |
+
+        v
+
+Result
+
+
+```
+
+
+## Example Trading Workflow
+
+
+```
+Signal
+
+ ↓
+
+Risk Check
+
+ ↓
+
+Order
+
+ ↓
+
+Execution
+
+ ↓
+
+Settlement
+
+```
+
+
+## Recovery
+
+
+```
+Failure
+
+ ↓
+
+Retry
+
+ ↓
+
+Compensation
+
+ ↓
+
+Rollback
+
+
 ```
