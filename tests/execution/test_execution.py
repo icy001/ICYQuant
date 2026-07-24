@@ -1,25 +1,39 @@
-import pytest
+from services.execution import *
 
-from services.execution.service import ExecutionService
-from services.execution.simulator import SimExecution
-from services.oms.models import Order
+from .mock_adapter import MockBroker
 
 
-class TestExecutionService:
-    def test_execute_order(self):
-        simulator = SimExecution()
-        engine = ExecutionService(simulator)
+def test_execution_gateway():
 
-        order = Order(
-            symbol="NVDA",
-            side="BUY",
-            quantity=100,
-            price=480.0,
-        )
+    router = ExecutionRouter()
 
-        fill = engine.execute_order(order)
+    router.register(
+        "mock",
+        MockBroker()
+    )
 
-        assert fill.order_id == order.order_id
-        assert fill.symbol == "NVDA"
-        assert fill.quantity == 100
-        assert fill.price == 480.0
+    tracker = ExecutionTracker()
+
+    manager = ExecutionManager(
+        router,
+        tracker
+    )
+
+    service = ExecutionService(
+        manager
+    )
+
+    request = ExecutionRequest(
+        "ORD001",
+        "NVDA",
+        10,
+        "BUY",
+        "LIMIT"
+    )
+
+    result = service.submit(
+        "mock",
+        request
+    )
+
+    assert result.status == "FILLED"
