@@ -1,9 +1,17 @@
-from .simulator import SimExecution
-
-
 class ExecutionService:
-    def __init__(self, simulator: SimExecution = None):
-        self.simulator = simulator or SimExecution()
 
-    def execute_order(self, order):
-        return self.simulator.execute(order)
+    def __init__(
+        self,
+        manager,
+    ):
+        self.manager = manager
+
+    def submit(
+        self,
+        broker,
+        request,
+    ):
+        return self.manager.execute(
+            broker,
+            request
+        )
