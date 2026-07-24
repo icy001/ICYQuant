@@ -1,57 +1,23 @@
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from decimal import Decimal
-from uuid import UUID, uuid4
-
-from .enums import (
-    OrderSide,
-    OrderStatus,
-    OrderType,
-    TimeInForce,
-)
+from dataclasses import dataclass
 
 
 @dataclass
 class Order:
 
+    order_id: str
+
+    account_id: str
+
+    portfolio_id: str
+
     symbol: str
-    side: OrderSide
-    quantity: Decimal
 
-    order_type: OrderType = OrderType.MARKET
+    quantity: float
 
-    limit_price: Decimal | None = None
+    price: float
 
-    stop_price: Decimal | None = None
+    side: str
 
-    time_in_force: TimeInForce = TimeInForce.DAY
+    order_type: str
 
-    order_id: UUID = field(default_factory=uuid4)
-
-    status: OrderStatus = OrderStatus.NEW
-
-    filled_quantity: Decimal = Decimal("0")
-
-    average_price: Decimal = Decimal("0")
-
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-
-    updated_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-
-    @property
-    def remaining_quantity(self) -> Decimal:
-        return self.quantity - self.filled_quantity
-
-    @property
-    def is_completed(self) -> bool:
-        return self.status in (
-            OrderStatus.FILLED,
-            OrderStatus.CANCELLED,
-            OrderStatus.REJECTED,
-        )
+    status: str = "CREATED"
