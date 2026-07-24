@@ -1,12 +1,11 @@
-"""
-Asset allocation model.
-"""
-
 from dataclasses import dataclass
-from decimal import Decimal
 
 
-@dataclass(frozen=True)
-class AllocationTarget:
-    asset_class: str
-    target_weight: Decimal
+@dataclass
+class Allocation:
+
+    portfolio_id: str
+
+    symbol: str
+
+    weight: float

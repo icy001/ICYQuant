@@ -1,20 +1,20 @@
-"""
-Portfolio repository.
-"""
-
-
 class PortfolioRepository:
+
     def __init__(self):
-        self.storage = {}
+        self.portfolios = {}
 
     def save(
         self,
         portfolio,
     ):
-        self.storage[portfolio.portfolio_id] = portfolio
+        self.portfolios[
+            portfolio.portfolio_id
+        ] = portfolio
 
-    def get(
+    def find(
         self,
         portfolio_id,
     ):
-        return self.storage.get(portfolio_id)
+        return self.portfolios.get(
+            portfolio_id
+        )
