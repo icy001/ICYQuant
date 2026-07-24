@@ -1,18 +1,23 @@
-"""
-Portfolio service.
-"""
-
-
 class PortfolioService:
+
     def __init__(
         self,
-        repository,
+        manager,
     ):
-        self.repository = repository
+        self.manager = manager
 
-    def create(
+    def create_portfolio(
         self,
         portfolio,
     ):
-        self.repository.save(portfolio)
-        return portfolio
+        return self.manager.create(
+            portfolio
+        )
+
+    def query_portfolio(
+        self,
+        portfolio_id,
+    ):
+        return self.manager.get(
+            portfolio_id
+        )

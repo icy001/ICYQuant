@@ -1,0 +1,9 @@
+class PortfolioType:
+
+    INVESTMENT = "INVESTMENT"
+
+    STRATEGY = "STRATEGY"
+
+    MODEL = "MODEL"
+
+    SIMULATION = "SIMULATION"
