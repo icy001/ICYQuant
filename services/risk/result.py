@@ -16,3 +16,9 @@ class RiskResult:
     decision: RiskDecision
     message: Optional[str] = None
     modified_order: Optional[Order] = None
+
+
+@dataclass
+class SimpleRiskResult:
+    passed: bool
+    reason: str = ""

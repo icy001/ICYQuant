@@ -27,3 +27,16 @@ class LedgerBalanceCalculator:
                 entry.account_code,
                 amount,
             )
+
+
+class BalanceCalculator:
+    def calculate(self, entries):
+        balance = 0
+
+        for entry in entries:
+            if entry.direction == "CREDIT":
+                balance += entry.amount
+            else:
+                balance -= entry.amount
+
+        return balance

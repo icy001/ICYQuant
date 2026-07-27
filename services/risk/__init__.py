@@ -13,13 +13,13 @@ from .enums import (
     RiskDecision,
     RiskType,
 )
-from .engine import RiskEngine
+from .engine import RiskEngine, SimpleRiskEngine
 from .events import RiskAuditEvent
 from .exceptions import (
     RiskRejectedError,
 )
-from .exposure import ExposureCalculator
-from .margin import MarginCalculator
+from .exposure import ExposureCalculator, SimpleExposure
+from .margin import MarginCalculator, Margin
 from .mapper import RiskRequestMapper
 from .model import RiskRequest
 from .providers import AccountProvider, PositionProvider
@@ -143,6 +143,9 @@ from .risk_platform import RiskPlatform
 from .risk_pipeline import RiskPipeline
 from .risk_orchestrator import RiskOrchestrator
 from .risk_service import EnterpriseRiskService
+from .repository import RiskRepository
+from .manager import RiskManager
+from .result import SimpleRiskResult
 
 __all__ = [
     "RiskDecision",
@@ -288,4 +291,9 @@ __all__ = [
     "RiskPipeline",
     "RiskOrchestrator",
     "EnterpriseRiskService",
+    "SimpleRiskResult",
+    "SimpleExposure",
+    "Margin",
+    "SimpleRiskEngine",
+    "RiskManager",
 ]

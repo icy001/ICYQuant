@@ -4,9 +4,17 @@ Margin calculator.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from .model import RiskRequest
+
+
+@dataclass
+class Margin:
+    account_id: str
+    used: float
+    available: float
 
 
 class MarginCalculator:

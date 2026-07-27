@@ -1,26 +1,22 @@
-"""
-Trade event publisher.
-"""
-
-from __future__ import annotations
-
-from typing import Awaitable
-from typing import Callable
-from typing import Optional
-
-
-Handler = Callable[[object], Optional[Awaitable[None]]]
+from services.eventbus import (
+    Event,
+    EventType
+)
 
 
 class TradeEventPublisher:
-    def __init__(self):
-        self._handlers: list[Handler] = []
+    def __init__(self, publisher):
+        self.publisher = publisher
 
-    def subscribe(self, handler: Handler) -> None:
-        self._handlers.append(handler)
+    def publish_trade(self, trade):
+        event = Event(
+            "TRADE_EVENT_" + trade.trade_id,
+            EventType.TRADE_EXECUTED,
+            {
+                "trade_id": trade.trade_id,
+                "symbol": trade.symbol,
+                "quantity": trade.quantity
+            }
+        )
 
-    async def publish(self, event: object) -> None:
-        for handler in self._handlers:
-            result = handler(event)
-            if hasattr(result, "__await__"):
-                await result
+        self.publisher.publish(event)

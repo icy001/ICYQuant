@@ -36,3 +36,11 @@ class PreTradeRiskService:
         ensure_approved(result)
 
         return result
+
+
+class RiskService:
+    def __init__(self, manager):
+        self.manager = manager
+
+    def pre_trade_check(self, exposure):
+        return self.manager.check(exposure)

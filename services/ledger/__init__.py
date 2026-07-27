@@ -8,7 +8,9 @@ all financial transactions and state changes.
 from .event import LedgerEvent
 from .event_type import LedgerEventType
 from .exceptions import EventValidationError
-from .models import LedgerDirection, LedgerEntry, LedgerType
+from .models import LedgerEntry, LedgerType
+from .models import LedgerDirection as ModelsLedgerDirection
+from .account import LedgerAccount, LedgerDirection
 from .service import LedgerService, TradeToLedger, PositionRebuilder, CashRebuilder, AccountingService
 from .publisher import LedgerEventPublisher
 from .events import LedgerPosted
@@ -21,7 +23,7 @@ from .repository import EventRepository
 from .postgres_repository import PostgreSQLLedgerRepository
 from .projector import Projection
 from .snapshot import Snapshot, LedgerSnapshot
-from .balance import LedgerBalanceCalculator
+from .balance import LedgerBalanceCalculator, BalanceCalculator
 from .replay import LedgerReplayService
 from .trial_balance import TrialBalanceService
 from .report import TrialBalanceReport
@@ -31,7 +33,6 @@ from .queries import JournalQuery
 from .position_projection import PositionProjection
 from .cash_projection import CashProjection
 from .pnl_projection import PnLProjection
-from .account import LedgerAccount
 from .journal import Journal
 from .enums import EntrySide, AccountType
 from .model import LedgerEntry as DomainLedgerEntry
@@ -46,6 +47,10 @@ from .orm import (
 from .exceptions import (
     UnbalancedJournalError,
 )
+from .entry import LedgerEntry as EntryLedgerEntry
+from .transaction import Transaction
+from .manager import LedgerManager
+from .transaction_repository import TransactionRepository
 
 __all__ = [
     "LedgerEvent",
@@ -72,6 +77,7 @@ __all__ = [
     "Snapshot",
     "LedgerSnapshot",
     "LedgerBalanceCalculator",
+    "BalanceCalculator",
     "LedgerReplayService",
     "TrialBalanceService",
     "TrialBalanceReport",
@@ -93,4 +99,7 @@ __all__ = [
     "JournalModel",
     "LedgerEntryModel",
     "UnbalancedJournalError",
+    "Transaction",
+    "LedgerManager",
+    "TransactionRepository",
 ]
