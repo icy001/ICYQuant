@@ -7,6 +7,7 @@ from __future__ import annotations
 from .context import RiskContext
 from .decision import RiskResult
 from .enums import RiskDecision
+from .result import SimpleRiskResult
 
 
 class RiskEngine:
@@ -28,3 +29,10 @@ class RiskEngine:
         return RiskResult(
             decision=RiskDecision.APPROVE
         )
+
+
+class SimpleRiskEngine:
+    def evaluate(self, exposure):
+        if exposure.value <= exposure.limit:
+            return SimpleRiskResult(True)
+        return SimpleRiskResult(False, "Exposure limit exceeded")

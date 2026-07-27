@@ -23,6 +23,13 @@ class Exposure:
     exposure_type: str
 
 
+@dataclass
+class SimpleExposure:
+    symbol: str
+    value: float
+    limit: float
+
+
 class ExposureCalculator:
     def projected_exposure(
         self,

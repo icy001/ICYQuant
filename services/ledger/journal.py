@@ -18,6 +18,9 @@ class Journal:
         default_factory=uuid4
     )
 
+    transaction_id: str = ""
+    timestamp: int = 0
+
     entries: list[LedgerEntry] = field(
         default_factory=list
     )

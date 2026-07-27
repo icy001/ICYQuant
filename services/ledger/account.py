@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from .enums import AccountType
 
 
+class LedgerDirection:
+    DEBIT = "DEBIT"
+    CREDIT = "CREDIT"
+
+
 @dataclass
 class LedgerAccount:
     code: str
