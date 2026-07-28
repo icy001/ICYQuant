@@ -1,0 +1,5 @@
+class Environment:
+    DEVELOPMENT = "DEVELOPMENT"
+    TEST = "TEST"
+    STAGING = "STAGING"
+    PRODUCTION = "PRODUCTION"

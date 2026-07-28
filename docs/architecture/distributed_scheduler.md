@@ -1,65 +1,54 @@
-# Distributed Scheduling Framework
+# Distributed Scheduler Service
 
 
-## Execution Flow
+## Responsibility
+
+
+Provides:
+
+
+- Scheduled execution
+
+- Automated workflows
+
+- Batch processing
+
+- Trading calendar tasks
+
+
+## Flow
 
 
 ```
-Job Definition
-
-      |
-
-      v
-
-Job Registry
-
-      |
-
-      v
-
 Scheduler
-
-      |
-
-      v
-
+|
+v
+Job Queue
+|
+v
 Worker
-
-      |
-
-      v
-
-Result
-
-
+|
+v
+Service Execution
 ```
 
 
-## Scheduling Types
+## Future Upgrade
 
 
-```
-Cron Trigger
-
-Event Trigger
-
-Manual Trigger
-
-Market Event Trigger
-
-```
+Production Features:
 
 
-## Reliability
+- Cron Expression Parser
 
+- Leader Election
 
-```
-Retry
+- Kubernetes CronJob
 
-Backoff
+- Persistent Scheduler Store
 
-Leader Election
+- Task Retry
 
-Failover
+- Calendar Service
 
-```
+- Time Zone Support

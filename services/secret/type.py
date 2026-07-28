@@ -1,0 +1,5 @@
+class SecretType:
+    API_KEY = "API_KEY"
+    PASSWORD = "PASSWORD"
+    TOKEN = "TOKEN"
+    CERTIFICATE = "CERTIFICATE"

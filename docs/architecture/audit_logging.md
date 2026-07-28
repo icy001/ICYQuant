@@ -1,53 +1,37 @@
-# Audit Logging Framework
+# Audit Logging Service
 
+## Responsibility
 
-## Audit Flow
+Audit Service provides:
 
+- User activity tracking
+- Trading audit trail
+- Risk decision history
+- Compliance evidence
 
+## Flow
 
-
-User / Agent
-
-  |
-
-  v
-
-Action Event
-
-  |
-
-  v
-
-Audit Manager
+Service Action
 
   |
-
   v
-
-Immutable Record
+Audit Event
 
   |
-
   v
+Audit Service
 
-Audit Storage
+  |
+  v
+Immutable Storage
 
+## Future Upgrade
 
+Production Features:
 
-
-## Audit Categories
-
-
-
-
-Trading Actions
-
-Risk Decisions
-
-AI Decisions
-
-Configuration Changes
-
-Permission Changes
-
-System Events
+- Event Sourcing Storage
+- Hash Chain Verification
+- Database WORM Storage
+- Compliance Export
+- SIEM Integration
+- Long Term Archive

@@ -1,0 +1,9 @@
+class WorkflowState:
+
+    CREATED = "CREATED"
+
+    RUNNING = "RUNNING"
+
+    COMPLETED = "COMPLETED"
+
+    FAILED = "FAILED"

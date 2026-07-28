@@ -188,6 +188,10 @@ from .dependency_validator import DependencyValidator
 from .platform_bootstrap import PlatformBootstrap
 from .backtest_platform import BacktestPlatform
 from .backtest_api import BacktestAPI
+from .job import BacktestJob
+from .result import BacktestResult
+from .manager import BacktestManager
+from .order_simulator import OrderSimulator
 
 __all__ = [
     "BacktestSession",
@@ -378,4 +382,8 @@ __all__ = [
     "PlatformBootstrap",
     "BacktestPlatform",
     "BacktestAPI",
+    "BacktestJob",
+    "BacktestResult",
+    "BacktestManager",
+    "OrderSimulator",
 ]
