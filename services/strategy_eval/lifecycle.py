@@ -1,0 +1,9 @@
+class StrategyLifecycle:
+
+    RESEARCH = "RESEARCH"
+
+    VALIDATED = "VALIDATED"
+
+    PRODUCTION = "PRODUCTION"
+
+    DEPRECATED = "DEPRECATED"

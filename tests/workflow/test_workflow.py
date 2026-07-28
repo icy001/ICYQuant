@@ -1,30 +1,16 @@
 from services.workflow import *
 
 
-def test_workflow_engine():
+def test_workflow():
+    repo = WorkflowRepository()
+    service = WorkflowService(repo)
 
-    workflow = WorkflowDefinition(
+    workflow = WorkflowInstance(
         "WF001",
-        "ORDER_FLOW",
-        [
-            WorkflowTask(
-                "T001",
-                "RISK_CHECK",
-                "risk",
-                "CREATED"
-            )
-        ]
+        "Settlement",
+        WorkflowState.CREATED
     )
 
-    service = WorkflowService(
-        WorkflowEngine(
-            TaskExecutor()
-        ),
-        WorkflowRepository()
-    )
+    result = service.start(workflow)
 
-    result = service.start(
-        workflow
-    )
-
-    assert result == WorkflowState.COMPLETED
+    assert result.state == WorkflowState.RUNNING

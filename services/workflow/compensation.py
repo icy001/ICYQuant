@@ -1,9 +1,5 @@
 class CompensationHandler:
-
-    def compensate(
-        self,
-        task
-    ):
-        task.status = "COMPENSATED"
-
-        return task
+    def compensate(self, task):
+        return {
+            "compensated": task.task_id
+        }

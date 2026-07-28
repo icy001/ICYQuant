@@ -1,22 +1,9 @@
-"""
-Audit store abstraction.
-"""
+class AuditStore:
+    def __init__(self):
+        self.events = []
 
-from __future__ import annotations
+    def append(self, event):
+        self.events.append(event)
 
-from typing import Protocol
-
-from .model import AuditRecord
-
-
-class AuditStore(Protocol):
-    def append(
-        self,
-        record: AuditRecord,
-    ) -> None:
-        ...
-
-    def list_all(
-        self,
-    ) -> list[AuditRecord]:
-        ...
+    def all(self):
+        return self.events

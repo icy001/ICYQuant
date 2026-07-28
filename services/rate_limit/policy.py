@@ -1,0 +1,7 @@
+class RateLimitPolicy:
+
+    TOKEN_BUCKET = "TOKEN_BUCKET"
+
+    LEAKY_BUCKET = "LEAKY_BUCKET"
+
+    SLIDING_WINDOW = "SLIDING_WINDOW"

@@ -1,38 +1,43 @@
-# Portfolio Optimization Service
+# Portfolio Optimization Engine
+
 
 ## Responsibility
 
-Portfolio Optimization provides:
+Provides:
 
-- Asset allocation
-- Portfolio construction
-- Risk adjusted weighting
+- Portfolio Construction
+- Asset Allocation
+- Risk Budgeting
+- Constraint Management
 - Rebalancing
 
-## Flow
 
-Strategy Signals
+## Architecture
 
-    |
-    v
-Portfolio Optimizer
 
-    |
-    v
-Target Portfolio
+Signal
 
-    |
-    v
-Order Service
+↓
+
+Optimization
+
+↓
+
+Portfolio Weight
+
+↓
+
+Execution
+
 
 ## Future Upgrade
 
 Production Features:
 
-- Mean Variance Optimization
+- Modern Portfolio Theory
 - Black-Litterman Model
 - Risk Parity
-- Factor Portfolio
-- CVaR Optimization
-- Dynamic Rebalancing
+- CVXPY Optimization
+- Barra Risk Model
 - Transaction Cost Optimization
+- Dynamic Rebalancing

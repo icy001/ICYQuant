@@ -1,12 +1,19 @@
-"""
-Backtest event model.
-"""
-
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
-class BacktestEvent:
-    event_type: str
+@dataclass
+class MarketEvent:
+
+    symbol: str
+
+    price: float
+
     timestamp: str
-    payload: dict
+
+
+@dataclass
+class SignalEvent:
+
+    symbol: str
+
+    direction: str

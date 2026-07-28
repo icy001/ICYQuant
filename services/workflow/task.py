@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class WorkflowTask:
-
+class TaskNode:
     task_id: str
     name: str
-    action: str
     status: str
