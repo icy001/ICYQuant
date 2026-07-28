@@ -1,65 +1,52 @@
-# Distributed Tracing Framework
+# Distributed Tracing Service
 
 
-## Trace Flow
+## Responsibility
 
 
+Provides:
 
 
-User Request
+- Request tracing
 
-  |
+- Service latency analysis
 
-  v
+- Transaction visibility
 
+- Performance monitoring
+
+
+## Flow
+
+
+```
+Request
+|
+v
 Trace ID
-
-  |
-
-  v
-
-Service A Span
-
-  |
-
-  v
-
-Service B Span
-
-  |
-
-  v
-
-Service C Span
-
-  |
-
-  v
-
-Trace Analysis
+|
+v
+Service Spans
+|
+v
+Trace Storage
+```
 
 
+## Future Upgrade
 
 
-## Example Trading Trace
+Production Features:
 
 
+- OpenTelemetry
 
+- Jaeger Integration
 
-Signal Generated
+- Zipkin Integration
 
-  ↓
+- Trace Sampling
 
-Risk Checked
+- Real Time Latency Dashboard
 
-  ↓
-
-Order Created
-
-  ↓
-
-Execution Submitted
-
-  ↓
-
-Trade Confirmed
+- Error Correlation

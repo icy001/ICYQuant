@@ -1,34 +1,9 @@
-"""
-Backtest repository.
-"""
-
-
 class BacktestRepository:
-
     def __init__(self):
+        self.results = {}
 
-        self.backtests = {}
+    def save(self, result):
+        self.results[result.get("job_id")] = result
 
-    def save(
-        self,
-        backtest,
-    ):
-
-        self.backtests[
-            backtest.backtest_id
-        ] = backtest
-
-    def load(
-        self,
-        backtest_id,
-    ):
-
-        return self.backtests.get(
-            backtest_id
-        )
-
-    def list_all(self):
-
-        return list(
-            self.backtests.values()
-        )
+    def get(self, job_id):
+        return self.results.get(job_id)

@@ -1,82 +1,52 @@
-# Workflow Orchestration Framework
+# Workflow Orchestration Service
 
 
-## Workflow Execution
+## Responsibility
 
 
-```
-Workflow Definition
+Provides:
 
-        |
 
-        v
+- Business workflow execution
 
-Task DAG
+- Multi service coordination
 
-        |
+- Saga transaction support
 
-        v
+- Compensation handling
 
-Execution Engine
 
-        |
+## Example
 
-        v
 
-State Machine
-
-        |
-
-        v
-
-Result
+Order Workflow:
 
 
 ```
-
-
-## Example Trading Workflow
-
-
-```
-Signal
-
- ↓
-
-Risk Check
-
- ↓
-
 Order
-
- ↓
-
+|
+Risk
+|
 Execution
-
- ↓
-
-Settlement
-
+|
+Ledger
 ```
 
 
-## Recovery
+## Future Upgrade
 
 
-```
-Failure
-
- ↓
-
-Retry
-
- ↓
-
-Compensation
-
- ↓
-
-Rollback
+Production Features:
 
 
-```
+- Temporal Integration
+
+- Workflow Persistence
+
+- Distributed Scheduler
+
+- State Recovery
+
+- Human Approval Step
+
+- Long Running Workflow

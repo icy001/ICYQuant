@@ -1,49 +1,40 @@
 from services.gateway import *
 
 
-def test_gateway_route():
-
-
+def test_gateway_load_balancer():
     router = Router()
 
-
-    router.register(
-
-        "/health",
-
-        lambda req: {
-
-            "ok": True
-
-        }
-
-    )
-
-
-    gateway = APIGateway(
-
-        router,
-
-        MiddlewareChain()
-
-    )
-
-
-    response = gateway.handle(
-
-        Request(
-
-            "/health",
-
-            "GET",
-
-            {},
-
-            {}
-
+    router.add(
+        Route(
+            "/orders",
+            "ORDER_SERVICE"
         )
-
     )
 
+    service = GatewayService(
+        GatewayManager(
+            router,
+            LoadBalancer(
+                RoundRobinStrategy(),
+                HealthFilter()
+            )
+        )
+    )
 
-    assert response.status_code == 200
+    instances = [
+        BackendInstance(
+            "127.0.0.1",
+            8001
+        ),
+        BackendInstance(
+            "127.0.0.2",
+            8002
+        )
+    ]
+
+    result = service.forward(
+        "/orders",
+        instances
+    )
+
+    assert result is not None

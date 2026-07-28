@@ -1,46 +1,9 @@
 class Router:
-
-
     def __init__(self):
-
         self.routes = {}
 
+    def add(self, route):
+        self.routes[route.path] = route
 
-
-    def register(
-
-        self,
-
-        path,
-
-        handler,
-
-    ):
-
-        self.routes[path] = handler
-
-
-
-    def dispatch(
-
-        self,
-
-        path,
-
-        request,
-
-    ):
-
-        handler = self.routes.get(path)
-
-
-        if not handler:
-
-            raise Exception(
-
-                "Route not found"
-
-            )
-
-
-        return handler(request)
+    def match(self, path):
+        return self.routes.get(path)
