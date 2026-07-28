@@ -1,26 +1,22 @@
 from services.audit import *
 
 
-def test_audit_service():
-    service = AuditLoggingService(
-        AuditManager(
-            AuditRepository(),
-            AuditValidator(),
-            AuditRecorder()
-        )
-    )
+def test_audit():
+    store = AuditStore()
+    repo = AuditRepository(store)
+    service = AuditService(repo)
 
     event = AuditEvent(
         "AUD001",
-        "USER001",
-        "CREATE_ORDER",
-        "NVDA_ORDER",
-        1000,
-        "SUCCESS"
+        "ORDER_CREATED",
+        "TRADER001",
+        {
+            "symbol": "NVDA"
+        }
     )
 
-    result = service.record(event)
+    service.record(event)
 
-    assert result.action == "CREATE_ORDER"
+    result = service.history()
 
-    assert len(service.history()) == 1
+    assert len(result) == 1

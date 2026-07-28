@@ -1,51 +1,43 @@
-# Distributed Cache Framework
+# Distributed Cache Service
 
-## Cache Hierarchy
+## Responsibility
+
+Provides:
+
+- Distributed Cache
+- Multi-Level Cache
+- Cache Synchronization
+- Cache Eviction
+- Cache Metrics
+
+## Architecture
 
 ```text
 Application
 
-      │
+↓
 
-      ▼
+L1 Cache
 
-L1 Memory Cache
+↓
 
-      │
+L2 Redis Cluster
 
-      ▼
-
-L2 Redis Cache
-
-      │
-
-      ▼
+↓
 
 Database
 ```
 
-## Cache Strategy
+## Future Upgrade
 
-```text
-Read Through
+Production Features:
 
-Write Through
-
-Write Back
-
-Cache Aside
-```
-
-## Metrics
-
-```text
-Cache Hit
-
-Cache Miss
-
-Eviction
-
-TTL Expiration
-
-Latency
-```
+- Redis Cluster
+- Redis Sentinel
+- Cache Aside Pattern
+- Write Through
+- Write Back
+- Bloom Filter
+- Cache Warmup
+- Cache Preload
+- Hot Key Detection

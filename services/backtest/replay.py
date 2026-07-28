@@ -1,12 +1,11 @@
-"""
-Historical market replay.
-"""
-
-
 class MarketReplay:
-    async def replay(
-        self,
-        timeline,
-    ):
-        for event in timeline:
+
+    def __init__(self, events):
+
+        self.events = events
+
+    def replay(self):
+
+        for event in self.events:
+
             yield event

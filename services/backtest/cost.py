@@ -1,13 +1,5 @@
-"""
-Transaction cost model.
-"""
-
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
 class TransactionCost:
-    commission: float
-    exchange_fee: float
-    slippage: float
-    spread: float
+
+    def calculate(self, amount):
+
+        return amount * 0.001

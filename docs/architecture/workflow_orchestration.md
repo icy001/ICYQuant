@@ -1,52 +1,49 @@
-# Workflow Orchestration Service
-
+# Distributed Workflow Orchestration Engine
 
 ## Responsibility
 
-
 Provides:
 
-
-- Business workflow execution
-
-- Multi service coordination
-
-- Saga transaction support
-
-- Compensation handling
+- Workflow DAG
+- Task Scheduling
+- State Management
+- Retry
+- Compensation
+- Execution History
 
 
-## Example
+## Architecture
 
+```text
+Workflow Definition
 
-Order Workflow:
+↓
 
+Workflow Engine
 
-```
-Order
-|
-Risk
-|
-Execution
-|
-Ledger
+↓
+
+Task Scheduler
+
+↓
+
+Workers
+
+↓
+
+Event History
 ```
 
 
 ## Future Upgrade
 
-
 Production Features:
 
-
 - Temporal Integration
-
-- Workflow Persistence
-
+- Apache Airflow Integration
+- DAG Visualization
 - Distributed Scheduler
-
-- State Recovery
-
+- Workflow Versioning
 - Human Approval Step
-
-- Long Running Workflow
+- SLA Monitoring
+- Workflow Audit Trail

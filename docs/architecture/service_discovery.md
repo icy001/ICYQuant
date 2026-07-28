@@ -1,52 +1,23 @@
-# Service Discovery Framework
+# Distributed Service Discovery & Health Management
 
+## Responsibility
+
+Provides:
+
+- Service Registration
+- Service Discovery
+- Heartbeat Management
+- Health Checking
+- Automatic Recovery
 
 ## Architecture
 
-
-
-
-Service Instance
-
-    |
-
-    v
-
-Service Registry
-
-    |
-
-    v
-
-Discovery Client
-
-    |
-
-    v
-
-Router
-
-    |
-
-    v
-
-Runtime Service Call
-
-
-
-
----
-
-## Discovery Flow
-
-
-
-
-Start Service
+```text
+Service
 
 ↓
 
-Register Instance
+Registry
 
 ↓
 
@@ -54,12 +25,22 @@ Health Check
 
 ↓
 
-Publish Metadata
+Discovery
 
 ↓
 
-Service Lookup
+Business Service
+```
 
-↓
+## Future Upgrade
 
-Route Request
+Production Features:
+
+- Consul Integration
+- etcd Integration
+- Kubernetes Service Discovery
+- Multi-Cluster Registry
+- gRPC Health Check
+- Automatic Failover
+- Instance Load Awareness
+- Service Topology Visualization

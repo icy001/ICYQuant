@@ -1,9 +1,9 @@
 class AuditRepository:
-    def __init__(self):
-        self.events = []
+    def __init__(self, store):
+        self.store = store
 
-    def append(self, event):
-        self.events.append(event)
+    def save(self, event):
+        self.store.append(event)
 
-    def query_all(self):
-        return self.events
+    def query(self):
+        return self.store.all()

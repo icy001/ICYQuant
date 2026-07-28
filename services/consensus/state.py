@@ -1,0 +1,4 @@
+class NodeState:
+    FOLLOWER = "FOLLOWER"
+    CANDIDATE = "CANDIDATE"
+    LEADER = "LEADER"

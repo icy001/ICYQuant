@@ -1,35 +1,28 @@
-from services.backtest.job import BacktestJob
-from services.backtest.simple_replay import ReplayEngine
-from services.backtest.order_simulator import OrderSimulator
-from services.backtest.backtest_repository import BacktestRepository
-from services.backtest.manager import BacktestManager
-from services.backtest.service import BacktestService
+from services.backtest import *
 
 
-def test_backtest_engine():
-    service = BacktestService(
-        BacktestManager(
-            ReplayEngine(),
-            OrderSimulator(),
-            BacktestRepository()
-        )
-    )
+def test_backtest():
 
-    job = BacktestJob(
-        "BT001",
-        "S001",
-        "NVDA",
-        "2025-01-01",
-        "2025-12-31"
-    )
+    events = [
 
-    result = service.execute(
-        job,
-        [
+        MarketEvent(
+
+            "NVDA",
+
             100,
-            101,
-            102
-        ]
+
+            "2026-01-01"
+
+        )
+
+    ]
+
+    replay = MarketReplay(events)
+
+    service = BacktestService(
+        replay
     )
 
-    assert result["trades"] == 3
+    result = service.run()
+
+    assert len(result) == 1

@@ -1,12 +1,11 @@
-"""
-Portfolio model.
-"""
-
-from dataclasses import dataclass, field
-
-
-@dataclass
 class Portfolio:
-    cash: float
-    equity: float
-    positions: dict = field(default_factory=dict)
+
+    def __init__(self):
+
+        self.cash = 0
+
+        self.positions = {}
+
+    def update(self, symbol, quantity):
+
+        self.positions[symbol] = quantity
