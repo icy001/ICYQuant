@@ -1,0 +1,361 @@
+"""Execution Optimization Models.
+
+Defines the core data structures for the execution optimization engine:
+- ExecutionTask: The order to be executed
+- ExecutionSlice: A single slice of a sliced order
+- ExecutionPlan: The complete execution plan with slices
+- ExecutionAlgorithm: Enum of supported algorithms (TWAP, VWAP, POV, ADAPTIVE)
+- MarketState: Current market conditions
+- ExecutionResult: Result of an executed plan
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+
+class ExecutionAlgorithm(str, Enum):
+    """Supported execution algorithms."""
+
+    TWAP = "TWAP"          # Time-Weighted Average Price
+    VWAP = "VWAP"          # Volume-Weighted Average Price
+    POV = "POV"            # Percentage Of Volume
+    ADAPTIVE = "ADAPTIVE"  # Adaptive algorithm selection
+    SMART = "SMART"        # Smart order routing
+
+
+class OrderSide(str, Enum):
+    """Order side."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class OrderUrgency(str, Enum):
+    """Order urgency level."""
+
+    LOW = "LOW"        # Passive, minimize cost
+    MEDIUM = "MEDIUM"  # Balanced
+    HIGH = "HIGH"      # Aggressive, minimize timing risk
+    CRITICAL = "CRITICAL"  # Execute immediately
+
+
+class SliceStatus(str, Enum):
+    """Status of an execution slice."""
+
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    PARTIALLY_FILLED = "PARTIALLY_FILLED"
+    FILLED = "FILLED"
+    CANCELLED = "CANCELLED"
+    REJECTED = "REJECTED"
+
+
+class PlanStatus(str, Enum):
+    """Status of an execution plan."""
+
+    CREATED = "CREATED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    PAUSED = "PAUSED"
+
+
+class ExecutionQuality(str, Enum):
+    """Execution quality rating."""
+
+    EXCELLENT = "EXCELLENT"
+    GOOD = "GOOD"
+    FAIR = "FAIR"
+    POOR = "POOR"
+
+
+# =============================================================================
+# Dataclasses
+# =============================================================================
+
+
+@dataclass
+class ExecutionTask:
+    """An order to be executed optimally.
+
+    Represents a single order that needs to be sliced and executed
+    using the best algorithm based on market conditions and urgency.
+    """
+
+    order_id: str
+    symbol: str
+    quantity: float
+    side: OrderSide
+    urgency: OrderUrgency = OrderUrgency.MEDIUM
+    algorithm: ExecutionAlgorithm = ExecutionAlgorithm.ADAPTIVE
+    price_limit: Optional[float] = None
+    max_participation_rate: float = 0.15       # Max % of market volume
+    min_slice_size: float = 100.0              # Minimum size per slice
+    max_duration_minutes: int = 120            # Max execution duration
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "order_id": self.order_id,
+            "symbol": self.symbol,
+            "quantity": self.quantity,
+            "side": self.side.value,
+            "urgency": self.urgency.value,
+            "algorithm": self.algorithm.value,
+            "price_limit": self.price_limit,
+            "max_participation_rate": self.max_participation_rate,
+            "min_slice_size": self.min_slice_size,
+            "max_duration_minutes": self.max_duration_minutes,
+        }
+
+
+@dataclass
+class ExecutionSlice:
+    """A single slice of a larger order.
+
+    One unit of execution within a sliced order plan.
+    """
+
+    slice_id: str
+    order_id: str
+    symbol: str
+    quantity: float
+    side: OrderSide
+    scheduled_time: datetime
+    status: SliceStatus = SliceStatus.PENDING
+    executed_quantity: float = 0.0
+    executed_price: float = 0.0
+    expected_impact_bps: float = 0.0
+
+    @property
+    def fill_pct(self) -> float:
+        """Percentage of slice that has been filled."""
+        if self.quantity <= 0:
+            return 0.0
+        return self.executed_quantity / self.quantity
+
+    def to_dict(self) -> dict:
+        return {
+            "slice_id": self.slice_id,
+            "order_id": self.order_id,
+            "symbol": self.symbol,
+            "quantity": self.quantity,
+            "side": self.side.value,
+            "scheduled_time": self.scheduled_time.isoformat(),
+            "status": self.status.value,
+            "executed_quantity": self.executed_quantity,
+            "executed_price": self.executed_price,
+            "fill_pct": self.fill_pct,
+            "expected_impact_bps": self.expected_impact_bps,
+        }
+
+
+@dataclass
+class ExecutionPlan:
+    """A complete execution plan with slices.
+
+    Generated by the execution optimizer, contains all slices
+    needed to execute the full order with minimal cost.
+    """
+
+    plan_id: str
+    order_id: str
+    algorithm: ExecutionAlgorithm
+    total_quantity: float
+    executed_quantity: float = 0.0
+    status: PlanStatus = PlanStatus.CREATED
+    slices: List[ExecutionSlice] = field(default_factory=list)
+    expected_impact_bps: float = 0.0
+    expected_slippage_bps: float = 0.0
+    estimated_cost: float = 0.0
+    duration_minutes: int = 0
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def remaining_quantity(self) -> float:
+        return self.total_quantity - self.executed_quantity
+
+    @property
+    def slice_count(self) -> int:
+        return len(self.slices)
+
+    @property
+    def fill_pct(self) -> float:
+        if self.total_quantity <= 0:
+            return 0.0
+        return self.executed_quantity / self.total_quantity
+
+    def to_dict(self) -> dict:
+        return {
+            "plan_id": self.plan_id,
+            "order_id": self.order_id,
+            "algorithm": self.algorithm.value,
+            "total_quantity": self.total_quantity,
+            "executed_quantity": self.executed_quantity,
+            "remaining_quantity": self.remaining_quantity,
+            "fill_pct": self.fill_pct,
+            "status": self.status.value,
+            "slice_count": self.slice_count,
+            "slices": [s.to_dict() for s in self.slices],
+            "expected_impact_bps": self.expected_impact_bps,
+            "expected_slippage_bps": self.expected_slippage_bps,
+            "estimated_cost": self.estimated_cost,
+            "duration_minutes": self.duration_minutes,
+        }
+
+
+@dataclass
+class MarketState:
+    """Current market conditions snapshot.
+
+    Used by the optimizer to select the best algorithm
+    and size slices appropriately.
+    """
+
+    symbol: str
+    bid: float
+    ask: float
+    last_price: float
+    bid_size: float = 0.0
+    ask_size: float = 0.0
+    daily_volume: float = 1_000_000.0
+    current_volume: float = 0.0
+    volatility_20d: float = 0.20
+    spread_bps: float = 0.0
+    vwap: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+    def __post_init__(self):
+        if self.spread_bps == 0.0 and self.last_price > 0:
+            self.spread_bps = ((self.ask - self.bid) / self.last_price) * 10000
+
+    @property
+    def mid_price(self) -> float:
+        return (self.bid + self.ask) / 2.0
+
+    @property
+    def spread(self) -> float:
+        return self.ask - self.bid
+
+    @property
+    def volume_participation_rate(self) -> float:
+        """What % of daily volume has been traded so far."""
+        if self.daily_volume <= 0:
+            return 0.0
+        return self.current_volume / self.daily_volume
+
+    def to_dict(self) -> dict:
+        return {
+            "symbol": self.symbol,
+            "bid": self.bid,
+            "ask": self.ask,
+            "mid_price": self.mid_price,
+            "last_price": self.last_price,
+            "spread_bps": self.spread_bps,
+            "daily_volume": self.daily_volume,
+            "volatility_20d": self.volatility_20d,
+            "volume_participation_rate": self.volume_participation_rate,
+        }
+
+
+@dataclass
+class ImpactEstimate:
+    """Estimated market impact of an order."""
+
+    symbol: str
+    order_quantity: float
+    daily_volume: float
+    volatility: float
+    spread_bps: float
+    participation_rate: float = 0.0
+    temporary_impact_bps: float = 0.0
+    permanent_impact_bps: float = 0.0
+    total_impact_bps: float = 0.0
+    total_impact_amount: float = 0.0
+    confidence_interval: tuple = (0.0, 0.0)
+
+    def __post_init__(self):
+        if self.participation_rate == 0.0 and self.daily_volume > 0:
+            self.participation_rate = self.order_quantity / self.daily_volume
+
+    def to_dict(self) -> dict:
+        return {
+            "symbol": self.symbol,
+            "order_quantity": self.order_quantity,
+            "participation_rate": f"{self.participation_rate:.4%}",
+            "temporary_impact_bps": self.temporary_impact_bps,
+            "permanent_impact_bps": self.permanent_impact_bps,
+            "total_impact_bps": self.total_impact_bps,
+            "total_impact_amount": self.total_impact_amount,
+            "expected_impact_pct": f"{self.total_impact_bps / 100:.3%}",
+        }
+
+
+@dataclass
+class ExecutionOutcome:
+    """Result of executing an order or plan."""
+
+    order_id: str
+    plan_id: str
+    algorithm: ExecutionAlgorithm
+    total_quantity: float
+    executed_quantity: float
+    average_price: float
+    arrival_price: float
+    vwap_price: float = 0.0
+    slippage_bps: float = 0.0
+    impact_bps: float = 0.0
+    implementation_shortfall_bps: float = 0.0
+    commission: float = 0.0
+    total_cost: float = 0.0
+    quality: ExecutionQuality = ExecutionQuality.FAIR
+    duration_minutes: int = 0
+    slices_filled: int = 0
+    slices_total: int = 0
+    completed_at: datetime = field(default_factory=datetime.utcnow)
+
+    @property
+    def fill_rate(self) -> float:
+        if self.total_quantity <= 0:
+            return 0.0
+        return self.executed_quantity / self.total_quantity
+
+    @property
+    def cost_bps(self) -> float:
+        """Total cost in basis points relative to arrival price."""
+        if self.arrival_price <= 0:
+            return 0.0
+        return self.slippage_bps + self.impact_bps
+
+    def to_dict(self) -> dict:
+        return {
+            "order_id": self.order_id,
+            "plan_id": self.plan_id,
+            "algorithm": self.algorithm.value,
+            "total_quantity": self.total_quantity,
+            "executed_quantity": self.executed_quantity,
+            "fill_rate": f"{self.fill_rate:.1%}",
+            "average_price": self.average_price,
+            "arrival_price": self.arrival_price,
+            "vwap_price": self.vwap_price,
+            "slippage_bps": self.slippage_bps,
+            "impact_bps": self.impact_bps,
+            "implementation_shortfall_bps": self.implementation_shortfall_bps,
+            "commission": self.commission,
+            "total_cost": self.total_cost,
+            "cost_bps": self.cost_bps,
+            "quality": self.quality.value,
+            "duration_minutes": self.duration_minutes,
+            "slices": f"{self.slices_filled}/{self.slices_total}",
+        }
