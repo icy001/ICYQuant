@@ -1,21 +1,25 @@
-from .goal import ResearchGoal
-from .task import ResearchTask
-from .workflow import ResearchWorkflow
-from .planner import ResearchPlanner
-from .scheduler import TaskScheduler
-from .experiment import ExperimentLoop, ExperimentResult
-from .evaluator import ResearchEvaluator, EvaluationReport
+from .opportunity import ResearchOpportunityDetector
+from .hypothesis import HypothesisGenerator
+from .experiment import ExperimentPlanner
+from .data_agent import ResearchDataAgent
+from .backtest_agent import BacktestExecutionAgent
+from .evaluator import ResearchEvaluationEngine
+from .critic import ResearchCriticAgent
+from .report import ResearchReportGenerator
+from .scheduler import AutonomousResearchScheduler
+from .memory import ResearchLoopMemory
 from .service import AutonomousResearchService
 
 __all__ = [
-    "ResearchGoal",
-    "ResearchTask",
-    "ResearchWorkflow",
-    "ResearchPlanner",
-    "TaskScheduler",
-    "ExperimentLoop",
-    "ExperimentResult",
-    "ResearchEvaluator",
-    "EvaluationReport",
+    "ResearchOpportunityDetector",
+    "HypothesisGenerator",
+    "ExperimentPlanner",
+    "ResearchDataAgent",
+    "BacktestExecutionAgent",
+    "ResearchEvaluationEngine",
+    "ResearchCriticAgent",
+    "ResearchReportGenerator",
+    "AutonomousResearchScheduler",
+    "ResearchLoopMemory",
     "AutonomousResearchService",
 ]
