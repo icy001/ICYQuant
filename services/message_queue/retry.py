@@ -1,9 +1,4 @@
 class RetryManager:
-
-    def retry(
-        self,
-        message
-    ):
+    def retry(self, message):
         message.status = "RETRY"
-
         return message
