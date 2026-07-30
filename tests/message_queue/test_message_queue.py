@@ -2,7 +2,6 @@ from services.message_queue import *
 
 
 def test_message_queue():
-
     repository = MessageRepository()
 
     service = MessageQueueService(
@@ -15,15 +14,11 @@ def test_message_queue():
         Message(
             "MSG001",
             "ORDER_CREATED",
-            {
-                "order_id": "10001"
-            },
+            {"order_id": "10001"},
             "NEW"
         )
     )
 
-    result = service.consume(
-        "ORDER_CREATED"
-    )
+    result = service.consume("ORDER_CREATED")
 
     assert len(result) == 1

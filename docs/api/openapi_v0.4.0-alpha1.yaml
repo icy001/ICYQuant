@@ -1,0 +1,1772 @@
+openapi: 3.0.3
+info:
+  title: ICYQuant API
+  description: |
+    Institution-grade quantitative trading infrastructure API.
+
+    ICYQuant provides a comprehensive set of APIs for:
+    - Order Management System (OMS)
+    - Portfolio Management
+    - Risk Management
+    - Backtesting Engine
+    - Data Management
+    - AI Services
+    - Strategy Management
+    - User Management
+    - Authentication & Authorization
+    - System Monitoring
+
+    ## Authentication
+    All API requests require Bearer Token authentication.
+    
+    ## Rate Limiting
+    - Standard tier: 1000 requests/minute
+    - Premium tier: 5000 requests/minute
+    - Enterprise tier: Unlimited
+
+    ## Versioning
+    API version: v0.4.0-alpha1
+  version: 0.4.0-alpha1
+  contact:
+    name: ICYQuant Team
+    email: support@icyquant.com
+    url: https://icyquant.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.icyquant.io/api/v1
+    description: Production server
+  - url: https://stg-api.icyquant.io/api/v1
+    description: Staging server
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+tags:
+  - name: Orders
+    description: Order Management System operations
+  - name: Portfolio
+    description: Portfolio management operations
+  - name: Risk
+    description: Risk management operations
+  - name: Backtest
+    description: Backtesting engine operations
+  - name: Data
+    description: Data management operations
+  - name: AI
+    description: AI services operations
+  - name: Strategy
+    description: Strategy management operations
+  - name: Users
+    description: User management operations
+  - name: Auth
+    description: Authentication and authorization
+  - name: Monitoring
+    description: System monitoring operations
+
+paths:
+  # ==================== Authentication ====================
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: User login
+      description: Authenticate user and obtain access token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      description: Refresh access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: User logout
+      description: Invalidate current session and tokens
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Orders ====================
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: List orders
+      description: Retrieve a list of orders with optional filtering
+      operationId: listOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Orders
+      summary: Create order
+      description: Create a new order for execution
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /orders/{order_id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      description: Retrieve detailed information about a specific order
+      operationId: getOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Orders
+      summary: Update order
+      description: Update an existing order (amend quantity, price, etc.)
+      operationId: updateOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderRequest'
+      responses:
+        '200':
+          description: Order updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Orders
+      summary: Cancel order
+      description: Cancel an existing order
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '204':
+          description: Order cancelled successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{order_id}/versions:
+    get:
+      tags:
+        - Orders
+      summary: Get order version history
+      description: Retrieve the complete version history of an order
+      operationId: getOrderVersions
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Order version history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderVersionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Portfolio ====================
+  /portfolio/positions:
+    get:
+      tags:
+        - Portfolio
+      summary: Get positions
+      description: Retrieve current positions for the portfolio
+      operationId: getPositions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: symbol
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of positions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /portfolio/pnl:
+    get:
+      tags:
+        - Portfolio
+      summary: Get profit and loss
+      description: Retrieve profit and loss information
+      operationId: getPnL
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Profit and loss data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PnLResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /portfolio/nav:
+    get:
+      tags:
+        - Portfolio
+      summary: Get NAV
+      description: Retrieve Net Asset Value calculation
+      operationId: getNAV
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: NAV data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NAVResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /portfolio/optimize:
+    post:
+      tags:
+        - Portfolio
+      summary: Optimize portfolio
+      description: Run portfolio optimization algorithm
+      operationId: optimizePortfolio
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortfolioOptimizationRequest'
+      responses:
+        '200':
+          description: Optimization result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioOptimizationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Risk ====================
+  /risk/check:
+    post:
+      tags:
+        - Risk
+      summary: Risk check
+      description: Perform pre-trade risk check
+      operationId: riskCheck
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskCheckRequest'
+      responses:
+        '200':
+          description: Risk check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskCheckResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /risk/limits:
+    get:
+      tags:
+        - Risk
+      summary: Get risk limits
+      description: Retrieve current risk limits
+      operationId: getRiskLimits
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Risk limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskLimitsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /risk/rules:
+    get:
+      tags:
+        - Risk
+      summary: List risk rules
+      description: Retrieve list of risk rules
+      operationId: listRiskRules
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of risk rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskRuleListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /risk/rules/{rule_id}:
+    put:
+      tags:
+        - Risk
+      summary: Update risk rule
+      description: Update a specific risk rule configuration
+      operationId: updateRiskRule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRiskRuleRequest'
+      responses:
+        '200':
+          description: Rule updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskRuleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /risk/audit/logs:
+    get:
+      tags:
+        - Risk
+      summary: Get risk audit logs
+      description: Retrieve risk management audit logs
+      operationId: getRiskAuditLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Backtest ====================
+  /backtest/jobs:
+    get:
+      tags:
+        - Backtest
+      summary: List backtest jobs
+      description: Retrieve list of backtest jobs
+      operationId: listBacktestJobs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/BacktestJobStatus'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: List of backtest jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Backtest
+      summary: Create backtest job
+      description: Create and start a new backtest job
+      operationId: createBacktestJob
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBacktestJobRequest'
+      responses:
+        '201':
+          description: Backtest job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /backtest/jobs/{job_id}:
+    get:
+      tags:
+        - Backtest
+      summary: Get backtest job
+      description: Retrieve backtest job status and details
+      operationId: getBacktestJob
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backtest job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /backtest/results/{result_id}:
+    get:
+      tags:
+        - Backtest
+      summary: Get backtest result
+      description: Retrieve detailed backtest results
+      operationId: getBacktestResult
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backtest results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResultResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Data ====================
+  /data/bar/{symbol}:
+    get:
+      tags:
+        - Data
+      summary: Get bar data
+      description: Retrieve historical bar/K-line data
+      operationId: getBarData
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: interval
+          in: query
+          schema:
+            $ref: '#/components/schemas/BarInterval'
+      responses:
+        '200':
+          description: Bar data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BarDataResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /data/tick/{symbol}:
+    get:
+      tags:
+        - Data
+      summary: Get tick data
+      description: Retrieve historical tick data
+      operationId: getTickData
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Tick data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TickDataResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /data/factors:
+    get:
+      tags:
+        - Data
+      summary: Get factor data
+      description: Retrieve factor data
+      operationId: getFactorData
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: factor_names
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: symbols
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Factor data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactorDataResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== AI ====================
+  /ai/predict:
+    post:
+      tags:
+        - AI
+      summary: AI prediction
+      description: Get AI model predictions for trading decisions
+      operationId: aiPredict
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIPredictRequest'
+      responses:
+        '200':
+          description: AI predictions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIPredictResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ai/agents:
+    post:
+      tags:
+        - AI
+      summary: Create AI agent
+      description: Create a new AI agent instance
+      operationId: createAIAgent
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAIAgentRequest'
+      responses:
+        '201':
+          description: AI agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIAgentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ai/sessions/{session_id}:
+    get:
+      tags:
+        - AI
+      summary: Get AI session
+      description: Retrieve AI session details and history
+      operationId: getAISession
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: AI session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ai/workflows:
+    post:
+      tags:
+        - AI
+      summary: Execute AI workflow
+      description: Execute a multi-step AI workflow
+      operationId: executeAIWorkflow
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIWorkflowRequest'
+      responses:
+        '200':
+          description: Workflow execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIWorkflowResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Strategy ====================
+  /strategy:
+    get:
+      tags:
+        - Strategy
+      summary: List strategies
+      description: Retrieve list of trading strategies
+      operationId: listStrategies
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/StrategyStatus'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: List of strategies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Strategy
+      summary: Create strategy
+      description: Create a new trading strategy
+      operationId: createStrategy
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStrategyRequest'
+      responses:
+        '201':
+          description: Strategy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /strategy/{strategy_id}:
+    get:
+      tags:
+        - Strategy
+      summary: Get strategy
+      description: Retrieve strategy details
+      operationId: getStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Strategy details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Strategy
+      summary: Update strategy
+      description: Update strategy configuration
+      operationId: updateStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStrategyRequest'
+      responses:
+        '200':
+          description: Strategy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Strategy
+      summary: Delete strategy
+      description: Delete a trading strategy
+      operationId: deleteStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Strategy deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Users ====================
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      description: Retrieve list of users (admin only)
+      operationId: listUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Create a new user (admin only)
+      operationId: createUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user
+      description: Retrieve current user information
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{user_id}:
+    get:
+      tags:
+        - Users
+      summary: Get user
+      description: Retrieve user details
+      operationId: getUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update user information
+      operationId: updateUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete a user (admin only)
+      operationId: deleteUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: User deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{user_id}/permissions:
+    get:
+      tags:
+        - Users
+      summary: Get user permissions
+      description: Retrieve user permissions
+      operationId: getUserPermissions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Monitoring ====================
+  /monitoring/health:
+    get:
+      tags:
+        - Monitoring
+      summary: Health check
+      description: Check system health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /monitoring/metrics:
+    get:
+      tags:
+        - Monitoring
+      summary: Prometheus metrics
+      description: Get Prometheus metrics endpoint
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Prometheus text format metrics
+
+  /monitoring/alerts:
+    get:
+      tags:
+        - Monitoring
+      summary: Get alerts
+      description: Retrieve system alerts
+      operationId: getAlerts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/AlertSeverity'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AlertStatus'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  # ==================== Security ====================
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+
+  # ==================== Parameters ====================
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+    OrderIdParam:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Order ID
+
+  # ==================== Responses ====================
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Schemas ====================
+  schemas:
+    # Common
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: "INVALID_REQUEST"
+        message:
+          type: string
+          example: "The request parameters are invalid"
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+        trace_id:
+          type: string
+          format: uuid
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        total_items:
+          type: integer
+          example: 100
+        total_pages:
+          type: integer
+          example: 5
+
+    # Auth
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "trader@example.com"
+        password:
+          type: string
+          format: password
+          example: "SecureP@ss123"
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIs..."
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIs..."
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIs..."
+        token_type:
+          type: string
+          default: "Bearer"
+        expires_in:
+          type: integer
+          example: 3600
+          description: Token expiration in seconds
+
+    # Orders
+    OrderStatus:
+      type: string
+      enum:
+        - PENDING
+        - AI_PROCESSING
+        - SPLITTING
+        - EXECUTING
+        - SUBMITTED
+        - PARTIAL_FILLED
+        - FILLED
+        - CANCELLED
+        - REJECTED
+
+    OrderSide:
+      type: string
+      enum:
+        - BUY
+        - SELL
+
+    OrderType:
+      type: string
+      enum:
+        - MARKET
+        - LIMIT
+        - STOP
+        - STOP_LIMIT
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - account_id
+        - symbol
+        - side
+        - quantity
+        - order_type
+      properties:
+        account_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        symbol:
+          type: string
+          example: "IC2412"
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: number
+          format: double
+          example: 10
+        price:
+          type: number
+          format: double
+          example: 5500.0
+          description: Required for LIMIT orders
+        order_type:
+          $ref: '#/components/schemas/OrderType'
+        time_in_force:
+          type: string
+          enum:
+            - GTC
+            - IOC
+            - FOK
+            - DAY
+          default: GTC
+        ai_strategy_id:
+          type: string
+          format: uuid
+          description: Optional AI strategy for execution
+        ai_options:
+          $ref: '#/components/schemas/AIOrderOptions'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    AIOrderOptions:
+      type: object
+      properties:
+        model_version:
+          type: string
+          example: "v3.2.1"
+        min_confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          example: 0.7
+        strategy:
+          type: string
+          enum:
+            - MOMENTUM
+            - MEAN_REVERSION
+            - MARKET_MAKING
+            - ARBITRAGE
+          example: "MOMENTUM"
+        max_slippage:
+          type: number
+          format: double
+          example: 0.002
+        partial_fill_allowed:
+          type: boolean
+          default: true
+
+    UpdateOrderRequest:
+      type: object
+      properties:
+        quantity:
+          type: number
+          format: double
+          example: 15
+        price:
+          type: number
+          format: double
+          example: 5520.0
+
+    OrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: number
+          format: double
+        filled_quantity:
+          type: number
+          format: double
+        price:
+          type: number
+          format: double
+        avg_fill_price:
+          type: number
+          format: double
+        order_type:
+          $ref: '#/components/schemas/OrderType'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        time_in_force:
+          type: string
+        ai_strategy_id:
+          type: string
+          format: uuid
+        ai_confidence:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          example: 1
+
+    OrderListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    OrderVersionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderVersion'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    OrderVersion:
+      type: object
+      properties:
+        version:
+          type: integer
+        changes:
+          type: object
+          additionalProperties: true
+        reason:
+          type: string
+        changed_by:
+          type: string
+          format: uuid
+        changed_at:
+          type: string
+          format: date-time
+
+    # Portfolio
+    Position:
+      type: object
+      properties:
+        symbol:
+          type: string
+        quantity:
+          type: number
+          format: double
+        avg_cost:
+          type: number
+          format: double
+        market_value:
+          type: number
+          format: double
+        unrealized_pnl:
+          type: number
+          format: double
+        realized_pnl:
+          type: number
+          format: double
+        risk_score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+
+    PositionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+        total_value:
+          type: number
+          format: double
+        currency:
+          type: string
+          default: "CNY"
+
+    PnLResponse:
+      type: object
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        total_pnl:
+          type: number
+          format: double
+        realized_pnl:
+          type: number
+          format: double
+        unrealized_pnl:
+          type: number
+          format: double
+        daily_pnl:
+          type: number
+          format: double
+        currency:
+          type: string
+          default: "CNY"
+        as_of:
+          type: string
+          format: date-time
+
+    NAVResponse:
+      type: object
+      properties:
+        nav:
+          type: number
+          format: double
+          example: 10000000.00
+        nav_per_share:
+          type: number
+          format: double
+          example: 100.00
+        shares_outstanding:
+          type: number
+          format: double
+          example: 100000
+        currency:
+          type: string
+          default: "CNY"
+        date:
+          type: string
+          format: date
+
+    PortfolioOptimizationRequest:
+      type: object
+      required:
+        - objective
+      properties:
+        objective:
+          type: string
+          enum:
+            - MAX_SHARPE
+            - MIN_VARIANCE
+            - RISK_PARITY
+            - MAX_RETURN
+        universe:
+          type: array
+          items:
+            type: string
+          example: ["IC2412", "IF2412", "IH2412"]
+        constraints:
+          $ref: '#/components/schemas/Constraint'

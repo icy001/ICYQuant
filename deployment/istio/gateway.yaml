@@ -1,0 +1,71 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: icyquant-gateway
+  namespace: icyquant
+  labels:
+    app.kubernetes.io/managed-by: icyquant-operator
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - api.icyquant.io
+        - "*.icyquant.io"
+      tls:
+        mode: SIMPLE
+        credentialName: icyquant-tls
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - api.icyquant.io
+        - "*.icyquant.io"
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 8443
+        name: https-internal
+        protocol: HTTPS
+      hosts:
+        - "*.icyquant.svc.cluster.local"
+      tls:
+        mode: MUTUAL
+        credentialName: icyquant-mtls
+    - port:
+        number: 15021
+        name: status
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icyquant-gateway
+  namespace: icyquant
+  labels:
+    istio: ingressgateway
+    app.kubernetes.io/managed-by: icyquant-operator
+spec:
+  type: LoadBalancer
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: https-internal
+      port: 8443
+      targetPort: 8443
+    - name: status
+      port: 15021
+      targetPort: 15021
+  selector:
+    istio: ingressgateway

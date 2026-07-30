@@ -1,0 +1,37 @@
+# ICYQuant Platform - Plugin Configuration
+plugins:
+  - name: InteractiveBrokersAdapter
+    type: broker
+    version: 1.0.0
+    enabled: true
+    config:
+      host: localhost
+      port: 7497
+  - name: AlpacaBrokerAdapter
+    type: broker
+    version: 1.0.0
+    enabled: false
+  - name: MACDStrategy
+    type: strategy
+    version: 1.0.0
+    enabled: true
+    config:
+      fast_period: 12
+      slow_period: 26
+      signal_period: 9
+  - name: RSIIndicator
+    type: indicator
+    version: 1.0.0
+    enabled: true
+    config:
+      period: 14
+      overbought: 70
+      oversold: 30
+  - name: SentimentAnalyzer
+    type: ai_model
+    version: 1.0.0
+    enabled: true
+  - name: NewsDataSource
+    type: data_source
+    version: 1.0.0
+    enabled: false

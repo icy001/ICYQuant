@@ -1,0 +1,80 @@
+environment: staging
+cluster: staging-cluster
+namespace: icyquant-staging
+
+imageRegistry: ghcr.io/icyquant
+tag: develop
+
+services:
+  api:
+    replicaCount: 3
+    version: "develop"
+    resources:
+      cpuRequest: 250m
+      memoryRequest: 512Mi
+      cpuLimit: 1
+      memoryLimit: 2Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPU: 80
+    strategy: canary
+    canary:
+      stages: [50, 100]
+
+  ai:
+    replicaCount: 2
+    version: "develop"
+    gpu:
+      enabled: true
+      model: nvidia-t4
+      count: 1
+    autoscaling:
+      enabled: false
+
+  risk:
+    replicaCount: 2
+
+  marketGateway:
+    replicaCount: 1
+    gateways:
+      - name: binance
+        enabled: false
+      - name: test
+        enabled: true
+
+  portfolio:
+    replicaCount: 1
+  strategy:
+    replicaCount: 1
+  execution:
+    replicaCount: 2
+  reconciliation:
+    replicaCount: 1
+
+network:
+  networkPolicy:
+    enabled: true
+    defaultDeny: false
+  serviceMesh:
+    enabled: true
+    mtls: permissive
+
+monitoring:
+  prometheus:
+    enabled: true
+    retention: 7d
+  grafana:
+    enabled: true
+
+security:
+  podSecurityStandard: baseline
+  encryption:
+    atRest: true
+    inTransit: true
+  rbac:
+    enabled: true
+
+disasterRecovery:
+  enabled: false

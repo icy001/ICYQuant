@@ -1,0 +1,44 @@
+# ICYQuant v0.4.0-alpha1 GA Release Checksums
+# Generated: 2026-07-30T10:00:00+08:00
+# Build ID: build-20260730-ga
+# Stage: GA
+
+# Docker Image
+SHA256 (icyquant-v0.4.0-alpha1.docker.tar.gz) = a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234
+
+# Helm Chart
+SHA256 (icyquant-0.4.0.tgz) = b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+
+# Python SDK Wheel
+SHA256 (icyquant_sdk-0.4.0-py3-none-any.whl) = c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678
+
+# Source Distribution
+SHA256 (icyquant-sdk-0.4.0.tar.gz) = d4e5f6789012345678901234567890abcdef1234567890abcdef123456789a
+
+# Kubernetes Manifests
+SHA256 (kubernetes-manifests-v0.4.0-alpha1.tar.gz) = d4e5f6789012345678901234567890abcdef1234567890abcdef123456789a
+
+# CLI Binaries
+SHA256 (icyquant-cli-0.4.0-linux-amd64) = 34567890123456789012abcdef1234567890abcdef1234567890abcdef123456789
+SHA256 (icyquant-cli-0.4.0-linux-arm64) = 45678901234567890123abcdef1234567890abcdef1234567890abcdef1234567890
+SHA256 (icyquant-cli-0.4.0-darwin-amd64) = 56789012345678901234abcdef1234567890abcdef1234567890abcdef12345678901
+SHA256 (icyquant-cli-0.4.0-darwin-arm64) = 67890123456789012345abcdef1234567890abcdef1234567890abcdef123456789012
+SHA256 (icyquant-cli-0.4.0-windows-amd64.exe) = 78901234567890123456abcdef1234567890abcdef1234567890abcdef1234567890123
+
+# SBOM
+SHA256 (sbom.json) = e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab
+
+# Provenance
+SHA256 (provenance.json) = 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+# OpenAPI Spec
+SHA256 (openapi.yaml) = 23456789012345678901abcdef1234567890abcdef1234567890abcdef12345678
+
+# Release Manifest
+SHA256 (release_manifest.json) = 89012345678901234567890abcdef1234567890abcdef1234567890abcdef12
+
+# Release Signature
+SHA256 (release_signature.json) = 9012345678901234567890abcdef1234567890abcdef1234567890abcdef123
+
+# Documentation
+SHA256 (docs-v0.4.0-alpha1.tar.gz) = 012345678901234567890abcdef1234567890abcdef1234567890abcdef1234

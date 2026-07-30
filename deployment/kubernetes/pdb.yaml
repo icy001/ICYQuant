@@ -1,0 +1,39 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: icyquant-api-pdb
+  namespace: icyquant
+  labels:
+    app: icyquant-api
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: icyquant-api
+  unhealthyPodEvictionPolicy: AlwaysAllow
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: icyquant-ai-pdb
+  namespace: icyquant
+  labels:
+    app: icyquant-ai
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: icyquant-ai
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: icyquant-redis-pdb
+  namespace: icyquant
+  labels:
+    app: icyquant-redis
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: icyquant-redis

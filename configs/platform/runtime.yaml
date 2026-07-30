@@ -1,0 +1,38 @@
+# ICYQuant Platform - Runtime Configuration
+runtime:
+  max_threads: 32
+  min_threads: 4
+  thread_pool_size: 16
+  queue_size: 10000
+  timeout_seconds: 300
+  max_memory_mb: 4096
+  gc_interval_seconds: 60
+
+startup:
+  order:
+    - lakehouse
+    - market_data
+    - feature_store
+    - research
+    - ai
+    - risk
+    - backtest
+    - oms
+    - ems
+    - portfolio
+    - reporting
+    - security
+    - observability
+    - cloud
+  parallel_startup: false
+  health_check_timeout: 30
+
+shutdown:
+  order: reverse_startup
+  force_timeout_seconds: 10
+  save_state: true
+
+workspace:
+  max_parallel: 4
+  auto_save: true
+  snapshot_interval: 3600

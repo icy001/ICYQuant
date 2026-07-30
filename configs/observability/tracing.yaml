@@ -1,0 +1,54 @@
+# Tracing Configuration for ICYQuant Observability
+# Defines distributed tracing settings for request/order lifecycle tracking
+
+tracing:
+  enabled: true
+  exporter:
+    type: otlp
+    endpoint: http://localhost:4317
+    timeout_ms: 5000
+
+  sampling:
+    strategy: probabilistic
+    default_rate: 0.1
+    per_service:
+      api_gateway: 1.0
+      risk_engine: 1.0
+      execution: 0.5
+      broker: 0.5
+      ai_service: 0.3
+
+  propagation:
+    format: w3c-tracecontext
+    inject: true
+    extract: true
+
+  services:
+    - name: api_gateway
+      enabled: true
+    - name: auth
+      enabled: true
+    - name: risk_engine
+      enabled: true
+    - name: execution
+      enabled: true
+    - name: broker
+      enabled: true
+    - name: ai_service
+      enabled: true
+    - name: market_data
+      enabled: true
+
+  attributes:
+    global:
+      environment: production
+      version: v0.4.0-alpha1
+    per_service:
+      api_gateway: [request_id, user_id]
+      risk_engine: [order_id, risk_check_type]
+      execution: [order_id, symbol]
+      ai_service: [model_name, inference_type]
+
+  retention:
+    trace_days: 30
+    span_days: 7

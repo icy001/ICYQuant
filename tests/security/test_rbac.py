@@ -1,29 +1,25 @@
-from services.security import (
-    RBACService,
-    Role,
+"""
+Tests for ICYQuant RBAC authorization.
+"""
+
+from services.security.authorization import (
+    AuthorizationService,
     Permission,
+    ResourceType,
 )
 
 
 def test_trader_permission():
-    service = RBACService()
+    service = AuthorizationService()
+    service.assign_role("trader1", "trader")
 
-    assert (
-        service.has_permission(
-            Role.TRADER,
-            Permission.CREATE_ORDER
-        )
-        is True
-    )
+    assert service.check_permission("trader1", ResourceType.ORDER, Permission.WRITE) is True
+    assert service.check_permission("trader1", ResourceType.TRADE, Permission.EXECUTE) is True
 
 
 def test_auditor_cannot_trade():
-    service = RBACService()
+    service = AuthorizationService()
+    service.assign_role("auditor1", "auditor")
 
-    assert (
-        service.has_permission(
-            Role.AUDITOR,
-            Permission.CREATE_ORDER
-        )
-        is False
-    )
+    assert service.check_permission("auditor1", ResourceType.TRADE, Permission.WRITE) is False
+    assert service.check_permission("auditor1", ResourceType.AUDIT_LOG, Permission.READ) is True

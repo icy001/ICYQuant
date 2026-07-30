@@ -1,0 +1,50 @@
+# Metrics Configuration for ICYQuant Observability
+# Defines metric collection, aggregation, and retention settings
+
+metrics:
+  collection:
+    interval_seconds: 10
+    batch_size: 100
+    flush_interval_seconds: 60
+
+  types:
+    counters:
+      - name: order_count
+        description: Total number of orders processed
+        labels: [symbol, side, status]
+      - name: trade_count
+        description: Total number of trades executed
+        labels: [symbol, venue]
+      - name: error_count
+        description: Total number of errors
+        labels: [service, error_type]
+
+    gauges:
+      - name: active_orders
+        description: Number of currently active orders
+        labels: [service]
+      - name: positions_count
+        description: Number of active positions
+        labels: [strategy, account]
+      - name: cpu_usage_pct
+        description: CPU usage percentage
+      - name: memory_usage_pct
+        description: Memory usage percentage
+      - name: gpu_utilization_pct
+        description: GPU utilization percentage
+        labels: [gpu_id]
+
+    histograms:
+      - name: order_latency_ms
+        description: Order processing latency
+        buckets: [5, 10, 25, 50, 100, 250, 500, 1000]
+      - name: inference_latency_ms
+        description: AI inference latency
+        buckets: [10, 25, 50, 100, 250, 500, 1000, 5000]
+      - name: risk_check_latency_ms
+        description: Risk check processing latency
+        buckets: [1, 5, 10, 25, 50, 100, 250]
+
+  aggregation:
+    default_aggregations: [avg, min, max, p50, p95, p99]
+    retention_days: 90

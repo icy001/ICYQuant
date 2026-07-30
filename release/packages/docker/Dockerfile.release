@@ -1,0 +1,113 @@
+# =============================================================================
+# ICYQuant RC1 Production Dockerfile
+# Multi-stage build for optimized production image
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder
+# -----------------------------------------------------------------------------
+FROM python:3.9-slim AS builder
+
+# Build arguments for versioning
+ARG VERSION=0.4.0-alpha1
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Labels for container metadata
+LABEL org.opencontainers.image.title="ICYQuant Platform" \
+      org.opencontainers.image.description="Institutional Quant Operating System" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="ICYQuant" \
+      org.opencontainers.image.licenses="MIT"
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy dependency files
+COPY pyproject.toml ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir .
+
+# -----------------------------------------------------------------------------
+# Stage 2: Production Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.9-slim AS runtime
+
+# Build arguments
+ARG VERSION=0.4.0-alpha1
+
+# Labels
+LABEL org.opencontainers.image.title="ICYQuant Platform" \
+      org.opencontainers.image.description="Institutional Quant Operating System" \
+      org.opencontainers.image.version="${VERSION}"
+
+# Security: Create non-root user
+RUN groupadd -r icyquant && \
+    useradd -r -g icyquant -d /app -s /sbin/nologin -c "ICYQuant service user" icyquant
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create application directory
+WORKDIR /app
+
+# Copy application source code
+COPY --chown=icyquant:icyquant services/ ./services/
+COPY --chown=icyquant:icyquant research/ ./research/
+COPY --chown=icyquant:icyquant contracts/ ./contracts/
+COPY --chown=icyquant:icyquant common/ ./common/
+COPY --chown=icyquant:icyquant infrastructure/ ./infrastructure/
+COPY --chown=icyquant:icyquant platform/ ./platform/
+COPY --chown=icyquant:icyquant configs/ ./configs/
+COPY --chown=icyquant:icyquant apps/ ./apps/
+
+# Copy configuration files
+COPY --chown=icyquant:icyquant pyproject.toml ./
+COPY --chown=icyquant:icyquant alembic.ini* ./
+
+# Copy scripts if they exist
+COPY --chown=icyquant:icyquant scripts/ ./scripts/ 2>/dev/null || true
+
+# Set proper permissions
+RUN chown -R icyquant:icyquant /app
+
+# Switch to non-root user
+USER icyquant
+
+# Environment variables for production
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    ICYQUANT_ENV=production \
+    ICYQUANT_VERSION=${VERSION}
+
+# Expose application port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Entry point for ICYQuant platform
+ENTRYPOINT ["python", "-m", "services.gateway.service"]
+CMD ["--host", "0.0.0.0", "--port", "8000"]

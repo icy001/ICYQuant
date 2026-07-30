@@ -1,0 +1,290 @@
+# ICYQuant v0.4.0-alpha1 RC1 Manifest
+# Release Candidate 1 冻结清单
+
+apiVersion: release.icyquant.io/v1
+kind: ReleaseManifest
+metadata:
+  name: icyquant-v0.4.0-alpha1-rc1
+  namespace: icyquant-release
+  labels:
+    version: v0.4.0-alpha1-rc1
+    release_stage: rc1
+    release_type: alpha
+
+spec:
+  version: v0.4.0-alpha1-rc1
+  release_stage: rc1
+  freeze_date: "2026-07-30T00:00:00+08:00"
+  release_date: null  # 待定
+  
+  frozen_modules:
+    - name: Research
+      path: research/
+      status: frozen
+      owners:
+        - research-team@icyquant.io
+    - name: AI
+      path: services/ai/
+      status: frozen
+      owners:
+        - ai-team@icyquant.io
+    - name: Backtest
+      path: services/backtest/
+      status: frozen
+      owners:
+        - backtest-team@icyquant.io
+    - name: OMS (Order Management System)
+      path: services/oms/
+      status: frozen
+      owners:
+        - oms-team@icyquant.io
+    - name: EMS (Execution Management System)
+      path: services/order/
+      status: frozen
+      owners:
+        - execution-team@icyquant.io
+    - name: Risk
+      path: services/risk/
+      status: frozen
+      owners:
+        - risk-team@icyquant.io
+    - name: Portfolio
+      path: services/portfolio/
+      status: frozen
+      owners:
+        - portfolio-team@icyquant.io
+    - name: Lakehouse
+      path: services/data/
+      status: frozen
+      owners:
+        - data-team@icyquant.io
+    - name: Observability
+      path: services/tracing/, services/metrics/
+      status: frozen
+      owners:
+        - platform-team@icyquant.io
+    - name: Security
+      path: services/security/, services/auth/
+      status: frozen
+      owners:
+        - security-team@icyquant.io
+    - name: Platform
+      path: platform/
+      status: frozen
+      owners:
+        - platform-team@icyquant.io
+
+  quality_gates:
+    - name: unit_test
+      type: test
+      requirement:
+        coverage_threshold: 95
+        pass_threshold: 100
+      status: pending
+      results:
+        coverage_percent: null
+        total_tests: null
+        passed_tests: null
+        failed_tests: null
+      timestamp: null
+      
+    - name: integration_test
+      type: test
+      requirement:
+        pass_threshold: 100
+      status: pending
+      results:
+        total_suites: null
+        passed_suites: null
+        failed_suites: null
+      timestamp: null
+      
+    - name: security_scan
+      type: security
+      requirement:
+        critical_vulnerabilities: 0
+        high_vulnerabilities: 0
+        medium_vulnerabilities: 0
+      status: pending
+      results:
+        critical_count: null
+        high_count: null
+        medium_count: null
+        low_count: null
+      timestamp: null
+      
+    - name: performance
+      type: benchmark
+      requirement:
+        p95_latency_ms: 200
+        throughput_rps: 1000
+        error_rate_percent: 0.1
+      status: pending
+      results:
+        p95_latency_ms: null
+        p99_latency_ms: null
+        throughput_rps: null
+        error_rate_percent: null
+      timestamp: null
+      
+    - name: lint
+      type: code_quality
+      requirement:
+        errors: 0
+        warnings: 0
+      status: pending
+      results:
+        errors: null
+        warnings: null
+        info: null
+      timestamp: null
+      
+    - name: type_check
+      type: code_quality
+      requirement:
+        errors: 0
+      status: pending
+      results:
+        errors: null
+        warnings: null
+      timestamp: null
+
+  artifacts:
+    - name: docker-image
+      type: docker
+      repository: registry.icyquant.io/icyquant/core
+      tags:
+        - v0.4.0-alpha1-rc1
+        - rc1
+        - latest-rc
+      digest: null
+      build_timestamp: null
+      
+    - name: helm-chart
+      type: helm
+      repository: registry.icyquant.io/icyquant/charts
+      chart_name: icyquant
+      version: 0.4.0-alpha1-rc1
+      build_timestamp: null
+      
+    - name: python-sdk
+      type: python_package
+      name: icyquant-sdk
+      version: 0.4.0a1
+      repository: pypi
+      distribution_url: null
+      build_timestamp: null
+      
+    - name: api-documentation
+      type: documentation
+      format: openapi
+      url: https://docs.icyquant.io/api/v0.4.0-alpha1-rc1
+      build_timestamp: null
+      
+    - name: release-notes
+      type: documentation
+      format: markdown
+      path: release/rc/release_summary.md
+      
+    - name: sbom
+      type: sbom
+      format: spdx
+      path: release/sbom/spdx-sbom.json
+      sha256: null
+
+  signatories:
+    - role: Release Manager
+      name: 待定
+      email: release-manager@icyquant.io
+      signature: null
+      timestamp: null
+      
+    - role: Engineering Lead
+      name: 待定
+      email: engineering-lead@icyquant.io
+      signature: null
+      timestamp: null
+      
+    - role: QA Lead
+      name: 待定
+      email: qa-lead@icyquant.io
+      signature: null
+      timestamp: null
+      
+    - role: Security Lead
+      name: 待定
+      email: security-lead@icyquant.io
+      signature: null
+      timestamp: null
+      
+    - role: Product Owner
+      name: 待定
+      email: product-owner@icyquant.io
+      signature: null
+      timestamp: null
+
+  release_criteria:
+    - criterion: 所有质量门禁通过
+      status: pending
+    - criterion: 无 P0/P1 级别未解决问题
+      status: pending
+    - criterion: API 兼容性验证完成
+      status: pending
+    - criterion: 文档更新完成
+      status: pending
+    - criterion: 回滚计划已就绪
+      status: pending
+
+  freeze_policies:
+    feature_freeze:
+      enabled: true
+      since: "2026-07-30T00:00:00+08:00"
+      document: feature_freeze.md
+      
+    api_freeze:
+      enabled: true
+      since: "2026-07-30T00:00:00+08:00"
+      document: api_freeze.md
+      
+    configuration_freeze:
+      enabled: true
+      since: "2026-07-30T00:00:00+08:00"
+      document: configuration_freeze.md
+
+  deployment:
+    environments:
+      - name: staging
+        status: pending
+        deploy_timestamp: null
+        health_check_url: null
+      - name: production
+        status: pending
+        deploy_timestamp: null
+        health_check_url: null
+
+status:
+  phase: frozen
+  conditions:
+    - type: FeatureFrozen
+      status: "True"
+      lastTransitionTime: "2026-07-30T00:00:00+08:00"
+      reason: FeatureFreezeDeclared
+      message: 所有模块特性已冻结
+      
+    - type: APIFrozen
+      status: "True"
+      lastTransitionTime: "2026-07-30T00:00:00+08:00"
+      reason: APIFreezeDeclared
+      message: 所有 API 已冻结
+      
+    - type: ConfigurationFrozen
+      status: "True"
+      lastTransitionTime: "2026-07-30T00:00:00+08:00"
+      reason: ConfigurationFreezeDeclared
+      message: 所有配置项已冻结
+      
+    - type: QualityGatesPassed
+      status: "False"
+      lastTransitionTime: null
+      reason: QualityGatesPending
+      message: 质量门禁待验证

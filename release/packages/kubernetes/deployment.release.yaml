@@ -1,0 +1,465 @@
+# =============================================================================
+# ICYQuant RC1 Kubernetes Deployment Templates
+# Production-ready deployments for all services
+# =============================================================================
+
+---
+# =============================================================================
+# API Gateway Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-gateway
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/version: "0.4.0-alpha1"
+    app.kubernetes.io/managed-by: helm
+spec:
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/version: "0.4.0-alpha1"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: icyquant/platform:0.4.0-alpha1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: ICYQUANT_ENV
+              value: "production"
+            - name: ICYQUANT_SERVICE
+              value: "gateway"
+            - name: ICYQUANT_LOG_LEVEL
+              value: "INFO"
+          envFrom:
+            - configMapRef:
+                name: icyquant-config
+            - secretRef:
+                name: icyquant-secrets
+          resources:
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: icyquant
+                    app.kubernetes.io/component: gateway
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: icyquant
+              app.kubernetes.io/component: gateway
+
+---
+# =============================================================================
+# Order Management Service (OMS)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-oms
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: oms
+    app.kubernetes.io/version: "0.4.0-alpha1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: oms
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: oms
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: oms
+          image: icyquant/platform:0.4.0-alpha1
+          ports:
+            - containerPort: 8001
+          env:
+            - name: ICYQUANT_SERVICE
+              value: "oms"
+          resources:
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8001
+            initialDelaySeconds: 15
+
+---
+# =============================================================================
+# Risk Management Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-risk
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: risk
+    app.kubernetes.io/version: "0.4.0-alpha1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: risk
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: risk
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: risk
+          image: icyquant/platform:0.4.0-alpha1
+          ports:
+            - containerPort: 8002
+          env:
+            - name: ICYQUANT_SERVICE
+              value: "risk"
+          resources:
+            limits:
+              cpu: "3000m"
+              memory: "6Gi"
+            requests:
+              cpu: "1500m"
+              memory: "3Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8002
+            initialDelaySeconds: 15
+
+---
+# =============================================================================
+# Ledger Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-ledger
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: ledger
+    app.kubernetes.io/version: "0.4.0-alpha1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: ledger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: ledger
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: ledger
+          image: icyquant/platform:0.4.0-alpha1
+          ports:
+            - containerPort: 8003
+          env:
+            - name: ICYQUANT_SERVICE
+              value: "ledger"
+          resources:
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8003
+            initialDelaySeconds: 15
+
+---
+# =============================================================================
+# AI Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-ai
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: ai
+    app.kubernetes.io/version: "0.4.0-alpha1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: ai
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: ai
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: ai
+          image: icyquant/platform:0.4.0-alpha1
+          ports:
+            - containerPort: 8004
+          env:
+            - name: ICYQUANT_SERVICE
+              value: "ai"
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+            requests:
+              cpu: "2000m"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8004
+            initialDelaySeconds: 30
+
+---
+# =============================================================================
+# Backtest Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icyquant-backtest
+  labels:
+    app.kubernetes.io/name: icyquant
+    app.kubernetes.io/component: backtest
+    app.kubernetes.io/version: "0.4.0-alpha1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: backtest
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: icyquant
+        app.kubernetes.io/component: backtest
+    spec:
+      serviceAccountName: icyquant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: backtest
+          image: icyquant/platform:0.4.0-alpha1
+          ports:
+            - containerPort: 8005
+          env:
+            - name: ICYQUANT_SERVICE
+              value: "backtest"
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: "16Gi"
+            requests:
+              cpu: "2000m"
+              memory: "8Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8005
+            initialDelaySeconds: 15
+
+---
+# =============================================================================
+# Service Account
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: icyquant
+  labels:
+    app.kubernetes.io/name: icyquant
+
+---
+# =============================================================================
+# Horizontal Pod Autoscaler for Gateway
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: icyquant-gateway-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: icyquant-gateway
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+
+---
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: icyquant-gateway-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: icyquant
+      app.kubernetes.io/component: gateway

@@ -1,0 +1,108 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: icyquant-vs
+  namespace: icyquant
+  labels:
+    app.kubernetes.io/managed-by: icyquant-operator
+spec:
+  hosts:
+    - api.icyquant.io
+    - "*.icyquant.io"
+  gateways:
+    - icyquant-gateway
+  http:
+    - match:
+        - headers:
+            x-user-agent:
+              regex: ".*Chrome.*"
+      route:
+        - destination:
+            host: icyquant-api
+            port:
+              number: 8080
+          weight: 90
+        - destination:
+            host: icyquant-api-canary
+            port:
+              number: 8080
+          weight: 10
+      retries:
+        attempts: 3
+        perTryTimeout: 5s
+        retryOn: "5xx,reset,connect-failure"
+      timeout: 30s
+    - route:
+        - destination:
+            host: icyquant-api
+            port:
+              number: 8080
+      retries:
+        attempts: 3
+        perTryTimeout: 5s
+      timeout: 30s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: icyquant-ai-vs
+  namespace: icyquant
+spec:
+  hosts:
+    - ai.icyquant.io
+  gateways:
+    - icyquant-gateway
+  http:
+    - route:
+        - destination:
+            host: icyquant-ai
+            port:
+              number: 8081
+      retries:
+        attempts: 2
+        perTryTimeout: 10s
+        retryOn: "5xx,reset"
+      timeout: 60s
+    - match:
+        - headers:
+            canary:
+              exact: "true"
+      route:
+        - destination:
+            host: icyquant-ai-canary
+            port:
+              number: 8081
+          weight: 20
+        - destination:
+            host: icyquant-ai
+            port:
+              number: 8081
+          weight: 80
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: icyquant-risk-vs
+  namespace: icyquant
+spec:
+  hosts:
+    - risk.icyquant.io
+  gateways:
+    - icyquant-gateway
+  http:
+    - route:
+        - destination:
+            host: icyquant-risk
+            port:
+              number: 8082
+      retries:
+        attempts: 5
+        perTryTimeout: 2s
+        retryOn: "5xx,reset,connect-failure"
+      timeout: 10s
+      mirror:
+        host: icyquant-risk-shadow
+        port:
+          number: 8082
+        percentage:
+          value: 10

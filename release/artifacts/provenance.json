@@ -1,0 +1,172 @@
+{
+  "_type": "https://in-toto.io/Statement/v1.0",
+  "subject": [
+    {
+      "name": "ghcr.io/icyquant/icyquant",
+      "digest": {
+        "sha256": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234"
+      }
+    },
+    {
+      "name": "icyquant-0.4.0-alpha1.tgz",
+      "digest": {
+        "sha256": "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
+      }
+    },
+    {
+      "name": "icyquant_sdk-0.4.0a1-py3-none-any.whl",
+      "digest": {
+        "sha256": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678"
+      }
+    },
+    {
+      "name": "kubernetes-manifests-v0.4.0-alpha1-rc1.tar.gz",
+      "digest": {
+        "sha256": "e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd"
+      }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1.0",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://github.com/actions/runner-images/",
+      "externalParameters": {
+        "source": {
+          "uri": "git+https://github.com/icyquant/icyquant@refs/heads/release/v0.4.0-alpha1",
+          "digest": {
+            "sha1": "abc123def456ghi789jkl012mno345pqr678stu9"
+          }
+        },
+        "builder": {
+          "id": "https://github.com/icyquant/icyquant/.github/workflows/release.yml@refs/heads/main"
+        },
+        "parameters": {
+          "BUILD_PLATFORM": "linux/amd64",
+          "PYTHON_VERSION": "3.11",
+          "RELEASE_VERSION": "v0.4.0-alpha1-rc1",
+          "DOCKER_REGISTRY": "ghcr.io",
+          "HELM_CHART_VERSION": "0.4.0-alpha1"
+        },
+        "resolvedDependencies": [
+          {
+            "uri": "pkg:docker/python@sha256:abc123def456ghi789jkl012mno345pqr678stu901vwx234yza567bcd890efg",
+            "digest": {
+              "sha256": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yza567bcd890efg"
+            }
+          }
+        ]
+      },
+      "systemParameters": {
+        "GITHUB_RUN_ID": "8472905136",
+        "GITHUB_RUN_NUMBER": "847",
+        "GITHUB_WORKFLOW": "Release Pipeline",
+        "GITHUB_JOB": "build",
+        "GITHUB_SHA": "abc123def456ghi789jkl012mno345pqr678stu9",
+        "GITHUB_REF": "refs/heads/release/v0.4.0-alpha1"
+      }
+    },
+    "runDetails": {
+      "builder": {
+        "id": "https://github.com/icyquant/icyquant/.github/workflows/release.yml",
+        "version": {
+          "name": "GitHub Actions",
+          "version": "2.0.0"
+        },
+        "builderDependencies": [
+          {
+            "uri": "pkg:github/actions/checkout@v4",
+            "digest": {
+              "sha256": "1e204e9a925456a8f7a8b4e5b6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e"
+            }
+          },
+          {
+            "uri": "pkg:docker/docker/setup-buildx-action@v3",
+            "digest": {
+              "sha256": "2f3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "invocationId": "//github.com/icyquant/icyquant/actions/runs/8472905136",
+        "startedOn": "2026-07-30T10:00:00.000000+08:00",
+        "finishedOn": "2026-07-30T10:15:42.123456+08:00",
+        "byproducts": [
+          {
+            "name": "build.log",
+            "digest": {
+              "sha256": "f1e2d3c4b5a69788f9e0d1c2b3a4567890abcdef1234567890abcdef123456"
+            },
+            "uri": "https://github.com/icyquant/icyquant/actions/runs/8472905136/logs"
+          }
+        ]
+      }
+    },
+    "buildSteps": [
+      {
+        "name": "checkout",
+        "description": "Checkout source code",
+        "entryPoint": "actions/checkout@v4",
+        "environment": {
+          "GITHUB_REF": "refs/heads/release/v0.4.0-alpha1"
+        }
+      },
+      {
+        "name": "setup-python",
+        "description": "Setup Python 3.11 environment",
+        "entryPoint": "actions/setup-python@v5",
+        "environment": {
+          "python-version": "3.11"
+        }
+      },
+      {
+        "name": "install-dependencies",
+        "description": "Install Python dependencies",
+        "entryPoint": "pip install -r requirements.txt",
+        "environment": {}
+      },
+      {
+        "name": "run-tests",
+        "description": "Run test suite",
+        "entryPoint": "pytest tests/ -v --cov=services",
+        "environment": {
+          "PYTHONPATH": "."
+        }
+      },
+      {
+        "name": "build-wheel",
+        "description": "Build Python wheel package",
+        "entryPoint": "python -m build --wheel",
+        "environment": {}
+      },
+      {
+        "name": "build-docker",
+        "description": "Build Docker image",
+        "entryPoint": "docker buildx build --platform linux/amd64 -t ghcr.io/icyquant/icyquant:v0.4.0-alpha1-rc1 .",
+        "environment": {
+          "DOCKER_BUILDKIT": "1"
+        }
+      },
+      {
+        "name": "package-helm",
+        "description": "Package Helm chart",
+        "entryPoint": "helm package deployment/helm/",
+        "environment": {
+          "CHART_VERSION": "0.4.0-alpha1"
+        }
+      },
+      {
+        "name": "generate-sbom",
+        "description": "Generate Software Bill of Materials",
+        "entryPoint": "cyclonedx-py -i requirements.txt -o release/artifacts/sbom.json",
+        "environment": {}
+      },
+      {
+        "name": "calculate-checksums",
+        "description": "Calculate SHA256 checksums for all artifacts",
+        "entryPoint": "sha256sum * > checksums.txt",
+        "environment": {}
+      }
+    ]
+  }
+}

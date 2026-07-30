@@ -1,0 +1,102 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: icyquant-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    environment: production
+spec:
+  description: ICYQuant Production Environment
+  sourceRepos:
+    - https://github.com/icyquant/*
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: icyquant
+    - server: https://*.k8s.local
+      namespace: "icyquant-*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true
+  roles:
+    - name: admin
+      description: Full access to production
+      policies:
+        - p, proj:icyquant-production:admin, applications, *, icyquant-production/*, allow
+      groups:
+        - icx-admin
+    - name: developer
+      description: Deploy and sync applications
+      policies:
+        - p, proj:icyquant-production:developer, applications, sync, icyquant-production/*, allow
+        - p, proj:icyquant-production:developer, applications, get, icyquant-production/*, allow
+      groups:
+        - icx-developer
+    - name: viewer
+      description: Read-only access
+      policies:
+        - p, proj:icyquant-production:viewer, applications, get, icyquant-production/*, allow
+      groups:
+        - icx-viewer
+  orphanedResources:
+    warn: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: icyquant-staging
+  namespace: argocd
+spec:
+  description: ICYQuant Staging Environment
+  sourceRepos:
+    - https://github.com/icyquant/*
+  destinations:
+    - server: https://staging-cluster.k8s.local
+      namespace: icyquant-staging
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  roles:
+    - name: admin
+      policies:
+        - p, proj:icyquant-staging:admin, applications, *, icyquant-staging/*, allow
+      groups:
+        - icx-developer
+    - name: viewer
+      policies:
+        - p, proj:icyquant-staging:viewer, applications, get, icyquant-staging/*, allow
+      groups:
+        - icx-viewer
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: icyquant-dr
+  namespace: argocd
+spec:
+  description: ICYQuant Disaster Recovery Environment
+  sourceRepos:
+    - https://github.com/icyquant/*
+  destinations:
+    - server: https://dr-cluster.k8s.local
+      namespace: icyquant-dr
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  roles:
+    - name: admin
+      policies:
+        - p, proj:icyquant-dr:admin, applications, *, icyquant-dr/*, allow
+      groups:
+        - icx-sre

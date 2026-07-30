@@ -1,0 +1,35 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: icyquant-critical
+value: 1000000
+globalDefault: false
+description: "Critical ICYQuant trading services - never preempted"
+preemptionPolicy: Never
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: icyquant-high
+value: 100000
+globalDefault: false
+description: "High priority services - AI inference, risk engine"
+preemptionPolicy: LowerPriority
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: icyquant-medium
+value: 10000
+globalDefault: true
+description: "Medium priority services - API gateway, workers"
+preemptionPolicy: LowerPriority
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: icyquant-low
+value: 1000
+globalDefault: false
+description: "Low priority services - batch jobs, reporting"
+preemptionPolicy: LowerPriority

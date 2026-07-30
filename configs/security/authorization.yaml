@@ -1,0 +1,82 @@
+# ICYQuant Authorization Configuration
+authorization:
+  model: rbac_abac
+  default_action: deny
+
+  roles:
+    - name: admin
+      description: System Administrator - Full access
+      grants:
+        - resource: system
+          permissions: [admin, read, write]
+        - resource: user
+          permissions: [read, write, admin]
+        - resource: policy
+          permissions: [read, write, approve]
+        - resource: secret
+          permissions: [read, write]
+        - resource: audit_log
+          permissions: [read, admin]
+
+    - name: trader
+      description: Trading operations
+      grants:
+        - resource: trade
+          permissions: [read, write, execute]
+        - resource: order
+          permissions: [read, write, execute]
+        - resource: position
+          permissions: [read]
+
+    - name: risk_manager
+      description: Risk oversight
+      grants:
+        - resource: risk
+          permissions: [read, write, approve]
+        - resource: portfolio
+          permissions: [read]
+        - resource: trade
+          permissions: [read]
+
+    - name: researcher
+      description: Research and strategy
+      grants:
+        - resource: strategy
+          permissions: [read, write, execute]
+        - resource: model
+          permissions: [read, write]
+        - resource: portfolio
+          permissions: [read]
+
+    - name: auditor
+      description: Audit and compliance
+      grants:
+        - resource: audit_log
+          permissions: [read]
+        - resource: trade
+          permissions: [read]
+        - resource: order
+          permissions: [read]
+
+    - name: ops
+      description: Platform operations
+      grants:
+        - resource: system
+          permissions: [read, deploy]
+        - resource: policy
+          permissions: [read]
+        - resource: secret
+          permissions: [read]
+
+  abac_policies:
+    - name: "Allow trading during market hours"
+      attribute: market_status
+      operator: eq
+      value: "open"
+      effect: allow
+
+    - name: "Deny risk limit modification by AI agents"
+      attribute: service_type
+      operator: eq
+      value: "ai_agent"
+      effect: deny

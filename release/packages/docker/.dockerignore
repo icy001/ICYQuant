@@ -1,0 +1,119 @@
+# =============================================================================
+# ICYQuant Docker Ignore File
+# Excludes unnecessary files from Docker build context
+# =============================================================================
+
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+.eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development files
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+Makefile
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Release and packaging
+release/
+.packaging/
+
+# Test data and fixtures
+tests/
+test_*.py
+*_test.py
+conftest.py
+
+# Local configuration
+.env.*
+*.local
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.db
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Helm charts (deployed separately)
+deployment/helm/
+
+# Benchmark results
+release/benchmark/
+
+# SBOM files (generated during build)
+release/sbom/
+
+# Validation scripts
+release/validation/
+
+# RC files
+release/rc/

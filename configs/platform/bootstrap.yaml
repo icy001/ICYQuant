@@ -1,0 +1,20 @@
+# ICYQuant Platform - Bootstrap Configuration
+bootstrap:
+  name: icyquant-platform
+  version: 0.4.0
+  log_level: INFO
+  startup_timeout_seconds: 60
+  health_check_interval: 10
+
+phases:
+  - config_load
+  - dependency_resolve
+  - infrastructure_init
+  - module_load
+  - service_start
+  - health_check
+  - ready
+
+environment:
+  mode: development
+  region: us-east-1

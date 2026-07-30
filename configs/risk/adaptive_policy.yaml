@@ -1,0 +1,76 @@
+# Adaptive Risk Policy Configuration
+
+market_regime_limits:
+  BULL:
+    max_position_pct: 0.10
+    max_leverage: 3.0
+    max_drawdown_pct: 0.10
+    max_daily_loss_pct: 0.03
+    sector_limits_override: {}
+
+  BEAR:
+    max_position_pct: 0.03
+    max_leverage: 1.5
+    max_drawdown_pct: 0.05
+    max_daily_loss_pct: 0.015
+    sector_limits_override:
+      financial: 0.15
+      energy: 0.15
+
+  SIDEWAY:
+    max_position_pct: 0.07
+    max_leverage: 2.5
+    max_drawdown_pct: 0.08
+    max_daily_loss_pct: 0.025
+    sector_limits_override: {}
+
+  HIGH_VOLATILITY:
+    max_position_pct: 0.05
+    max_leverage: 2.0
+    max_drawdown_pct: 0.07
+    max_daily_loss_pct: 0.02
+    sector_limits_override:
+      technology: 0.30
+
+  LOW_LIQUIDITY:
+    max_position_pct: 0.04
+    max_leverage: 1.5
+    max_drawdown_pct: 0.06
+    max_daily_loss_pct: 0.015
+    sector_limits_override: {}
+
+  RISK_OFF:
+    max_position_pct: 0.03
+    max_leverage: 1.5
+    max_drawdown_pct: 0.04
+    max_daily_loss_pct: 0.01
+    sector_limits_override:
+      technology: 0.20
+      financial: 0.15
+
+adaptive_rules:
+  risk_score_tightening:
+    medium_threshold: 70
+    high_threshold: 85
+    medium_factor: 0.8
+    high_factor: 0.5
+
+  volatility_adjustment:
+    low_vol_threshold: 0.10
+    high_vol_threshold: 0.30
+    low_vol_multiplier: 1.2
+    high_vol_multiplier: 0.7
+
+  liquidity_adjustment:
+    low_liq_threshold: 0.5
+    critical_liq_threshold: 0.2
+    low_liq_multiplier: 0.7
+    critical_liq_multiplier: 0.3
+
+position_sizing:
+  base_max_pct: 0.10
+  min_signal_confidence: 0.6
+  risk_adjustment: true
+  liquidity_adjustment: true
+  regime_adjustment: true
+  black_swan_adjustment: true

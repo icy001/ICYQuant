@@ -1,0 +1,102 @@
+# Alert Rules Configuration for ICYQuant Observability
+# Defines alert thresholds, severity levels, and notification channels
+
+alerts:
+  rules:
+    - rule_id: order_latency_warning
+      name: Order Latency Warning
+      metric: order_latency_ms
+      condition: GT
+      threshold: 200
+      severity: WARNING
+      duration_seconds: 60
+      cooldown_seconds: 300
+      enabled: true
+
+    - rule_id: order_latency_critical
+      name: Order Latency Critical
+      metric: order_latency_ms
+      condition: GT
+      threshold: 500
+      severity: CRITICAL
+      duration_seconds: 30
+      cooldown_seconds: 600
+      enabled: true
+
+    - rule_id: error_rate_high
+      name: High Error Rate
+      metric: error_rate_pct
+      condition: GT
+      threshold: 5
+      severity: WARNING
+      duration_seconds: 120
+      cooldown_seconds: 600
+      enabled: true
+
+    - rule_id: cpu_high
+      name: High CPU Usage
+      metric: cpu_usage_pct
+      condition: GT
+      threshold: 85
+      severity: WARNING
+      duration_seconds: 300
+      cooldown_seconds: 600
+      enabled: true
+
+    - rule_id: memory_critical
+      name: Critical Memory Usage
+      metric: memory_usage_pct
+      condition: GT
+      threshold: 95
+      severity: CRITICAL
+      duration_seconds: 60
+      cooldown_seconds: 300
+      enabled: true
+
+    - rule_id: gpu_memory_warning
+      name: GPU Memory Warning
+      metric: gpu_memory_used_pct
+      condition: GT
+      threshold: 90
+      severity: WARNING
+      duration_seconds: 120
+      cooldown_seconds: 600
+      enabled: true
+
+    - rule_id: gpu_oom
+      name: GPU Out of Memory
+      metric: gpu_oom_events
+      condition: GTE
+      threshold: 1
+      severity: EMERGENCY
+      duration_seconds: 0
+      cooldown_seconds: 300
+      enabled: true
+
+    - rule_id: ai_inference_timeout
+      name: AI Inference Timeout
+      metric: inference_timeout_rate
+      condition: GT
+      threshold: 10
+      severity: CRITICAL
+      duration_seconds: 120
+      cooldown_seconds: 600
+      enabled: true
+
+  notification_channels:
+    - channel: EMAIL
+      target: ops@icyquant.com
+      enabled: true
+      min_severity: WARNING
+    - channel: SLACK
+      target: #alerts
+      enabled: true
+      min_severity: WARNING
+    - channel: PAGERDUTY
+      target: primary
+      enabled: true
+      min_severity: CRITICAL
+    - channel: WEBHOOK
+      target: http://localhost:8080/webhook
+      enabled: true
+      min_severity: WARNING

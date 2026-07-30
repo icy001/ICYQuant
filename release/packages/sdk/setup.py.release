@@ -1,0 +1,116 @@
+# =============================================================================
+# ICYQuant SDK setup.py Template
+# Python package configuration for RC1 release
+# =============================================================================
+
+from setuptools import setup, find_packages
+from pathlib import Path
+
+# Read the README file for long description
+this_directory = Path(__file__).parent
+long_description = ""
+readme_path = this_directory / "README.md"
+if readme_path.exists():
+    long_description = readme_path.read_text(encoding="utf-8")
+
+# Read version from file or use default
+version = "0.4.0a1"
+
+setup(
+    name="icyquant",
+    version=version,
+    author="ICYQuant Team",
+    author_email="platform@icyquant.io",
+    description="ICYQuant SDK - Institutional Quant Operating System Python SDK",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/icyquant/icyquant",
+    project_urls={
+        "Bug Tracker": "https://github.com/icyquant/icyquant/issues",
+        "Documentation": "https://docs.icyquant.io",
+        "Source Code": "https://github.com/icyquant/icyquant",
+    },
+    license="MIT",
+    packages=find_packages(include=["icyquant", "icyquant.*"]),
+    package_dir={"icyquant": "platform/sdk"},
+    python_requires=">=3.9",
+    install_requires=[
+        # Core dependencies
+        "pydantic>=2.0.0,<3.0.0",
+        "httpx>=0.24.0,<1.0.0",
+        "aiohttp>=3.8.0,<4.0.0",
+        # Data handling
+        "numpy>=1.24.0,<2.0.0",
+        "pandas>=2.0.0,<3.0.0",
+        # Async support
+        "asyncio-pool>=0.3.2",
+        "tenacity>=8.0.0,<9.0.0",
+        # Serialization
+        "orjson>=3.9.0,<4.0.0",
+        # Utilities
+        "python-dateutil>=2.8.0,<3.0.0",
+        "pytz>=2023.3",
+        # Optional: Finance libraries
+        "scipy>=1.10.0,<2.0.0",
+    ],
+    extras_require={
+        # Development dependencies
+        "dev": [
+            "pytest>=7.0.0,<8.0.0",
+            "pytest-asyncio>=0.21.0,<1.0.0",
+            "pytest-cov>=4.0.0,<5.0.0",
+            "black>=23.0.0,<24.0.0",
+            "isort>=5.12.0,<6.0.0",
+            "mypy>=1.0.0,<2.0.0",
+            "ruff>=0.0.260",
+        ],
+        # ML/AI dependencies
+        "ai": [
+            "openai>=1.0.0,<2.0.0",
+            "tiktoken>=0.5.0,<1.0.0",
+            "langchain>=0.1.0,<1.0.0",
+        ],
+        # Data science dependencies
+        "data": [
+            "polars>=0.19.0,<1.0.0",
+            "pyarrow>=14.0.0,<15.0.0",
+            "fsspec>=2023.9.0",
+            "s3fs>=2023.9.0",
+        ],
+        # Backtesting dependencies
+        "backtest": [
+            "numba>=0.58.0,<1.0.0",
+            "tables>=3.9.0,<4.0.0",
+            "h5py>=3.10.0,<4.0.0",
+        ],
+        # All dependencies
+        "all": [
+            "icyquant[dev,ai,data,backtest]",
+        ],
+    },
+    entry_points={
+        "console_scripts": [
+            "icyquant=icyquant.cli:main",
+        ],
+    },
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Intended Audience :: Financial and Insurance Industry",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Office/Business :: Financial",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Typing :: Typed",
+    ],
+    keywords="quant trading finance algorithmic-trading hedge-fund portfolio risk backtesting",
+    include_package_data=True,
+    zip_safe=False,
+)

@@ -1,0 +1,87 @@
+# SLO/SLA Configuration for ICYQuant Observability
+# Defines Service Level Objectives and Agreements
+
+slo:
+  definitions:
+    - slo_id: trading_availability
+      name: Trading System Availability
+      service: oms
+      type: AVAILABILITY
+      target: 0.9999
+      window_days: 30
+      warning_threshold: 0.9995
+      critical_threshold: 0.9990
+      description: Trading system uptime SLO
+
+    - slo_id: order_latency_p99
+      name: Order Execution Latency
+      service: execution
+      type: LATENCY
+      target: 0.99
+      window_days: 30
+      description: 99% of orders executed within 50ms
+
+    - slo_id: ai_inference_latency
+      name: AI Inference Latency
+      service: ai_service
+      type: LATENCY
+      target: 0.95
+      window_days: 30
+      description: 95% of AI inferences complete within 150ms
+
+    - slo_id: risk_check_latency
+      name: Risk Check Latency
+      service: risk_engine
+      type: LATENCY
+      target: 0.99
+      window_days: 30
+      description: 99% of risk checks complete within 10ms
+
+    - slo_id: api_availability
+      name: API Gateway Availability
+      service: api_gateway
+      type: AVAILABILITY
+      target: 0.9995
+      window_days: 30
+      description: API Gateway uptime SLO
+
+sla:
+  definitions:
+    - sla_id: p1_response
+      name: P1 Incident Response
+      service: ops
+      type: RESPONSE_TIME
+      target: 0.5
+      unit: hours
+      priority: P1
+      description: Critical incident response within 30 minutes
+
+    - sla_id: p1_resolution
+      name: P1 Incident Resolution
+      service: ops
+      type: RESOLUTION_TIME
+      target: 4.0
+      unit: hours
+      priority: P1
+      description: Critical incident resolution within 4 hours
+
+    - sla_id: p2_response
+      name: P2 Incident Response
+      service: ops
+      type: RESPONSE_TIME
+      target: 2.0
+      unit: hours
+      priority: P2
+
+    - sla_id: p3_response
+      name: P3 Incident Response
+      service: ops
+      type: RESPONSE_TIME
+      target: 8.0
+      unit: hours
+      priority: P3
+
+  reporting:
+    frequency: daily
+    format: markdown
+    include_history_days: 30
