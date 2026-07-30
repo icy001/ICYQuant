@@ -1,0 +1,1 @@
+"""ICYQuant Data Platform API."""
