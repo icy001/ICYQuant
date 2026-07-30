@@ -1,0 +1,87 @@
+# ============================================================================
+# ICYQuant Data Platform — Retention & Lifecycle Configuration
+# ============================================================================
+# Configures data lifecycle management: tier transitions and retention.
+
+lifecycle:
+  default_policy: standard
+  enforce_retention: true
+  hot_retention_days: 30
+  warm_retention_days: 90
+  cold_retention_days: 365
+
+  # Storage cost model (per GB/month)
+  cost_model:
+    hot: 0.023
+    warm: 0.0125
+    cold: 0.004
+    deep_archive: 0.001
+
+  # Compression settings
+  compression:
+    archive_format: parquet
+    codec: snappy  # snappy | gzip | lz4 | zstd
+    level: 6
+
+# Lifecycle policies by dataset type
+policies:
+  tick_lifecycle:
+    dataset_pattern: "*tick*"
+    hot_retention_days: 30
+    warm_retention_days: 60
+    cold_retention_days: 90
+    archive_format: parquet
+    compress: true
+    compression_codec: snappy
+    enabled: true
+    description: "Tick data: 30d hot, 60d warm, 90d cold then delete"
+
+  bar_lifecycle:
+    dataset_pattern: "*bar*"
+    hot_retention_days: 90
+    warm_retention_days: 180
+    cold_retention_days: 365
+    archive_format: parquet
+    compress: true
+    compression_codec: zstd
+    enabled: true
+    description: "Bar data: 90d hot, 180d warm, 365d cold"
+
+  order_lifecycle:
+    dataset_pattern: "*order*"
+    hot_retention_days: 30
+    warm_retention_days: 90
+    cold_retention_days: 365
+    archive_format: parquet
+    compress: true
+    compression_codec: snappy
+    enabled: true
+    description: "Order data: 30d hot, 90d warm, 365d cold"
+
+  feature_lifecycle:
+    dataset_pattern: "*feature*"
+    hot_retention_days: 90
+    warm_retention_days: 180
+    cold_retention_days: 365
+    archive_format: parquet
+    compress: true
+    compression_codec: zstd
+    enabled: true
+    description: "Feature data: longer retention for ML training"
+
+  model_lifecycle:
+    dataset_pattern: "*model*"
+    hot_retention_days: 30
+    warm_retention_days: 90
+    cold_retention_days: 365
+    archive_format: parquet
+    compress: true
+    compression_codec: snappy
+    enabled: true
+    description: "Model artifacts: 30d hot, 90d warm, 365d cold"
+
+# Scheduled maintenance
+maintenance:
+  vacuum_interval_hours: 24
+  compaction_schedule: "0 3 * * 0"  # Every Sunday at 3am
+  expiration_check_schedule: "0 2 * * *"  # Daily at 2am

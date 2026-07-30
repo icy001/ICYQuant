@@ -1,0 +1,61 @@
+# ============================================================================
+# ICYQuant Data Platform — Storage Configuration
+# ============================================================================
+# Configures the lakehouse storage layer: paths, tiers, and retention.
+
+lakehouse:
+  name: icyquant_lakehouse
+  base_path: data/lakehouse
+  default_tier: hot
+  enable_time_travel: true
+  time_travel_retention_days: 30
+  max_open_snapshots: 100
+
+# Storage backends
+storage:
+  backend: local  # local | s3 | minio | gcs
+  base_path: data/storage
+
+  # S3 configuration (when backend=s3)
+  s3:
+    endpoint: ""
+    access_key: ""
+    secret_key: ""
+    region: us-east-1
+    use_ssl: true
+
+  # MinIO configuration (when backend=minio)
+  minio:
+    endpoint: localhost:9000
+    access_key: minioadmin
+    secret_key: minioadmin
+    secure: false
+
+# Tier configuration
+tiers:
+  hot:
+    description: "Frequently accessed data (SSD)"
+    cost_per_gb_month: 0.023
+    max_age_days: 30
+  warm:
+    description: "Infrequently accessed data (HDD)"
+    cost_per_gb_month: 0.0125
+    max_age_days: 90
+  cold:
+    description: "Archive data (object storage)"
+    cost_per_gb_month: 0.004
+    max_age_days: 365
+
+# Partition defaults
+partition:
+  default_type: date  # date | hour | symbol | symbol_date | none
+  max_partitions: 10000
+  auto_compact: true
+  compaction_threshold_mb: 128
+
+# Snapshot management
+snapshot:
+  frequency: daily  # hourly | daily | weekly | monthly | manual
+  max_snapshots: 365
+  retention_days: 90
+  enable_auto_snapshot: true

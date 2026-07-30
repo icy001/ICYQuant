@@ -1,0 +1,122 @@
+# Policy Engine Configuration
+# Controls AI agent behavioral boundaries
+
+policies:
+  # Default institutional trading policies
+  rules:
+    # Position Limits
+    - id: "POSITION_LIMIT"
+      type: "POSITION_LIMIT"
+      enabled: true
+      description: "Maximum position size for any single security"
+      params:
+        max_pct: 10.0
+        hard_limit: 12.0
+
+    # Sector Exposure
+    - id: "SECTOR_EXPOSURE"
+      type: "SECTOR_EXPOSURE"
+      enabled: true
+      description: "Maximum exposure to any single sector"
+      params:
+        max_pct: 40.0
+        warning_pct: 30.0
+
+    # Daily Loss Limit
+    - id: "DAILY_LOSS"
+      type: "DAILY_LOSS"
+      enabled: true
+      description: "Maximum daily loss before trading halt"
+      params:
+        max_loss_pct: 3.0
+        action: "halt_trading"
+
+    # Drawdown Limit
+    - id: "DRAWDOWN"
+      type: "DRAWDOWN"
+      enabled: true
+      description: "Maximum drawdown from peak"
+      params:
+        max_drawdown_pct: 15.0
+        action: "reduce_exposure"
+
+    # Confidence Threshold
+    - id: "CONFIDENCE"
+      type: "CONFIDENCE"
+      enabled: true
+      description: "Minimum confidence for trade execution"
+      params:
+        min_confidence: 0.5
+        reject_below: 0.4
+
+    # Volatility Control
+    - id: "VOLATILITY"
+      type: "VOLATILITY"
+      enabled: true
+      description: "Reduce trading during high volatility"
+      params:
+        high_vol_threshold: 40.0   # VIX level
+        action: "reduce_size"
+        reduction_pct: 50.0
+
+    # Leverage Control
+    - id: "LEVERAGE"
+      type: "LEVERAGE"
+      enabled: true
+      description: "Maximum portfolio leverage"
+      params:
+        max_leverage: 1.5
+        warning_leverage: 1.2
+
+    # Concentration Control
+    - id: "CONCENTRATION"
+      type: "CONCENTRATION"
+      enabled: true
+      description: "Maximum concentration in top holdings"
+      params:
+        top5_max: 60.0
+        top3_max: 45.0
+        top1_max: 15.0
+
+    # Trading Frequency
+    - id: "TRADING_FREQUENCY"
+      type: "TRADING_FREQUENCY"
+      enabled: false
+      description: "Limit trading frequency"
+      params:
+        max_trades_per_hour: 20
+        max_trades_per_day: 100
+
+  # Circuit breaker
+  circuit_breaker:
+    enabled: true
+    triggers:
+      - type: "daily_loss"
+        threshold: -3.0
+      - type: "consecutive_rejections"
+        threshold: 10
+      - type: "volatility_spike"
+        threshold: 3.0
+    auto_recovery_minutes: 30
+    manual_override: true
+
+  # Policy evaluation order
+  evaluation_order:
+    - "POSITION_LIMIT"
+    - "SECTOR_EXPOSURE"
+    - "DAILY_LOSS"
+    - "DRAWDOWN"
+    - "CONFIDENCE"
+    - "VOLATILITY"
+    - "LEVERAGE"
+    - "CONCENTRATION"
+    - "TRADING_FREQUENCY"
+
+  # Override permissions
+  overrides:
+    require_supervisor_approval:
+      - "POSITION_LIMIT"
+      - "SECTOR_EXPOSURE"
+    allow_manual_override:
+      - "CONFIDENCE"
+      - "TRADING_FREQUENCY"

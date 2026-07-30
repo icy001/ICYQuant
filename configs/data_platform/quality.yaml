@@ -1,0 +1,91 @@
+# ============================================================================
+# ICYQuant Data Platform — Quality Configuration
+# ============================================================================
+# Configures data quality rules and validation settings.
+
+quality:
+  validate_on_ingest: true
+  validate_on_read: false
+  max_rules_per_dataset: 50
+  alert_threshold: 0.1  # Alert when >10% of checks fail
+  store_results_days: 90
+
+# Quality rules by dataset
+rules:
+  market_tick:
+    - name: price_not_null
+      type: not_null
+      field: last_price
+      severity: error
+    - name: volume_non_negative
+      type: range
+      field: volume
+      min_value: 0
+      severity: error
+    - name: bid_less_than_ask
+      type: custom
+      description: "Bid must be <= ask"
+      severity: warning
+    - name: symbol_valid
+      type: regex
+      field: symbol
+      pattern: "^[A-Z]{1,10}$"
+      severity: error
+    - name: freshness_check
+      type: timeliness
+      timestamp_field: timestamp
+      max_age_hours: 1
+      severity: warning
+
+  market_bar:
+    - name: ohlc_not_null
+      type: not_null
+      fields: [open, high, low, close]
+      severity: error
+    - name: volume_non_negative
+      type: range
+      field: volume
+      min_value: 0
+      severity: error
+    - name: high_gte_low
+      type: custom
+      description: "High must be >= low"
+      severity: error
+    - name: open_close_in_range
+      type: custom
+      description: "Open and close must be between low and high"
+      severity: warning
+
+  order_data:
+    - name: order_id_unique
+      type: unique
+      field: order_id
+      severity: error
+    - name: quantity_positive
+      type: range
+      field: quantity
+      min_value: 1
+      severity: error
+    - name: side_valid
+      type: enum
+      field: side
+      allowed_values: [BUY, SELL]
+      severity: error
+
+  feature_data:
+    - name: feature_value_not_null
+      type: not_null
+      field: value
+      severity: error
+    - name: symbol_valid
+      type: regex
+      field: symbol
+      pattern: "^[A-Z]{1,10}$"
+      severity: error
+
+# Outlier detection
+outliers:
+  method: iqr  # iqr | zscore | isolation_forest
+  iqr_multiplier: 1.5
+  zscore_threshold: 3.0
+  min_samples: 30

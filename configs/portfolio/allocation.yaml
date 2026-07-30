@@ -1,0 +1,54 @@
+# Capital Allocation configuration
+
+allocation:
+  default_method: equal_weight
+  methods:
+    - equal_weight
+    - risk_parity
+    - kelly
+    - mean_variance
+    - black_litterman
+
+  pools:
+    - name: "Main Capital Pool"
+      currency: CNY
+      default: true
+    - name: "Alternative Pool"
+      currency: CNY
+    - name: "Global Pool"
+      currency: USD
+
+  # Kelly Criterion defaults
+  kelly:
+    default_win_rate: 0.55
+    default_odds: 1.0
+    max_fraction: 0.25  # Half-Kelly cap
+    min_fraction: 0.01
+
+  # Risk Parity defaults
+  risk_parity:
+    default_volatility: 0.20
+    min_volatility: 0.05
+
+strategy_allocation:
+  strategies:
+    - type: alpha_long
+      expected_return: 0.15
+      expected_volatility: 0.20
+      max_capacity: 500_000_000
+    - type: market_neutral
+      expected_return: 0.10
+      expected_volatility: 0.08
+      max_capacity: 300_000_000
+    - type: cta_trend
+      expected_return: 0.18
+      expected_volatility: 0.25
+      max_capacity: 200_000_000
+    - type: event_driven
+      expected_return: 0.12
+      expected_volatility: 0.15
+      max_capacity: 150_000_000
+    - type: ai_driven
+      expected_return: 0.25
+      expected_volatility: 0.22
+      max_capacity: 250_000_000
