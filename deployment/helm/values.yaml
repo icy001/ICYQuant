@@ -1,0 +1,326 @@
+global:
+  environment: production
+  imageRegistry: ghcr.io/icyquant
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  networkPolicy:
+    enabled: true
+  serviceMesh:
+    enabled: true
+    provider: istio
+  observability:
+    enabled: true
+    tracing: true
+    metrics: true
+    logging: true
+  persistence:
+    enabled: true
+    storageClass: standard
+  resources:
+    cpuRequest: 500m
+    memoryRequest: 1Gi
+    cpuLimit: 2
+    memoryLimit: 4Gi
+
+# API Gateway
+api:
+  replicaCount: 5
+  image:
+    repository: api
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 9090
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 75
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  livenessProbe:
+    path: /health
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    path: /health/ready
+    port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+
+# AI Service
+ai:
+  replicaCount: 3
+  image:
+    repository: ai
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8081
+  gpu:
+    enabled: true
+    model: nvidia-t4
+    count: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetGPUUtilization: 80
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 4
+      memory: 16Gi
+      nvidia.com/gpu: 1
+
+# Risk Engine
+risk:
+  replicaCount: 3
+  image:
+    repository: risk
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8082
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilization: 60
+
+# Market Gateway
+marketGateway:
+  replicaCount: 2
+  image:
+    repository: market-gateway
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8083
+  gateways:
+    - name: binance
+      enabled: true
+    - name: alpaca
+      enabled: true
+    - name: interactive-brokers
+      enabled: false
+
+# Portfolio Service
+portfolio:
+  replicaCount: 2
+  image:
+    repository: portfolio
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8084
+
+# Strategy Engine
+strategy:
+  replicaCount: 2
+  image:
+    repository: strategy
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8085
+
+# Execution Service
+execution:
+  replicaCount: 3
+  image:
+    repository: execution
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8086
+
+# Reconciliation Service
+reconciliation:
+  replicaCount: 2
+  image:
+    repository: reconciliation
+    tag: v0.4.0
+  service:
+    type: ClusterIP
+    port: 8087
+
+# Data Stores
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+  master:
+    persistence:
+      enabled: true
+      size: 50Gi
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      enabled: true
+      size: 500Gi
+  replication:
+    enabled: true
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 500Gi
+
+kafka:
+  enabled: true
+  replicas: 3
+  listeners:
+    internal:
+      port: 9092
+    external:
+      port: 9094
+  kraft:
+    enabled: true
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: api.icyquant.io
+      paths:
+        - path: /api/v1
+          pathType: Prefix
+          service: api
+        - path: /ws
+          pathType: Prefix
+          service: api
+    - host: ai.icyquant.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: ai
+    - host: metrics.icyquant.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: prometheus
+  tls:
+    - hosts:
+        - api.icyquant.io
+        - "*.icyquant.io"
+      secretName: icyquant-tls
+
+# Monitoring
+prometheus:
+  enabled: true
+  server:
+    persistentVolume:
+      size: 100Gi
+    retention: 30d
+  alertmanager:
+    enabled: true
+
+grafana:
+  enabled: true
+  adminPassword: ""
+  persistence:
+    enabled: true
+    size: 10Gi
+  sidecar:
+    datasources:
+      enabled: true
+    dashboards:
+      enabled: true
+
+jaeger:
+  enabled: true
+  storage:
+    type: elasticsearch
+    elasticsearch:
+      host: elasticsearch
+      port: 9200
+
+# Service Mesh
+istio:
+  enabled: true
+  global:
+    proxy:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+# GitOps
+argocd:
+  enabled: true
+
+# Disaster Recovery
+disasterRecovery:
+  enabled: true
+  replicaCount: 2
+  replication:
+    enabled: true
+    interval: 5m
+
+# Network
+networkPolicy:
+  enabled: true
+  defaultDeny: true
+
+# Security
+security:
+  podSecurityStandard: restricted
+  networkPolicyEnabled: true
+  rbac:
+    enabled: true
+  secrets:
+    encryption: true
+    rotationPeriod: 90d
+
+# Autoscaling (KEDA)
+keda:
+  enabled: true
+  scalers:
+    - name: redis-queue
+      type: redis
+      metadata:
+        address: redis://icyquant-redis:6379
+        listName: orders
+        minLength: 100
+    - name: kafka-lag
+      type: kafka
+      metadata:
+        bootstrapServers: kafka:9092
+        consumerGroup: order-processor
+        topic: orders
+        lagThreshold: 1000

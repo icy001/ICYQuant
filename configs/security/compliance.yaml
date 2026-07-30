@@ -1,0 +1,83 @@
+# ICYQuant Compliance Configuration
+compliance:
+  frameworks:
+    - name: sec
+      enabled: true
+      checks:
+        - id: log_retention_7y
+          description: Audit logs retained for 7 years
+          severity: critical
+        - id: trade_audit_trail
+          description: Complete audit trail for all trades
+          severity: critical
+        - id: insider_trading_monitoring
+          description: Insider trading detection monitoring
+          severity: high
+
+    - name: mifid_ii
+      enabled: true
+      checks:
+        - id: best_execution
+          description: Best execution policy compliance
+          severity: high
+        - id: pre_trade_disclosure
+          description: Pre-trade client disclosure
+          severity: medium
+        - id: post_trade_reporting
+          description: Post-trade transaction reporting
+          severity: high
+        - id: client_categorization
+          description: Client categorization (professional/retail)
+          severity: medium
+
+    - name: gdpr
+      enabled: true
+      checks:
+        - id: data_minimization
+          description: Data minimization principle
+          severity: high
+        - id: consent_management
+          description: Consent management for data processing
+          severity: high
+        - id: right_to_erasure
+          description: Right to erasure (right to be forgotten)
+          severity: high
+        - id: data_breach_notification
+          description: 72-hour breach notification
+          severity: critical
+
+    - name: iso27001
+      enabled: true
+      checks:
+        - id: access_control
+          description: Access control policy
+          severity: high
+        - id: encryption_at_rest
+          description: Encryption at rest for sensitive data
+          severity: high
+        - id: encryption_in_transit
+          description: Encryption in transit (TLS 1.3)
+          severity: high
+        - id: incident_response
+          description: Incident response procedures
+          severity: medium
+
+    - name: soc2
+      enabled: true
+      checks:
+        - id: security_monitoring
+          description: Continuous security monitoring
+          severity: high
+        - id: change_management
+          description: Change management process
+          severity: medium
+        - id: data_backup
+          description: Data backup and recovery
+          severity: high
+
+  reporting:
+    frequency: daily
+    format: json
+    notification_channels:
+      - security_team
+      - compliance_officer

@@ -1,0 +1,101 @@
+# =============================================================================
+# ICYQuant RC1 Helm Chart Template
+# Institutional Quant Operating System
+# =============================================================================
+
+apiVersion: v2
+name: icyquant
+version: 0.4.0-alpha1
+appVersion: "0.4.0-alpha1"
+type: application
+description: Institutional Quant Operating System
+
+# Keywords for search
+keywords:
+  - quant
+  - trading
+  - ai
+  - hedge-fund
+  - enterprise
+  - alpha
+  - portfolio-management
+  - risk-management
+  - backtesting
+
+# Project URLs
+home: https://github.com/icyquant/icyquant
+sources:
+  - https://github.com/icyquant/icyquant
+
+# Maintainers
+maintainers:
+  - name: ICYQuant Platform Team
+    email: platform@icyquant.io
+    url: https://icyquant.io
+
+# Annotations for artifact hub and other registries
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/signKey: |
+    fingerprint: ""
+    url: ""
+  category: Financial
+
+# Supported Kubernetes versions
+kubeVersion: ">=1.24.0-0"
+
+# Chart dependencies for production deployment
+dependencies:
+  # Message Queue
+  - name: kafka
+    version: "25.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+    alias: kafka
+
+  # Database
+  - name: postgresql
+    version: "15.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+
+  # Cache
+  - name: redis
+    version: "18.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    alias: redis
+
+  # Monitoring
+  - name: prometheus
+    version: "25.0.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+    alias: prometheus
+
+  - name: grafana
+    version: "9.0.0"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+    alias: grafana
+
+  # Tracing
+  - name: jaeger
+    version: "1.0.0"
+    repository: https://jaegertracing.github.io/helm-charts
+    condition: jaeger.enabled
+    alias: jaeger
+
+  # Service Mesh (optional)
+  - name: istio
+    version: "1.20.0"
+    repository: https://istio-release.storage.googleapis.com/charts
+    condition: istio.enabled
+    alias: istio
+
+# Chart icon
+icon: https://icyquant.io/logo.png
+
+# Deprecated flag
+deprecated: false

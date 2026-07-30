@@ -1,0 +1,121 @@
+environment: production
+cluster: production-cluster
+namespace: icyquant
+
+imageRegistry: ghcr.io/icyquant
+
+services:
+  api:
+    replicaCount: 5
+    version: "v0.4.0"
+    resources:
+      cpuRequest: 500m
+      memoryRequest: 1Gi
+      cpuLimit: 2
+      memoryLimit: 4Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 5
+      maxReplicas: 50
+      targetCPU: 70
+      targetMemory: 75
+    strategy: rolling
+    healthCheck:
+      path: /health
+      port: 8080
+      interval: 10
+      timeout: 5
+
+  ai:
+    replicaCount: 3
+    version: "v0.4.0"
+    gpu:
+      enabled: true
+      model: nvidia-t4
+    resources:
+      cpuRequest: 2
+      memoryRequest: 8Gi
+      cpuLimit: 4
+      memoryLimit: 16Gi
+      gpuCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 20
+      targetGPU: 80
+    strategy: canary
+    canary:
+      stages: [5, 20, 50, 100]
+      autoPromote: true
+
+  risk:
+    replicaCount: 3
+    version: "v0.4.0"
+    resources:
+      cpuRequest: 2
+      memoryRequest: 4Gi
+      cpuLimit: 4
+      memoryLimit: 8Gi
+    strategy: rolling
+
+  marketGateway:
+    replicaCount: 2
+    version: "v0.4.0"
+    gateways:
+      - name: binance
+        enabled: true
+      - name: alpaca
+        enabled: true
+
+  portfolio:
+    replicaCount: 2
+    version: "v0.4.0"
+
+  strategy:
+    replicaCount: 2
+    version: "v0.4.0"
+
+  execution:
+    replicaCount: 3
+    version: "v0.4.0"
+
+  reconciliation:
+    replicaCount: 2
+    version: "v0.4.0"
+
+network:
+  networkPolicy:
+    enabled: true
+    defaultDeny: true
+  serviceMesh:
+    enabled: true
+    provider: istio
+    mtls: strict
+
+monitoring:
+  prometheus:
+    enabled: true
+    retention: 30d
+  grafana:
+    enabled: true
+  jaeger:
+    enabled: true
+
+security:
+  podSecurityStandard: restricted
+  encryption:
+    atRest: true
+    inTransit: true
+  rbac:
+    enabled: true
+
+disasterRecovery:
+  enabled: true
+  primaryRegion: us-east-1
+  standbyRegions:
+    - us-west-2
+    - eu-west-1
+  rpo:
+    target: 5m
+  rto:
+    target: 15m

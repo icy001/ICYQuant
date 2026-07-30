@@ -1,0 +1,61 @@
+# ICYQuant Governance Configuration
+governance:
+  categories:
+    - name: data
+      requires_approval: true
+      default_approvers: [data_owner, security_lead]
+      risk_threshold: medium
+    - name: ai_model
+      requires_approval: true
+      default_approvers: [ai_lead, risk_manager]
+      risk_threshold: medium
+    - name: security
+      requires_approval: true
+      default_approvers: [security_lead, compliance_officer]
+      risk_threshold: high
+    - name: policy
+      requires_approval: true
+      default_approvers: [security_lead, admin]
+      risk_threshold: high
+    - name: deployment
+      requires_approval: true
+      default_approvers: [tech_lead, devops_lead]
+      risk_threshold: high
+    - name: access
+      requires_approval: true
+      default_approvers: [security_lead, admin]
+      risk_threshold: critical
+
+  approval_policies:
+    - name: AI Model Deployment
+      category: ai_model
+      requires_approval: true
+      approvers: [ai_lead, risk_manager]
+      auto_approve_threshold: low
+
+    - name: Policy Changes
+      category: policy
+      requires_approval: true
+      approvers: [security_lead, compliance_officer]
+      auto_approve_threshold: none
+
+    - name: Production Deployment
+      category: deployment
+      requires_approval: true
+      approvers: [tech_lead, devops_lead]
+      auto_approve_threshold: low
+
+    - name: Privilege Escalation
+      category: access
+      requires_approval: true
+      approvers: [security_lead, admin]
+      auto_approve_threshold: none
+      multi_party_required: true
+
+  workflow:
+    auto_approve_low_risk: true
+    require_unanimous_for_critical: true
+    escalation_after_hours: 48
+    notify_on_submit: true
+    notify_on_approve: true
+    notify_on_reject: true

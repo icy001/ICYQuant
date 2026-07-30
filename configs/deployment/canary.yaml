@@ -1,0 +1,62 @@
+environment: canary
+cluster: production-cluster
+namespace: icyquant
+
+canary:
+  enabled: true
+  stages:
+    - weight: 5
+      duration: 10m
+      minSamples: 100
+    - weight: 20
+      duration: 30m
+      minSamples: 500
+    - weight: 50
+      duration: 1h
+      minSamples: 1000
+    - weight: 100
+      duration: 0
+      minSamples: 0
+  autoPromote: true
+  monitoring:
+    errorRateThreshold: 1.0
+    latencyIncreaseThreshold: 20
+    cpuIncreaseThreshold: 20
+    riskEventThreshold: 0
+  rollback:
+    automatic: true
+    waitPeriod: 30s
+
+targetService:
+  api:
+    version: "v0.4.1-canary"
+    replicas: 5
+  ai:
+    version: "v0.4.1-canary"
+    replicas: 3
+
+monitoring:
+  metrics:
+    - name: error_rate
+      query: rate(http_requests_total{status=~"5.."}[5m])
+      threshold: 0.01
+    - name: p95_latency
+      query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+      threshold: 0.5
+    - name: cpu_usage
+      query: rate(process_cpu_seconds_total[5m])
+      threshold: 0.8
+
+alerts:
+  - name: CanaryErrorRate
+    severity: critical
+    condition: "error_rate > 1.0%"
+    action: rollback
+  - name: CanaryLatency
+    severity: warning
+    condition: "p95_latency > 500ms"
+    action: notify
+  - name: CanaryRiskEvent
+    severity: critical
+    condition: "risk_events > 0"
+    action: rollback

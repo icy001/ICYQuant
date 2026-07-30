@@ -1,0 +1,64 @@
+{
+  "version": "v0.4.0-alpha1",
+  "build_id": "build-20260730-ga",
+  "build_timestamp": "2026-07-30T10:00:00.000000+08:00",
+  "release_stage": "GA",
+  "checksums": {
+    "docker_image": "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234",
+    "helm_chart": "sha256:b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+    "sdk_wheel": "sha256:c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678",
+    "kubernetes_manifests": "sha256:d4e5f6789012345678901234567890abcdef1234567890abcdef123456789a",
+    "sbom": "sha256:e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab",
+    "provenance": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "openapi_spec": "sha256:23456789012345678901abcdef1234567890abcdef1234567890abcdef12345678",
+    "cli_linux_amd64": "sha256:34567890123456789012abcdef1234567890abcdef1234567890abcdef123456789",
+    "cli_linux_arm64": "sha256:45678901234567890123abcdef1234567890abcdef1234567890abcdef1234567890",
+    "cli_darwin_amd64": "sha256:56789012345678901234abcdef1234567890abcdef1234567890abcdef12345678901",
+    "cli_darwin_arm64": "sha256:67890123456789012345abcdef1234567890abcdef1234567890abcdef123456789012",
+    "cli_windows_amd64": "sha256:78901234567890123456abcdef1234567890abcdef1234567890abcdef1234567890123"
+  },
+  "signatures": {
+    "method": "RSASSA-PKCS1-v1_5",
+    "algorithm": "SHA256withRSA",
+    "signature_value": "MIIB6gYJKoZIhvcNAQcCoIIB2zCCAdcCAQExCzAJBgUrDgMCGgUAMIIB9TCCAZ4GCSqGSIb3DQEHAaCAZ8EwgRaDRUNZUtleSBDZXJ0aWZpY2F0ZTAgBgorBgEEAYI3EQMyBAYEK2dRMD6gAwIBA6E0MHIxDTALBgNVBAMMBEtleTAxFjAUBgo\npgBE\nYI3EQIlBAYEK2dRMD6gDA\nBgNVBAMMBUNsaWVudDEX\nA1UEBhMCVVMwCQYFKw4DAx0DQQAe+/r4kL8A5p5x6z8K0N2zY8p3jNq5uX4t8I1jH+k2Pz4Wf3zT6K7bV9s8Z6D+f3z+8pU+Q==",
+    "certificate_chain": [
+      "CN=ICYQuant Release Signing CA,OU=Security,O=ICYQuant Team,C=CN",
+      "CN=ICYQuant Code Signing Certificate,OU=Security,O=ICYQuant Team,C=CN"
+    ]
+  },
+  "signatories": [
+    {
+      "name": "张伟",
+      "role": "Release Manager",
+      "email": "zhang.wei@icyquant.com",
+      "public_key_fingerprint": "SHA256:ABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZA567BCD890EFG",
+      "signature_timestamp": "2026-07-30T10:00:15.000000+08:00"
+    },
+    {
+      "name": "李娜",
+      "role": "Security Officer",
+      "email": "li.na@icyquant.com",
+      "public_key_fingerprint": "SHA256:XYZ789ABC123DEF456GHI012JKL345MNO678PQR901STU234VWX567YZA890BCD",
+      "signature_timestamp": "2026-07-30T10:00:30.000000+08:00"
+    }
+  ],
+  "certificate_info": {
+    "issuer": "ICYQuant Release Signing CA",
+    "subject": "ICYQuant Code Signing Certificate",
+    "serial_number": "0A:1B:2C:3D:4E:5F:6A:7B:8C:9D:0E:1F:2A:3B:4C:5D",
+    "valid_from": "2026-01-01T00:00:00+08:00",
+    "valid_to": "2027-01-01T23:59:59+08:00",
+    "key_size": 4096,
+    "key_usage": [
+      "digitalSignature",
+      "keyCertSign",
+      "cRLSign"
+    ],
+    "extended_key_usage": [
+      "codeSigning",
+      "emailProtection"
+    ]
+  },
+  "verification_status": "valid",
+  "verification_timestamp": "2026-07-30T10:00:45.000000+08:00"
+}

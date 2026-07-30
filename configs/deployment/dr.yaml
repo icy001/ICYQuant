@@ -1,0 +1,77 @@
+environment: disaster-recovery
+cluster: dr-cluster
+namespace: icyquant-dr
+
+primaryRegion: us-east-1
+standbyRegions:
+  - us-west-2
+    priority: 1
+    autoFailover: true
+  - eu-west-1
+    priority: 2
+    autoFailover: false
+
+replication:
+  mode: async
+  lagTargetSeconds: 300
+  lagCriticalSeconds: 1800
+  syncIntervalSeconds: 60
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2am
+  retentionDays: 30
+  storage: s3://icyquant-dr-backups
+  encryption:
+    enabled: true
+    algorithm: AES256
+  includes:
+    - database
+    - redis
+    - kafka
+    - object-storage
+
+restore:
+  pointInTime: true
+  crossRegion: true
+
+failover:
+  automatic: false
+  onFailure:
+    timeoutSeconds: 300
+    healthCheckRetries: 5
+    trafficDrainSeconds: 60
+  notification:
+    - channel: pagerduty
+      critical: true
+    - channel: slack
+      channel: "#ops-dr"
+
+services:
+  - name: api
+    critical: true
+    recoveryOrder: 1
+  - name: ai
+    critical: true
+    recoveryOrder: 2
+  - name: risk
+    critical: true
+    recoveryOrder: 3
+  - name: execution
+    critical: true
+    recoveryOrder: 4
+  - name: portfolio
+    critical: false
+    recoveryOrder: 5
+
+network:
+  interRegion:
+    vpn: true
+    bandwidthGbps: 10
+    encryption: AES256
+
+testing:
+  enabled: true
+  frequency: quarterly
+  lastTest: "2024-01-01"
+  runbook: docs/dr/runbook.md

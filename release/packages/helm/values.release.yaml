@@ -1,0 +1,297 @@
+# =============================================================================
+# ICYQuant RC1 Helm Values - Production Release Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  security:
+    allowInsecureImages: false
+
+# -----------------------------------------------------------------------------
+# ICYQuant Platform Configuration
+# -----------------------------------------------------------------------------
+icyquant:
+  # Image configuration
+  image:
+    repository: icyquant/platform
+    tag: "0.4.0-alpha1"
+    pullPolicy: Always
+    pullSecrets: []
+
+  # Number of replicas
+  replicaCount: 3
+
+  # Container ports
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: icyquant.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: icyquant-tls
+        hosts:
+          - icyquant.example.com
+
+  # Resource limits (production)
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+
+  # Autoscaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 120
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # Pod security context
+  podSecurityContext:
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Health probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # Service mesh integration
+  serviceMesh:
+    enabled: true
+    istio:
+      mtlsMode: STRICT
+
+  # Environment variables
+  env:
+    - name: ICYQUANT_ENV
+      value: "production"
+    - name: ICYQUANT_LOG_LEVEL
+      value: "INFO"
+    - name: ICYQUANT_VERSION
+      value: "0.4.0-alpha1"
+
+  # ConfigMap and Secrets
+  configMap:
+    enabled: true
+    data: {}
+
+  secrets:
+    enabled: true
+    existingSecret: "icyquant-secrets"
+
+  # Node affinity
+  nodeAffinity: {}
+  podAffinity: {}
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: icyquant
+          topologyKey: kubernetes.io/hostname
+
+  # Tolerations
+  tolerations: []
+
+  # Topology spread constraints
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: icyquant
+
+# -----------------------------------------------------------------------------
+# Kafka Configuration
+# -----------------------------------------------------------------------------
+kafka:
+  enabled: true
+  replicaCount: 3
+  auth:
+    clientProtocol: sasl_tls
+  zookeeper:
+    enabled: true
+    replicaCount: 3
+  persistence:
+    size: 100Gi
+
+# -----------------------------------------------------------------------------
+# PostgreSQL Configuration
+# -----------------------------------------------------------------------------
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""
+    username: icyquant
+    password: ""
+    database: icyquant
+  primary:
+    persistence:
+      size: 100Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+  readReplicas:
+    enabled: true
+    replicaCount: 2
+
+# -----------------------------------------------------------------------------
+# Redis Configuration
+# -----------------------------------------------------------------------------
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+  master:
+    persistence:
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+  replica:
+    replicaCount: 2
+    persistence:
+      size: 10Gi
+
+# -----------------------------------------------------------------------------
+# Prometheus Configuration
+# -----------------------------------------------------------------------------
+prometheus:
+  enabled: true
+  server:
+    retention: "15d"
+    persistence:
+      size: 50Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+  alertmanager:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Grafana Configuration
+# -----------------------------------------------------------------------------
+grafana:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+# -----------------------------------------------------------------------------
+# Jaeger Configuration
+# -----------------------------------------------------------------------------
+jaeger:
+  enabled: true
+  agent:
+    enabled: true
+  collector:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Istio Configuration
+# -----------------------------------------------------------------------------
+istio:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Service Account
+# -----------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# -----------------------------------------------------------------------------
+# RBAC
+# -----------------------------------------------------------------------------
+rbac:
+  create: true

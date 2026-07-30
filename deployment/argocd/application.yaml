@@ -1,0 +1,121 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: icyquant-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-options: >-
+      Prune=true,
+      CreateNamespace=true,
+      ServerSideApply=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: icyquant-production
+  source:
+    repoURL: https://github.com/icyquant/icyquant-infra.git
+    targetRevision: main
+    path: deployment/kubernetes
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: icyquant
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - Prune=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        environment: production
+  healthChecks:
+    - url: https://icyquant-api.icyquant.svc.cluster.local:8080/health
+      expectedCode: 200
+      periodSeconds: 10
+      timeoutSeconds: 5
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: icyquant-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    environment: staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: icyquant-staging
+  source:
+    repoURL: https://github.com/icyquant/icyquant-infra.git
+    targetRevision: develop
+    path: deployment/kubernetes
+    directory:
+      recurse: true
+  destination:
+    server: https://staging-cluster.k8s.local
+    namespace: icyquant-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: icyquant-dr
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    environment: disaster-recovery
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: icyquant-dr
+  source:
+    repoURL: https://github.com/icyquant/icyquant-infra.git
+    targetRevision: main
+    path: deployment/kubernetes/dr
+    directory:
+      recurse: true
+  destination:
+    server: https://dr-cluster.k8s.local
+    namespace: icyquant-dr
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

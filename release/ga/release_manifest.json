@@ -1,0 +1,25 @@
+{
+  "version": "v0.4.0-alpha1",
+  "release": "GA",
+  "stage": "GA",
+  "status": "stable",
+  "build": "20260730",
+  "released_at": "2026-07-30T10:00:00+08:00",
+  "artifacts": {
+    "docker": {"image": "icyquant:v0.4.0-alpha1", "registry": "ghcr.io/icyquant"},
+    "helm": {"chart": "icyquant", "version": "0.4.0", "repository": "https://charts.icyquant.io"},
+    "kubernetes": {"version": "v0.4.0-alpha1", "namespace": "icyquant"},
+    "python_sdk": {"version": "0.4.0", "package": "icyquant-sdk"},
+    "cli": {"version": "0.4.0", "name": "icyquant-cli"},
+    "openapi": {"version": "v1", "url": "https://api.icyquant.io/v1/openapi.yaml"}
+  },
+  "documentation": true,
+  "sbom": true,
+  "checksums": true,
+  "signatures": true,
+  "compliance": {
+    "license": "MIT",
+    "sbom_format": "CycloneDX",
+    "export_control": "EAR99"
+  }
+}

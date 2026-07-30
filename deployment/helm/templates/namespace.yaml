@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ include "icyquant.name" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    environment: {{ .Values.global.environment }}
+  annotations:
+    description: "ICYQuant {{ .Values.global.environment }} namespace"
+    network-policy: strict
+    pod-security: restricted

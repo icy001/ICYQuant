@@ -1,0 +1,46 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: icyquant-default-mtls
+  namespace: icyquant
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: icyquant-api-mtls
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      app: icyquant-api
+  portLevelMtls:
+    8080:
+      mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: icyquant-ai-mtls
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      app: icyquant-ai
+  portLevelMtls:
+    8081:
+      mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: icyquant-gateway-mtls
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway
+  mtls:
+    mode: PERMISSIVE

@@ -1,0 +1,1 @@
+"""ICYQuant Platform Tests."""

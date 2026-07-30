@@ -1,0 +1,51 @@
+# Crisis Detection Rules Configuration
+
+black_swan_thresholds:
+  index_decline_warning: -0.05
+  index_decline_critical: -0.10
+  index_decline_extreme: -0.15
+  vix_change_warning: 0.5
+  vix_change_critical: 1.0
+  vix_change_extreme: 1.5
+  volume_surge_warning: 3.0
+  volume_surge_critical: 5.0
+  volume_surge_extreme: 8.0
+  spread_warning: 0.005
+  spread_critical: 0.01
+  spread_extreme: 0.02
+
+emergency_levels:
+  level_1_alert:
+    trigger: "WARNING"
+    actions:
+      notify_admin: true
+      increase_monitoring: true
+      frequency: "1m"
+    auto_recoverable: true
+
+  level_2_restrict:
+    trigger: "CRITICAL"
+    actions:
+      notify_admin: true
+      disable_new_orders: true
+      reduce_position_limits: true
+      frequency: "30s"
+    auto_recoverable: false
+
+  level_3_halt:
+    trigger: "EXTREME"
+    actions:
+      notify_admin: true
+      cancel_all_orders: true
+      disable_new_orders: true
+      freeze_agents: true
+      halt_all_trading: true
+      frequency: "instant"
+    auto_recoverable: false
+    requires_manual_approval: true
+
+recovery:
+  auto_recover_timeout_seconds: 300
+  min_stable_period_seconds: 600
+  gradual_unfreeze: true
+  unfreeze_step_pct: 0.25

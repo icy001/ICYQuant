@@ -1,0 +1,63 @@
+# AI Monitor Configuration for ICYQuant Observability
+# Defines AI model health checks, thresholds, and monitoring intervals
+
+ai_monitor:
+  health_check:
+    interval_seconds: 30
+    timeout_seconds: 5
+    retry_count: 3
+
+  thresholds:
+    max_latency_ms: 500
+    max_error_rate: 0.05
+    min_rpm: 0
+
+  models:
+    - name: gpt-4
+      type: LLM
+      enabled: true
+      health_endpoint: /health
+      latency_threshold_ms: 1000
+      error_threshold: 0.05
+
+    - name: embedding-model
+      type: EMBEDDING
+      enabled: true
+      health_endpoint: /health
+      latency_threshold_ms: 200
+      error_threshold: 0.02
+
+    - name: rl-trading-agent
+      type: RL_MODEL
+      enabled: true
+      health_endpoint: /health
+      latency_threshold_ms: 50
+      error_threshold: 0.01
+
+    - name: prediction-service
+      type: PREDICTION
+      enabled: true
+      health_endpoint: /health
+      latency_threshold_ms: 150
+      error_threshold: 0.03
+
+  inference:
+    tracking:
+      enabled: true
+      track_tokens: true
+      track_cost: true
+    alert_on_timeout: true
+    alert_on_high_latency: true
+    p95_latency_threshold_ms: 800
+    p99_latency_threshold_ms: 2000
+
+  cost_tracking:
+    enabled: true
+    currency: CNY
+    budget_warning_pct: 80
+    budget_critical_pct: 95
+    categories:
+      - GPU
+      - STORAGE
+      - API
+      - INFERENCE

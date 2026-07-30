@@ -1,0 +1,40 @@
+# ICYQuant Platform - Workflow Configuration
+templates:
+  research_to_production:
+    - name: research
+      action: generate_signals
+    - name: backtest
+      action: run_backtest
+    - name: deploy
+      action: deploy_model
+      requires_approval: true
+    - name: paper_trading
+      action: start_paper_trading
+    - name: production
+      action: go_live
+      requires_approval: true
+
+  emergency_halt:
+    - name: pause_trading
+      action: pause
+    - name: cancel_orders
+      action: cancel_all
+    - name: notify_ai
+      action: notify
+    - name: freeze_portfolio
+      action: freeze
+
+  daily_reconciliation:
+    - name: fetch_daily_data
+      action: fetch
+    - name: reconcile_positions
+      action: reconcile
+    - name: generate_reports
+      action: report
+    - name: archive_logs
+      action: archive
+
+workflows:
+  max_concurrent: 5
+  default_timeout: 300
+  max_retries: 3

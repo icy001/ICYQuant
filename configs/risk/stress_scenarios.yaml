@@ -1,0 +1,56 @@
+# Stress Testing Scenarios Configuration
+
+scenarios:
+  market_crash:
+    description: "Broad equity market crash"
+    market_shock_pct: -0.20
+    volatility_multiplier: 3.0
+    liquidity_reduction: 0.5
+    credit_spread_widening: 0.03
+    duration_days: 10
+    capital_threshold: 0.05
+
+  recession:
+    description: "Economic recession scenario"
+    market_shock_pct: -0.12
+    volatility_multiplier: 2.0
+    liquidity_reduction: 0.3
+    credit_spread_widening: 0.05
+    duration_days: 90
+    capital_threshold: 0.08
+
+  rate_shock:
+    description: "Interest rate shock"
+    market_shock_pct: -0.08
+    volatility_multiplier: 2.5
+    liquidity_reduction: 0.2
+    credit_spread_widening: 0.02
+    duration_days: 30
+    capital_threshold: 0.04
+
+  liquidity_crisis:
+    description: "Liquidity crisis"
+    market_shock_pct: -0.15
+    volatility_multiplier: 4.0
+    liquidity_reduction: 0.8
+    credit_spread_widening: 0.04
+    duration_days: 15
+    capital_threshold: 0.05
+
+  currency_devaluation:
+    description: "Currency devaluation"
+    market_shock_pct: -0.10
+    volatility_multiplier: 2.2
+    liquidity_reduction: 0.4
+    credit_spread_widening: 0.06
+    duration_days: 20
+    capital_threshold: 0.05
+
+  credit_crisis:
+    description: "Credit crisis scenario"
+    market_shock_pct: -0.18
+    volatility_multiplier: 3.5
+    liquidity_reduction: 0.6
+    credit_spread_widening: 0.08
+    duration_days: 45
+    capital_threshold: 0.06

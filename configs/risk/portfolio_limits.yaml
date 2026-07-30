@@ -1,0 +1,36 @@
+# Portfolio Risk Limits Configuration
+
+global:
+  max_drawdown_pct: 0.10
+  max_leverage: 3.0
+  max_daily_loss_pct: 0.03
+  risk_budget: 1.0
+
+sector_limits:
+  technology: 0.40
+  financial: 0.30
+  healthcare: 0.25
+  consumer: 0.20
+  energy: 0.20
+  industrials: 0.15
+  materials: 0.15
+  utilities: 0.10
+  real_estate: 0.15
+  communication: 0.15
+
+strategy_limits:
+  mean_reversion: 0.20
+  trend_following: 0.15
+  arbitrage: 0.10
+  machine_learning: 0.25
+  deep_learning: 0.20
+  reinforcement_learning: 0.15
+
+agent_limits:
+  single_agent_max_pct: 0.30
+  total_agents_max_pct: 0.70
+
+exposure_limits:
+  single_stock_max_pct: 0.10
+  single_country_max_pct: 0.50
+  single_currency_max_pct: 0.80

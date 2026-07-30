@@ -1,0 +1,72 @@
+# ICYQuant Platform - Module Configuration
+modules:
+  - name: market_data
+    type: data
+    version: 1.0.0
+    description: "Market Data Service"
+    dependencies: [lakehouse]
+  - name: lakehouse
+    type: infrastructure
+    version: 1.0.0
+    description: "Data Lakehouse"
+    dependencies: []
+  - name: research
+    type: research
+    version: 1.0.0
+    description: "Research Service"
+    dependencies: [market_data]
+  - name: ai
+    type: ai
+    version: 1.0.0
+    description: "AI Engine"
+    dependencies: [feature_store, lakehouse]
+  - name: feature_store
+    type: data
+    version: 1.0.0
+    description: "Feature Store"
+    dependencies: [lakehouse]
+  - name: backtest
+    type: trading
+    version: 1.0.0
+    description: "Backtest Engine"
+    dependencies: [research, market_data]
+  - name: risk
+    type: risk
+    version: 1.0.0
+    description: "Risk Engine"
+    dependencies: [market_data]
+  - name: oms
+    type: trading
+    version: 1.0.0
+    description: "Order Management"
+    dependencies: [risk]
+  - name: ems
+    type: trading
+    version: 1.0.0
+    description: "Execution Management"
+    dependencies: [oms]
+  - name: portfolio
+    type: portfolio
+    version: 1.0.0
+    description: "Portfolio Engine"
+    dependencies: [risk]
+  - name: reporting
+    type: core
+    version: 1.0.0
+    description: "Reporting Service"
+    dependencies: [portfolio]
+  - name: security
+    type: security
+    version: 1.0.0
+    description: "Security Platform"
+    dependencies: []
+  - name: observability
+    type: observability
+    version: 1.0.0
+    description: "Observability Platform"
+    dependencies: []
+  - name: cloud
+    type: infrastructure
+    version: 1.0.0
+    description: "Cloud Platform"
+    dependencies: []

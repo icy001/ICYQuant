@@ -1,0 +1,99 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: icyquant-api-policy
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      app: icyquant-api
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/icyquant/sa/icyquant-ai-sa"
+              - "cluster.local/ns/icyquant/sa/icyquant-risk-sa"
+      to:
+        - operation:
+            paths:
+              - "/api/v1/orders/*"
+              - "/api/v1/risk/*"
+            ports:
+              - "8080"
+    - from:
+        - source:
+            namespaces:
+              - istio-system
+      to:
+        - operation:
+            paths:
+              - "/health"
+              - "/ready"
+            ports:
+              - "8080"
+    - to:
+        - operation:
+            paths:
+              - "/metrics"
+            ports:
+              - "9090"
+      from:
+        - source:
+            principals:
+              - "cluster.local/ns/monitoring/sa/prometheus"
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: icyquant-ai-policy
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      app: icyquant-ai
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/icyquant/sa/icyquant-api-sa"
+      to:
+        - operation:
+            paths:
+              - "/v1/infer"
+              - "/v1/predict"
+              - "/v1/health"
+            ports:
+              - "8081"
+    - to:
+        - operation:
+            paths:
+              - "/metrics"
+            ports:
+              - "9090"
+      from:
+        - source:
+            principals:
+              - "cluster.local/ns/monitoring/sa/prometheus"
+  action: ALLOW
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: icyquant-deny-all
+  namespace: icyquant
+spec:
+  selector:
+    matchLabels:
+      app: icyquant-redis
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/icyquant/sa/icyquant-api-sa"
+              - "cluster.local/ns/icyquant/sa/icyquant-ai-sa"
+              - "cluster.local/ns/icyquant/sa/icyquant-risk-sa"
+      to:
+        - operation:
+            ports:
+              - "6379"
+  action: ALLOW

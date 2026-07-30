@@ -1,0 +1,43 @@
+# ICYQuant Authentication Configuration
+authentication:
+  providers:
+    - name: jwt
+      enabled: true
+      algorithm: HS256
+      expiration_minutes: 60
+    - name: oauth2
+      enabled: true
+      authorization_endpoint: "https://auth.icyquant.com/oauth2/authorize"
+      token_endpoint: "https://auth.icyquant.com/oauth2/token"
+    - name: oidc
+      enabled: false
+      issuer_url: "https://auth.icyquant.com/.well-known/openid-configuration"
+    - name: saml
+      enabled: false
+      identity_provider_url: "https://auth.icyquant.com/saml"
+
+  mfa:
+    enabled: true
+    required_for_admin: true
+    providers:
+      - totp
+      - sms
+      - email
+
+  session:
+    timeout_minutes: 30
+    max_concurrent_sessions: 5
+    idle_timeout_minutes: 15
+
+  rate_limit:
+    max_failed_attempts: 5
+    lockout_duration_minutes: 15
+    window_minutes: 5
+
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_numbers: true
+    require_special_chars: true
+    max_age_days: 90
+    prevent_reuse: 5

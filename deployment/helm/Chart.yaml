@@ -1,0 +1,60 @@
+apiVersion: v2
+name: icyquant
+description: ICYQuant Enterprise Quant Trading Platform
+type: application
+version: 0.4.0
+appVersion: "0.4.0"
+keywords:
+  - quant
+  - trading
+  - ai
+  - hedge-fund
+  - enterprise
+  - production
+home: https://github.com/icyquant/icyquant
+sources:
+  - https://github.com/icyquant/icyquant
+maintainers:
+  - name: ICYQuant Team
+    email: platform@icyquant.io
+    url: https://icyquant.io
+icon: https://icyquant.io/logo.png
+kubeVersion: ">=1.24.0-0"
+dependencies:
+  - name: redis
+    version: 18.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: postgresql
+    version: 15.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: kafka
+    version: 25.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+  - name: prometheus
+    version: 25.0.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  - name: grafana
+    version: 9.0.0
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+  - name: jaeger
+    version: 1.0.0
+    repository: https://jaegertracing.github.io/helm-charts
+    condition: jaeger.enabled
+  - name: argocd
+    version: 6.0.0
+    repository: https://argoproj.github.io/argo-helm
+    condition: argocd.enabled
+  - name: istio
+    version: 1.20.0
+    repository: https://istio-release.storage.googleapis.com/charts
+    condition: istio.enabled
+annotations:
+  category: Financial
+  licenses: MIT
+  created: "2024-01-01"
+  updated: "2024-07-30"

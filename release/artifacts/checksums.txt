@@ -1,0 +1,37 @@
+# ICYQuant v0.4.0-alpha1-rc1 Release Checksums
+# Generated: 2026-07-30T10:15:42+08:00
+# Build ID: build-20260730-0400-alpha1-rc1
+
+# Docker Image
+SHA256 (icyquant-v0.4.0-alpha1-rc1.docker.tar.gz) = a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234
+
+# Helm Chart
+SHA256 (icyquant-0.4.0-alpha1.tgz) = b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+
+# Python SDK Wheel
+SHA256 (icyquant_sdk-0.4.0a1-py3-none-any.whl) = c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678
+
+# Source Distribution
+SHA256 (icyquant-sdk-0.4.0a1.tar.gz) = d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab
+
+# Kubernetes Manifests
+SHA256 (kubernetes-manifests-v0.4.0-alpha1-rc1.tar.gz) = e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd
+
+# CLI Binaries
+SHA256 (icyquant-cli-0.4.0a1-linux-amd64) = f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef1
+SHA256 (icyquant-cli-0.4.0a1-linux-arm64) = 6789012345678901234567890abcdef1234567890abcdef1234567890abcdef12
+SHA256 (icyquant-cli-0.4.0a1-darwin-amd64) = 789012345678901234567890abcdef1234567890abcdef1234567890abcdef123
+SHA256 (icyquant-cli-0.4.0a1-darwin-arm64) = 89012345678901234567890abcdef1234567890abcdef1234567890abcdef1234
+SHA256 (icyquant-cli-0.4.0a1-windows-amd64.exe) = 9012345678901234567890abcdef1234567890abcdef1234567890abcdef12345
+
+# SBOM
+SHA256 (sbom.json) = 012345678901234567890abcdef1234567890abcdef1234567890abcdef123456
+
+# Provenance
+SHA256 (provenance.json) = 123456789012345678901abcdef1234567890abcdef1234567890abcdef1234567
+
+# OpenAPI Spec
+SHA256 (openapi.yaml) = 23456789012345678901abcdef1234567890abcdef1234567890abcdef12345678
+
+# Documentation
+SHA256 (docs-v0.4.0-alpha1-rc1.tar.gz) = 34567890123456789012abcdef1234567890abcdef1234567890abcdef123456789
