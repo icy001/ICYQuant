@@ -1,0 +1,39 @@
+# RL Trading Environment Configuration
+# Controls the simulated trading environment for reinforcement learning
+
+environment:
+  # Market data
+  symbols:
+    - AAPL
+    - MSFT
+    - NVDA
+    - AMZN
+    - GOOGL
+  initial_balance: 1000000.0
+  max_position_pct: 0.25
+  commission_rate: 0.001
+  slippage_bps: 1.0
+  spread_bps: 2.0
+
+  # Episode settings
+  max_steps: 252        # ~1 trading year
+  window_size: 50       # lookback window for state
+
+  # Environment mode
+  mode: train            # train, eval, backtest, live
+  seed: 42
+  render: false
+
+  # Risk limits
+  max_drawdown_pct: 0.20
+  max_leverage: 2.0
+  var_limit_pct: 0.05
+
+  # Price dynamics
+  price_model:
+    type: gbm            # Geometric Brownian Motion
+    drift_mean: 0.0001
+    drift_std: 0.001
+    volatility_mean: 0.02
+    volatility_std: 0.005
+    mean_reversion_speed: 0.01

@@ -1,0 +1,66 @@
+# RL Policy Network Configuration
+# Neural network architecture and training policies
+
+policies:
+  # Default policy
+  default:
+    network_type: mlp         # mlp, lstm, transformer, cnn
+    hidden_layers: [256, 256, 128]
+    activation: relu          # relu, tanh, elu, gelu, leaky_relu
+
+    # I/O dimensions
+    state_dim: 64
+    action_dim: 3
+    use_discrete_actions: false
+
+    # Actor-Critic architecture
+    shared_layers: 2
+    actor_hidden: [128, 64]
+    critic_hidden: [128, 64]
+
+    # Regularization
+    dropout_rate: 0.1
+    layer_norm: true
+    weight_decay: 0.0
+
+    # Action distribution
+    use_tanh_squash: true
+    log_std_min: -5.0
+    log_std_max: 2.0
+
+    # Initialization
+    orthogonal_init: true
+    gain: 1.0
+
+  # LSTM variant
+  lstm_policy:
+    network_type: lstm
+    lstm_hidden_size: 128
+    lstm_num_layers: 2
+    hidden_layers: [128]
+    activation: tanh
+
+    state_dim: 64
+    action_dim: 3
+    use_discrete_actions: false
+
+  # Discrete action variant
+  discrete_policy:
+    network_type: mlp
+    hidden_layers: [128, 64]
+    activation: relu
+
+    state_dim: 64
+    action_dim: 6          # BUY, SELL, HOLD, INCREASE, REDUCE, CLOSE
+    use_discrete_actions: true
+
+  # Transformer variant
+  transformer_policy:
+    network_type: transformer
+    hidden_layers: [256, 256]
+    activation: gelu
+
+    state_dim: 64
+    action_dim: 3
+    use_discrete_actions: false
+    dropout_rate: 0.15

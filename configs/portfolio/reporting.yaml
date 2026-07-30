@@ -1,0 +1,67 @@
+# Reporting configuration
+
+reporting:
+  default_format: pdf
+  language: "zh-CN"
+  timezone: "Asia/Shanghai"
+  include_charts: true
+  include_tables: true
+  include_disclaimer: true
+
+  branding:
+    firm_name: "ICYQuant"
+    primary_color: "#1a73e8"
+
+  templates:
+    monthly:
+      sections:
+        - "Executive Summary"
+        - "Performance Overview"
+        - "Risk Analysis"
+        - "Attribution Analysis"
+        - "Position Summary"
+        - "Capital Allocation"
+        - "Market Commentary"
+        - "Outlook & Positioning"
+        - "Disclaimer"
+    risk:
+      sections:
+        - "Risk Summary"
+        - "VaR & CVaR Analysis"
+        - "Stress Testing Results"
+        - "Risk Budget Utilization"
+        - "Concentration Analysis"
+        - "Counterparty Risk"
+        - "Liquidity Risk"
+    attribution:
+      sections:
+        - "Attribution Summary"
+        - "Brinson Decomposition"
+        - "Sector Attribution"
+        - "Factor Attribution"
+        - "Top/Bottom Contributors"
+        - "Attribution Quality Metrics"
+    investor_letter:
+      sections:
+        - "Dear Investors"
+        - "Performance Review"
+        - "Market Environment"
+        - "Portfolio Positioning"
+        - "Outlook"
+        - "Operational Updates"
+
+  export_formats:
+    - pdf
+    - html
+    - csv
+    - json
+    - excel
+    - markdown
+
+fund_of_funds:
+  rebalance_frequency_months: 3
+  drift_threshold_pct: 5.0
+  cash_reserve_pct: 2.0
+  max_sub_fund_weight: 0.30
+  min_sub_fund_weight: 0.02
+  max_sub_funds: 15

@@ -1,0 +1,65 @@
+# Risk Agent Configuration
+# Controls risk management behavior
+
+risk:
+  # Agent identity
+  name: "risk_agent"
+  enabled: true
+
+  # Risk limits
+  limits:
+    # Position limits
+    max_position_pct: 10.0       # Max single position (% of portfolio)
+    max_sector_exposure: 40.0    # Max single sector exposure
+    max_concentration_top5: 60.0 # Max top 5 holdings combined
+
+    # Loss limits
+    max_daily_loss_pct: 3.0      # Max daily loss before circuit breaker
+    max_drawdown_pct: 15.0       # Max drawdown before reducing exposure
+    max_var_95: 5.0              # Max 95% VaR (% of portfolio)
+
+    # Leverage limits
+    max_leverage: 1.5            # Max portfolio leverage
+    max_gross_exposure: 200.0    # Max gross exposure (%)
+
+    # Trading limits
+    max_trades_per_hour: 20      # Max trades per hour
+    max_trades_per_day: 100      # Max trades per day
+
+  # Risk modes
+  risk_modes:
+    normal:
+      max_position_pct: 10.0
+      max_sector_exposure: 40.0
+    conservative:
+      max_position_pct: 5.0
+      max_sector_exposure: 25.0
+    defensive:
+      max_position_pct: 3.0
+      max_sector_exposure: 15.0
+    emergency:
+      max_position_pct: 1.0
+      max_sector_exposure: 10.0
+      stop_trading: true
+
+  # Circuit breaker thresholds
+  circuit_breaker:
+    daily_loss_trigger: -3.0     # % loss triggers halt
+    weekly_loss_trigger: -7.0    # % loss triggers cautious mode
+    volatility_spike: 3.0        # VIX spike multiplier triggers defensive
+
+  # Risk scoring
+  risk_scoring:
+    position_limit_weight: 0.25
+    sector_exposure_weight: 0.20
+    confidence_weight: 0.15
+    drawdown_weight: 0.20
+    volatility_weight: 0.10
+    liquidity_weight: 0.10
+
+  # Rejection tracking
+  rejection_tracking:
+    max_history: 500
+    analyze_patterns: true
+    alert_on_spike: true
+    spike_threshold: 5           # Rejections per hour to trigger alert

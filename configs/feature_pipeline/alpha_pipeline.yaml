@@ -1,0 +1,70 @@
+# Alpha Daily Pipeline Configuration
+# Generates alpha research features from daily market data.
+
+pipeline:
+  name: alpha_daily
+  description: "Daily alpha feature generation pipeline"
+  source: market_data
+
+  # Transformation steps (executed in order)
+  transforms:
+    - return          # Simple return (pct_change)
+    - log_return      # Log return
+    - ema20           # 20-period exponential moving average
+    - ema60           # 60-period exponential moving average
+    - volatility_20   # 20-period rolling volatility
+    - atr14           # Average True Range (14)
+    - rsi14           # Relative Strength Index (14)
+    - macd            # MACD (12, 26, 9)
+    - bollinger       # Bollinger Bands (20, 2)
+    - momentum_20     # 20-period momentum
+    - volume_ratio    # Volume / 20-period avg volume
+
+  # Validation
+  validate:
+    enabled: true
+    rules:
+      - no_missing_columns
+      - no_all_nan
+      - row_count_consistency
+      - min_sample_count
+    expected_columns:
+      - return
+      - ema20
+      - volatility_20
+      - momentum_20
+    min_rows: 252  # at least 1 year of trading days
+
+  # Feature selection
+  select:
+    enabled: false
+    max_features: 300
+    filters:
+      - type: variance
+        threshold: 0.0001
+      - type: correlation
+        threshold: 0.95
+      - type: mutual_info
+        k: 100
+
+  # Publishing
+  publish:
+    to: feature_store
+    category: alpha_factors
+    tags:
+      - daily
+      - alpha
+      - momentum
+      - volatility
+
+  # Caching
+  cache:
+    enabled: true
+    policy: hash          # hash-based invalidation
+    ttl_seconds: 86400    # 24 hours
+
+  # Scheduling
+  schedule:
+    trigger: "cron:0 3 * * 1-5"  # 3:00 AM, Mon-Fri
+    timezone: "Asia/Shanghai"
+    catch_up: false

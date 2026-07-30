@@ -1,0 +1,76 @@
+# Sentiment Analysis Configuration
+# ICYQuant Knowledge Platform
+
+sentiment:
+  # Direction thresholds
+  very_bullish_threshold: 0.8
+  bullish_threshold: 0.6
+  neutral_high: 0.55
+  neutral_low: 0.45
+  bearish_threshold: 0.4
+  very_bearish_threshold: 0.2
+
+  # Momentum
+  momentum_window_days: 30
+  acceleration_window_days: 7
+  min_samples_for_momentum: 5
+
+  # Trend detection
+  trend_change_threshold: 0.1
+
+  # Confidence
+  min_confidence: 0.1
+
+  # Dimension weights
+  dimensions:
+    earnings: 1.0
+    technical: 0.8
+    macro: 0.9
+    sentiment: 1.2
+    regulation: 0.7
+    industry: 0.6
+
+# Sentiment lexicon
+lexicon:
+  bullish:
+    strong:
+      surge: 0.90
+      soar: 0.95
+      breakthrough: 0.90
+      record_high: 0.90
+      blockbuster: 0.90
+    moderate:
+      beat: 0.75
+      outperform: 0.80
+      upgrade: 0.80
+      growth: 0.70
+      expansion: 0.70
+      strong: 0.75
+      bullish: 0.85
+      rally: 0.80
+    mild:
+      improve: 0.60
+      increase: 0.60
+      gain: 0.60
+      opportunity: 0.65
+
+  bearish:
+    strong:
+      plunge: 0.10
+      crash: 0.05
+      collapse: 0.05
+      crisis: 0.05
+      bankruptcy: 0.02
+    moderate:
+      miss: 0.25
+      decline: 0.30
+      downgrade: 0.20
+      loss: 0.20
+      weak: 0.25
+      bearish: 0.15
+      sell_off: 0.20
+    mild:
+      slow: 0.35
+      pressure: 0.35
+      challenge: 0.35
+      cautious: 0.35

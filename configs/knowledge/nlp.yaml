@@ -1,0 +1,148 @@
+# Financial NLP Configuration
+# ICYQuant Knowledge Platform
+
+nlp:
+  # Keyword extraction
+  max_keywords: 15
+  min_keyword_score: 0.1
+
+  # Summarization
+  max_summary_length: 200
+
+  # Topic classification
+  min_topic_confidence: 0.3
+  max_topics: 3
+
+  # Language
+  default_language: "en"
+
+  # Performance
+  max_text_length: 10000
+
+# Topic definitions with keywords
+topics:
+  earnings:
+    weight: 1.0
+    keywords:
+      - earnings
+      - revenue
+      - profit
+      - eps
+      - quarterly
+      - guidance
+      - 财报
+      - 业绩
+      - 净利润
+
+  merger_acquisition:
+    weight: 1.2
+    keywords:
+      - acquisition
+      - merger
+      - takeover
+      - buyout
+      - deal
+      - 收购
+      - 并购
+
+  product_launch:
+    weight: 0.9
+    keywords:
+      - launch
+      - new product
+      - release
+      - unveiled
+      - next generation
+      - 发布
+      - 新品
+
+  regulation:
+    weight: 1.1
+    keywords:
+      - regulation
+      - compliance
+      - sec
+      - investigation
+      - fine
+      - 监管
+      - 合规
+
+  supply_chain:
+    weight: 0.8
+    keywords:
+      - supply chain
+      - supplier
+      - shortage
+      - capacity
+      - logistics
+      - 供应链
+      - 产能
+
+  technology:
+    weight: 1.0
+    keywords:
+      - ai
+      - artificial intelligence
+      - chip
+      - semiconductor
+      - cloud
+      - 人工智能
+      - 芯片
+
+  macro:
+    weight: 1.0
+    keywords:
+      - gdp
+      - inflation
+      - interest rate
+      - fed
+      - monetary policy
+      - 利率
+      - 央行
+
+  capex:
+    weight: 0.8
+    keywords:
+      - capex
+      - capital expenditure
+      - investment
+      - expansion
+      - 资本开支
+      - 投资
+
+  management:
+    weight: 0.7
+    keywords:
+      - ceo
+      - cfo
+      - appointed
+      - resigned
+      - executive
+      - 任命
+      - 高管
+
+# Direction keywords
+direction:
+  positive:
+    - beat
+    - growth
+    - increase
+    - upgrade
+    - strong
+    - record
+    - bullish
+    - 增长
+    - 利好
+    - 突破
+
+  negative:
+    - miss
+    - decline
+    - loss
+    - downgrade
+    - weak
+    - risk
+    - bearish
+    - 亏损
+    - 下跌
+    - 风险

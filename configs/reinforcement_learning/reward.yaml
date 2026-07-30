@@ -1,0 +1,48 @@
+# RL Reward Engine Configuration
+# Multi-objective reward shaping for trading agents
+
+reward:
+  # Component weights
+  profit_weight: 1.0
+  sharpe_weight: 0.5
+  drawdown_weight: -2.0         # negative = penalty
+  risk_adjusted_weight: 0.3
+  turnover_penalty: -0.1
+  regime_weight: 0.2
+  consistency_weight: 0.1
+
+  # Risk-free rate for Sharpe computation
+  risk_free_rate: 0.02
+
+  # Drawdown thresholds
+  max_tolerated_drawdown: 0.15
+
+  # Normalization and clipping
+  normalize_rewards: true
+  reward_clip: 10.0
+
+  # Hindsight experience replay
+  use_hindsight: false
+
+  # Enabled reward components
+  enabled_components:
+    - profit
+    - sharpe
+    - drawdown
+    - risk_adjusted
+    - turnover
+
+  # Component-specific settings
+  components:
+    profit:
+      clip_low: -0.05
+      clip_high: 0.05
+    sharpe:
+      window: 20
+      annualization: 252
+    drawdown:
+      penalty_scale: 1.5
+    risk_adjusted:
+      sortino_window: 20
+    turnover:
+      base_penalty: -0.0001

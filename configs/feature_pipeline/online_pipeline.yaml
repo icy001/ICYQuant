@@ -1,0 +1,63 @@
+# Online Inference Pipeline Configuration
+# Real-time feature pipeline for online inference serving.
+
+pipeline:
+  name: online_pipeline
+  description: "Online inference feature pipeline"
+  source: real_time_data
+
+  # Lightweight transforms for low latency
+  transforms:
+    - return_1d
+    - return_5d
+    - ema_12
+    - ema_26
+    - momentum_10
+    - volatility_10
+    - rsi_14
+    - volume_ratio_10
+    - zscore_10
+
+  # Validation (lightweight)
+  validate:
+    enabled: true
+    rules:
+      - no_missing_columns
+      - no_all_nan
+      - min_sample_count
+    expected_columns:
+      - return_1d
+      - ema_12
+      - rsi_14
+    min_rows: 1  # single row for online inference
+
+  # Feature selection (pre-configured from offline training)
+  select:
+    enabled: false  # selection is done offline, reused online
+
+  # Publishing
+  publish:
+    to: online_store     # online feature store (Redis)
+    category: online_features
+    tags:
+      - online
+      - inference
+      - real_time
+
+  # Caching (short TTL for freshness)
+  cache:
+    enabled: true
+    policy: ttl
+    ttl_seconds: 300     # 5 minutes
+
+  # Scheduling
+  schedule:
+    trigger: "event:market_data_update"  # event-driven
+    timezone: "Asia/Shanghai"
+
+# Online-specific constraints
+online:
+  max_latency_ms: 50      # max feature computation latency
+  max_features: 50         # max features for online serving
+  precompute: true         # pre-compute rolling windows
+  window_lookback: 252     # lookback days for rolling windows

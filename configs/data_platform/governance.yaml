@@ -1,0 +1,89 @@
+# ============================================================================
+# ICYQuant Data Platform — Governance Configuration
+# ============================================================================
+# Configures data governance: ownership, classification, access control.
+
+governance:
+  require_owner: true
+  require_classification: true
+  audit_enabled: true
+  audit_retention_days: 365
+  auto_classify: false
+
+# Data classification levels
+classifications:
+  public:
+    description: "Publicly available data"
+    requires_approval: false
+  internal:
+    description: "Internal use only"
+    requires_approval: false
+  confidential:
+    description: "Confidential business data"
+    requires_approval: true
+  restricted:
+    description: "Highly restricted data"
+    requires_approval: true
+    requires_mfa: true
+
+# Access control
+access_control:
+  enforce_rbac: true
+  default_access: none
+  token_ttl_hours: 24
+  max_roles_per_user: 10
+
+  # Standard roles
+  roles:
+    admin:
+      description: "Full system access"
+      permissions: [read, write, delete, admin, export, audit]
+      access_level: admin
+      max_classification: restricted
+    researcher:
+      description: "Research team"
+      permissions: [read, write_feature, export]
+      access_level: write
+      max_classification: confidential
+    trader:
+      description: "Trading desk"
+      permissions: [read, read_prediction]
+      access_level: read
+      max_classification: confidential
+    auditor:
+      description: "Compliance audit"
+      permissions: [read, audit]
+      access_level: read
+      max_classification: restricted
+    viewer:
+      description: "Read-only"
+      permissions: [read]
+      access_level: read
+      max_classification: internal
+
+# Retention policies (default)
+retention:
+  default_policy: standard
+  enforce_retention: true
+
+  policies:
+    tick_data:
+      hot_days: 30
+      warm_days: 60
+      cold_days: 90
+    bar_data:
+      hot_days: 90
+      warm_days: 180
+      cold_days: 365
+    order_data:
+      hot_days: 30
+      warm_days: 90
+      cold_days: 365
+    feature_data:
+      hot_days: 90
+      warm_days: 180
+      cold_days: 365
+    model_data:
+      hot_days: 30
+      warm_days: 90
+      cold_days: 365

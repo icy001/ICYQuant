@@ -1,0 +1,46 @@
+# Scheduler and Execution configuration
+
+scheduler:
+  default_timezone: "Asia/Shanghai"
+  max_delay_minutes: 60
+  tasks:
+    rebalance:
+      schedule_type: monthly
+      day_of_month: 1
+      hour_of_day: 9
+      minute_of_hour: 30
+    performance:
+      schedule_type: daily
+      hour_of_day: 18
+      minute_of_hour: 0
+    risk_report:
+      schedule_type: daily
+      hour_of_day: 8
+      minute_of_hour: 0
+
+execution:
+  default_mode: paper  # paper | live | dry_run
+  modes:
+    - paper
+    - live
+    - dry_run
+    - twap
+    - vwap
+    - smart
+  max_slippage_pct: 0.5
+  max_market_impact_pct: 1.0
+  order_timeout_seconds: 300
+  retry_attempts: 3
+  batch_size: 10
+  concurrent_orders: 5
+  min_order_value: 1000
+  circuit_breaker:
+    enabled: true
+    threshold_pct: 5.0  # halt if daily loss > 5%
+
+snapshot:
+  frequency: daily
+  retention_days: 365
+  compression: false
+  max_snapshots_per_portfolio: 1000
+  storage_path: "./snapshots"

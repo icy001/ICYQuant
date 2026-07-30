@@ -1,0 +1,69 @@
+{
+  "datasets": [
+    {
+      "name": "market_tick",
+      "dataset_type": "tick",
+      "fields": [],
+      "primary_key": [],
+      "partition_keys": [],
+      "version": 1
+    },
+    {
+      "name": "test_ds",
+      "dataset_type": "custom",
+      "fields": [],
+      "primary_key": [],
+      "partition_keys": [],
+      "version": 1
+    }
+  ],
+  "snapshots": [
+    {
+      "snapshot_id": "c79b7ad8-d8cc-4c60-960e-197c0c448089",
+      "dataset": "market_tick",
+      "timestamp": "2026-07-29T10:16:36.849416",
+      "files": [],
+      "schema_version": 1,
+      "is_current": true,
+      "metadata": {
+        "description": "Initial creation of dataset 'market_tick'"
+      }
+    },
+    {
+      "snapshot_id": "a6c2b3a8-aa3c-45c3-8b0f-5cd1ff87a371",
+      "dataset": "test_ds",
+      "timestamp": "2026-07-29T10:16:37.381126",
+      "files": [],
+      "schema_version": 1,
+      "is_current": false,
+      "metadata": {
+        "description": "Initial creation of dataset 'test_ds'"
+      }
+    },
+    {
+      "snapshot_id": "d0558849-3a91-409a-a972-b7dd0ebcc6be",
+      "dataset": "test_ds",
+      "timestamp": "2026-07-29T10:16:37.389311",
+      "files": [],
+      "schema_version": 1,
+      "is_current": true,
+      "metadata": {
+        "description": "Initial version"
+      }
+    }
+  ],
+  "files": [
+    {
+      "file_id": "7cd7b854-2923-4397-ae32-cc7cab5d2e22",
+      "dataset": "market_tick",
+      "partition": "2026-07-29",
+      "file_path": "data/lakehouse\\market_tick\\2026-07-29\\7cd7b854-2923-4397-ae32-cc7cab5d2e22.parquet",
+      "row_count": 1,
+      "size_bytes": 36,
+      "created_at": "2026-07-29T10:16:36.857418",
+      "tier": "hot",
+      "metadata": {}
+    }
+  ],
+  "updated_at": "2026-07-29T10:16:37.389501"
+}

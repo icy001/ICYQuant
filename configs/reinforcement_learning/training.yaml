@@ -1,0 +1,61 @@
+# RL Training Configuration
+# Controls the training loop for RL trading agents
+
+training:
+  # Algorithm selection
+  algorithm: ppo           # ppo, sac, dqn, a2c, td3
+
+  # Training loop parameters
+  total_timesteps: 1000000
+  n_envs: 4
+  n_steps: 2048             # steps per policy update
+  batch_size: 64
+  n_epochs: 10
+
+  # PPO-specific hyperparameters
+  ppo:
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    target_kl: 0.015
+    learning_rate: 0.0003
+
+  # SAC-specific hyperparameters
+  sac:
+    tau: 0.005              # soft update rate
+    alpha: 0.2              # entropy coefficient
+    auto_alpha: true
+    learning_rate: 0.0003
+    reward_scale: 1.0
+
+  # DQN-specific hyperparameters
+  dqn:
+    epsilon_start: 1.0
+    epsilon_end: 0.01
+    epsilon_decay: 100000
+    target_update_freq: 1000
+    double_dqn: true
+    buffer_size: 100000
+
+  # Logging and evaluation
+  log_interval: 1000
+  eval_interval: 5000
+  save_interval: 10000
+  eval_episodes: 10
+
+  # Checkpointing
+  save_path: "./checkpoints"
+  load_path: null
+
+  # Seed
+  seed: 42
+
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 50
+    min_improvement: 0.001
+    metric: eval_reward_mean

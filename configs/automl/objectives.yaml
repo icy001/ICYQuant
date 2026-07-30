@@ -1,0 +1,106 @@
+# AutoML Multi-Objective Configuration
+# =====================================
+# Defines evaluation metrics, weights, and directions
+# for composite model scoring.
+
+# Default evaluation config
+default:
+  metrics:
+    - sharpe
+    - sortino
+    - max_drawdown
+    - calmar
+    - win_rate
+    - ic_mean
+    - rank_ic
+    - stability
+  weights:
+    sharpe: 0.25
+    sortino: 0.15
+    max_drawdown: 0.10
+    calmar: 0.10
+    ic_mean: 0.15
+    rank_ic: 0.10
+    stability: 0.10
+    win_rate: 0.05
+  directions:
+    sharpe: "maximize"
+    sortino: "maximize"
+    max_drawdown: "minimize"
+    calmar: "maximize"
+    win_rate: "maximize"
+    ic_mean: "maximize"
+    rank_ic: "maximize"
+    stability: "maximize"
+  risk_free_rate: 0.02
+  periods_per_year: 252
+  composite_method: "weighted_sum"
+
+# Conservative evaluation
+conservative:
+  metrics:
+    - sharpe
+    - max_drawdown
+    - stability
+    - win_rate
+  weights:
+    sharpe: 0.30
+    max_drawdown: 0.30
+    stability: 0.25
+    win_rate: 0.15
+  directions:
+    sharpe: "maximize"
+    max_drawdown: "minimize"
+    stability: "maximize"
+    win_rate: "maximize"
+  risk_free_rate: 0.02
+  periods_per_year: 252
+  composite_method: "weighted_sum"
+
+# Alpha-focused evaluation
+alpha_focused:
+  metrics:
+    - ic_mean
+    - ic_ir
+    - rank_ic
+    - stability
+  weights:
+    ic_mean: 0.30
+    ic_ir: 0.25
+    rank_ic: 0.25
+    stability: 0.20
+  directions:
+    ic_mean: "maximize"
+    ic_ir: "maximize"
+    rank_ic: "maximize"
+    stability: "maximize"
+  risk_free_rate: 0.02
+  periods_per_year: 252
+  composite_method: "weighted_sum"
+
+# Return-focused evaluation
+return_focused:
+  metrics:
+    - sharpe
+    - sortino
+    - annual_return
+    - calmar
+    - max_drawdown
+    - win_rate
+  weights:
+    sharpe: 0.25
+    sortino: 0.15
+    annual_return: 0.20
+    calmar: 0.15
+    max_drawdown: 0.15
+    win_rate: 0.10
+  directions:
+    sharpe: "maximize"
+    sortino: "maximize"
+    annual_return: "maximize"
+    calmar: "maximize"
+    max_drawdown: "minimize"
+    win_rate: "maximize"
+  risk_free_rate: 0.02
+  periods_per_year: 252
+  composite_method: "weighted_sum"

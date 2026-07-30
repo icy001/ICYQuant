@@ -1,0 +1,221 @@
+# AutoML Search Space Configuration
+# ====================================
+# Defines the default model candidates, hyperparameter ranges,
+# and feature universe for automated model search.
+
+name: "default"
+
+feature_groups:
+  price:
+    - open
+    - high
+    - low
+    - close
+    - volume
+    - vwap
+  momentum:
+    - rsi_14
+    - macd
+    - macd_signal
+    - macd_hist
+    - roc_10
+    - roc_20
+    - momentum_12m
+  volatility:
+    - atr_14
+    - bollinger_upper
+    - bollinger_lower
+    - bollinger_width
+    - daily_range
+  trend:
+    - sma_20
+    - sma_50
+    - ema_20
+    - ema_50
+    - adx_14
+  volume:
+    - obv
+    - volume_ratio
+    - vwap_deviation
+  fundamental:
+    - pe_ratio
+    - pb_ratio
+    - dividend_yield
+
+model_candidates:
+  - name: "lightgbm"
+    module: "lightgbm"
+    tags: ["tree", "boosting", "fast"]
+    params:
+      - name: "num_leaves"
+        type: "discrete"
+        low: 8
+        high: 256
+        step: 8
+        default: 31
+      - name: "learning_rate"
+        type: "continuous"
+        low: 0.005
+        high: 0.3
+        log_scale: true
+        default: 0.05
+      - name: "max_depth"
+        type: "discrete"
+        low: -1
+        high: 15
+        step: 1
+        default: -1
+      - name: "min_child_samples"
+        type: "discrete"
+        low: 5
+        high: 100
+        step: 5
+        default: 20
+      - name: "subsample"
+        type: "continuous"
+        low: 0.5
+        high: 1.0
+        log_scale: false
+        default: 0.8
+      - name: "colsample_bytree"
+        type: "continuous"
+        low: 0.5
+        high: 1.0
+        log_scale: false
+        default: 0.8
+      - name: "reg_alpha"
+        type: "continuous"
+        low: 0.0
+        high: 1.0
+        log_scale: false
+        default: 0.0
+      - name: "reg_lambda"
+        type: "continuous"
+        low: 0.0
+        high: 1.0
+        log_scale: false
+        default: 0.0
+      - name: "boosting_type"
+        type: "categorical"
+        choices: ["gbdt", "dart", "goss"]
+        default: "gbdt"
+
+  - name: "xgboost"
+    module: "xgboost"
+    tags: ["tree", "boosting", "fast"]
+    params:
+      - name: "n_estimators"
+        type: "discrete"
+        low: 50
+        high: 500
+        step: 50
+        default: 100
+      - name: "learning_rate"
+        type: "continuous"
+        low: 0.005
+        high: 0.3
+        log_scale: true
+        default: 0.1
+      - name: "max_depth"
+        type: "discrete"
+        low: 3
+        high: 12
+        step: 1
+        default: 6
+      - name: "min_child_weight"
+        type: "discrete"
+        low: 1
+        high: 10
+        step: 1
+        default: 1
+      - name: "subsample"
+        type: "continuous"
+        low: 0.5
+        high: 1.0
+        log_scale: false
+        default: 0.8
+      - name: "colsample_bytree"
+        type: "continuous"
+        low: 0.5
+        high: 1.0
+        log_scale: false
+        default: 0.8
+      - name: "gamma"
+        type: "continuous"
+        low: 0.0
+        high: 5.0
+        log_scale: false
+        default: 0.0
+      - name: "reg_alpha"
+        type: "continuous"
+        low: 0.0
+        high: 5.0
+        log_scale: false
+        default: 0.0
+
+  - name: "catboost"
+    module: "catboost"
+    tags: ["tree", "boosting", "categorical"]
+    params:
+      - name: "iterations"
+        type: "discrete"
+        low: 50
+        high: 500
+        step: 50
+        default: 100
+      - name: "learning_rate"
+        type: "continuous"
+        low: 0.005
+        high: 0.3
+        log_scale: true
+        default: 0.1
+      - name: "depth"
+        type: "discrete"
+        low: 3
+        high: 12
+        step: 1
+        default: 6
+      - name: "l2_leaf_reg"
+        type: "continuous"
+        low: 1.0
+        high: 10.0
+        log_scale: false
+        default: 3.0
+
+  - name: "tabnet"
+    module: "pytorch_tabnet"
+    tags: ["neural", "deep", "tabular"]
+    params:
+      - name: "n_d"
+        type: "discrete"
+        low: 8
+        high: 64
+        step: 8
+        default: 16
+      - name: "n_a"
+        type: "discrete"
+        low: 8
+        high: 64
+        step: 8
+        default: 16
+      - name: "n_steps"
+        type: "discrete"
+        low: 2
+        high: 8
+        step: 1
+        default: 3
+      - name: "learning_rate"
+        type: "continuous"
+        low: 0.001
+        high: 0.1
+        log_scale: true
+        default: 0.02
+
+shared_hyperparams: []
+
+constraints:
+  max_trials: 100
+  timeout_seconds: 3600
+  min_train_samples: 252
+  require_feature_importance: true
+  max_models_per_type: 3

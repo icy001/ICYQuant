@@ -1,0 +1,67 @@
+# Execution Agent Configuration
+# Controls trade execution behavior
+
+execution:
+  # Agent identity
+  name: "execution_agent"
+  enabled: true
+
+  # Execution mode
+  mode: "simulation"  # simulation | paper | live
+
+  # Algorithm defaults
+  algorithms:
+    vwap:
+      enabled: true
+      default_slices: 20
+      min_slice_pct: 5.0
+    twap:
+      enabled: true
+      default_slices: 10
+      interval_seconds: 60
+    pov:
+      enabled: true
+      default_participation: 0.10  # 10% of volume
+      max_participation: 0.25
+    iceberg:
+      enabled: true
+      visible_pct: 0.20            # 20% visible
+      hidden_pct: 0.80
+    adaptive:
+      enabled: true
+      use_ml: true
+      re_evaluate_seconds: 30
+
+  # Algorithm selection rules
+  algorithm_selection:
+    small_order_threshold: 1.0    # % of portfolio = small
+    large_order_threshold: 5.0    # % of portfolio = large
+    high_volatility_threshold: 2.0  # VIX multiplier
+
+    urgency_rules:
+      critical:
+        algorithm: "market"
+        slices: 1
+      high:
+        algorithm: "pov"
+        slices: 5
+      normal:
+        algorithm: "adaptive"
+        slices: 10
+      low:
+        algorithm: "vwap"
+        slices: 20
+
+  # Execution quality targets
+  quality_targets:
+    max_slippage_bps: 50          # Maximum acceptable slippage
+    max_market_impact_bps: 30     # Maximum market impact
+    target_fill_rate: 0.95        # Target fill rate
+    max_execution_time_minutes: 30
+
+  # Order management
+  order_management:
+    max_active_orders: 20
+    max_order_slices: 30
+    min_slice_size: 100           # Minimum shares per slice
+    auto_cancel_stale_minutes: 60

@@ -1,0 +1,120 @@
+# Portfolio Management default configurations
+
+portfolios:
+  # Default portfolio constraints
+  defaults:
+    max_position_weight: 0.10      # 10% max per position
+    max_sector_weight: 0.30        # 30% max per sector
+    min_cash_weight: 0.01          # 1% minimum cash
+    max_leverage: 1.0              # No leverage by default
+    rebalance_threshold_pct: 5.0   # Rebalance when drift > 5%
+
+  # Predefined portfolio types
+  types:
+    - name: "Stock Portfolio A"
+      type: stock
+      target_return_annual: 0.15
+      risk_budget_annual: 0.20
+
+    - name: "ETF Portfolio B"
+      type: etf
+      target_return_annual: 0.10
+      risk_budget_annual: 0.12
+
+    - name: "CTA Portfolio C"
+      type: cta
+      target_return_annual: 0.18
+      risk_budget_annual: 0.25
+
+    - name: "Alpha Portfolio D"
+      type: alpha
+      target_return_annual: 0.25
+      risk_budget_annual: 0.18
+
+    - name: "AI Portfolio E"
+      type: ai
+      target_return_annual: 0.30
+      risk_budget_annual: 0.22
+
+optimization:
+  default_method: max_sharpe
+  risk_free_rate: 0.03
+  methods:
+    - max_sharpe
+    - min_variance
+    - risk_parity
+    - max_diversification
+    - black_litterman
+
+rebalance:
+  default_method: threshold
+  drift_threshold_pct: 5.0
+  min_trade_value: 10000
+  max_trades_per_rebalance: 50
+  transaction_cost_bps: 10
+  methods:
+    - calendar
+    - threshold
+    - hybrid
+    - opportunistic
+    - tax_aware
+
+risk:
+  limits:
+    max_single_position:
+      type: concentration
+      hard: 10.0
+      soft: 8.0
+      unit: "%"
+    max_sector:
+      type: concentration
+      hard: 30.0
+      soft: 25.0
+      unit: "%"
+    daily_var_95:
+      type: var
+      hard: 2.0
+      soft: 1.5
+      unit: "%"
+    max_drawdown:
+      type: drawdown
+      hard: 20.0
+      soft: 15.0
+      unit: "%"
+    max_leverage:
+      type: leverage
+      hard: 2.0
+      soft: 1.5
+      unit: "x"
+    tracking_error:
+      type: tracking_error
+      hard: 5.0
+      soft: 3.0
+      unit: "%"
+    portfolio_volatility:
+      type: volatility
+      hard: 25.0
+      soft: 20.0
+      unit: "%"
+    daily_loss:
+      type: var
+      hard: 5.0
+      soft: 3.0
+      unit: "%"
+
+benchmarks:
+  csi300:
+    name: "CSI 300 Index"
+    ticker: "000300.SH"
+    type: market_index
+    currency: CNY
+  csi500:
+    name: "CSI 500 Index"
+    ticker: "000905.SH"
+    type: market_index
+    currency: CNY
+  sp500:
+    name: "S&P 500 Index"
+    ticker: "^GSPC"
+    type: market_index
+    currency: USD

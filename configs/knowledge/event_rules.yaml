@@ -1,0 +1,159 @@
+# Event Extraction Rules Configuration
+# ICYQuant Knowledge Platform
+
+event_engine:
+  # Extraction methods
+  use_pattern_rules: true
+  use_keyword_rules: true
+
+  # Minimum thresholds
+  min_confidence: 0.3
+  min_impact_score: 0.1
+  max_events_per_doc: 5
+
+# Event type definitions with signal mappings
+event_types:
+  earnings_surprise:
+    pattern: "(beat|exceeded?)\\s+(?:analysts?'?\\s*)?(?:earnings\\s*)?estimates?"
+    base_signal: BUY
+    base_impact: 0.7
+    horizon: medium_term
+    confidence_modifier: 1.2
+
+  earnings_miss:
+    pattern: "(missed?|fell\\s+short\\s+of)\\s+(?:analysts?'?\\s*)?(?:earnings\\s*)?estimates?"
+    base_signal: SELL
+    base_impact: -0.7
+    horizon: medium_term
+    confidence_modifier: 1.2
+
+  guidance_raised:
+    pattern: "raised?\\s+(?:its?\\s+)?(?:full.year|FY|quarterly|Q\\d)\\s*guidance"
+    base_signal: BUY
+    base_impact: 0.6
+    horizon: medium_term
+    confidence_modifier: 1.0
+
+  guidance_lowered:
+    pattern: "(lowered?|cut|reduced?)\\s+(?:its?\\s+)?(?:full.year|FY|quarterly|Q\\d)\\s*guidance"
+    base_signal: SELL
+    base_impact: -0.6
+    horizon: medium_term
+    confidence_modifier: 1.0
+
+  product_launch:
+    pattern: "(?:announced?|launched?|unveiled?)\\s+(?:a\\s+)?new\\s+(?:product|model|version|chip)"
+    base_signal: BUY
+    base_impact: 0.5
+    horizon: short_term
+    confidence_modifier: 0.8
+
+  product_recall:
+    pattern: "(?:recalled?|recall)\\s+(?:of\\s+)?(?:product|model|device)"
+    base_signal: SELL
+    base_impact: -0.6
+    horizon: short_term
+    confidence_modifier: 0.9
+
+  merger_acquisition:
+    pattern: "(?:announced?|agreed?\\s+to)\\s+(?:acquire|acquisition|merge|merger|buyout)"
+    base_signal: BUY
+    base_impact: 0.5
+    horizon: medium_term
+    confidence_modifier: 0.8
+
+  regulation_fine:
+    pattern: "(?:SEC|FTC|DOJ|regulator)\\s+(?:investigation|fine|penalty|lawsuit)"
+    base_signal: SELL
+    base_impact: -0.7
+    horizon: short_term
+    confidence_modifier: 1.0
+
+  supply_chain_disruption:
+    pattern: "supply\\s+chain\\s+(?:disruption|shortage|bottleneck)"
+    base_signal: SELL
+    base_impact: -0.5
+    horizon: short_term
+    confidence_modifier: 0.7
+
+  supply_chain_expansion:
+    pattern: "(?:expanded?|expand|scaling?)\\s+(?:production|manufacturing|capacity)"
+    base_signal: BUY
+    base_impact: 0.4
+    horizon: medium_term
+    confidence_modifier: 0.6
+
+  capex_increase:
+    pattern: "(?:increased?|boosted?)\\s+(?:capital\\s+expenditure|capex|investment)"
+    base_signal: BUY
+    base_impact: 0.4
+    horizon: long_term
+    confidence_modifier: 0.8
+
+  capex_decrease:
+    pattern: "(?:reduced?|cut|lowered?)\\s+(?:capital\\s+expenditure|capex|investment)"
+    base_signal: SELL
+    base_impact: -0.3
+    horizon: medium_term
+    confidence_modifier: 0.6
+
+  fda_approval:
+    pattern: "(?:FDA|EMA)\\s+(?:approved?|cleared?|authorized?)"
+    base_signal: BUY
+    base_impact: 0.7
+    horizon: medium_term
+    confidence_modifier: 1.2
+
+  bankruptcy:
+    pattern: "(?:filed\\s+for|declared?)\\s+(?:bankruptcy|chapter\\s+11)"
+    base_signal: SELL
+    base_impact: -0.9
+    horizon: long_term
+    confidence_modifier: 1.5
+
+  analyst_upgrade:
+    pattern: "(?:analyst|broker|firm)\\s+(?:upgraded?|raised?\\s+target)"
+    base_signal: BUY
+    base_impact: 0.5
+    horizon: short_term
+    confidence_modifier: 0.7
+
+  analyst_downgrade:
+    pattern: "(?:analyst|broker|firm)\\s+(?:downgraded?|lowered?\\s+target)"
+    base_signal: SELL
+    base_impact: -0.5
+    horizon: short_term
+    confidence_modifier: 0.7
+
+  macro_rate_hike:
+    pattern: "(?:Fed|Federal\\s+Reserve|central\\s+bank)\\s+(?:raised?|hiked?)\\s+(?:interest\\s+)?rates?"
+    base_signal: SELL
+    base_impact: -0.4
+    horizon: medium_term
+    confidence_modifier: 0.6
+
+  macro_rate_cut:
+    pattern: "(?:Fed|Federal\\s+Reserve|central\\s+bank)\\s+(?:cut|lowered?|reduced?)\\s+(?:interest\\s+)?rates?"
+    base_signal: BUY
+    base_impact: 0.4
+    horizon: medium_term
+    confidence_modifier: 0.6
+
+# Signal generation
+alpha_signals:
+  min_confidence: 0.3
+  min_events_for_signal: 1
+  confidence_thresholds:
+    very_high: 0.8
+    high: 0.6
+    medium: 0.4
+    low: 0.2
+  expiry:
+    intraday_hours: 8
+    short_term_hours: 48
+    medium_term_hours: 168
+    long_term_hours: 720
+  propagation:
+    enabled: true
+    max_depth: 2
+    decay: 0.5

@@ -1,0 +1,79 @@
+# AutoML Search Constraints
+# ===========================
+# Defines constraints, limits, and validation rules
+# for automated model search and promotion.
+
+search:
+  max_trials: 100
+  timeout_seconds: 3600
+  max_duration_per_trial: 600  # 10 min per trial
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001
+  min_trials_before_pruning: 20
+  pruner_quantile: 0.25  # Prune bottom 25%
+
+walk_forward:
+  train_window: 756       # 3 years daily
+  test_window: 252        # 1 year
+  step_size: 63           # quarterly
+  min_train_size: 252     # 1 year minimum
+  anchored: true
+  gap: 0
+  min_windows: 3
+  required_stability: 0.5
+
+cross_validation:
+  n_splits: 5
+  test_size: 0.2
+  gap: 0
+  min_train_size: 100
+
+alpha_discovery:
+  max_candidates: 200
+  max_depth: 3
+  min_ic_required: 0.01
+  correlation_threshold: 0.7  # Max correlation between discovered alphas
+  filter_redundant: true
+
+factor_combination:
+  max_factors_per_combiner: 20
+  regression_regularization: 0.01
+  pca_variance_threshold: 0.90
+
+promotion:
+  auto_promote: true
+  require_approval: true
+  max_champions: 5
+  criteria:
+    validated:
+      min_sharpe: 1.0
+      max_drawdown: 0.3
+    champion:
+      min_sharpe: 1.5
+      max_drawdown: 0.2
+      min_stability: 0.6
+      min_ic: 0.02
+      require_walk_forward: true
+    staging:
+      min_sharpe: 2.0
+      max_drawdown: 0.15
+      min_stability: 0.7
+      min_ic: 0.03
+    production:
+      min_sharpe: 2.0
+      max_drawdown: 0.1
+      min_stability: 0.8
+      min_ic: 0.04
+      require_champion_superseded: true
+
+leaderboard:
+  top_n: 50
+  min_trials_for_rank: 5
+  default_metric: "composite"
+  default_scope: "global"
+
+monitoring:
+  drift_psi_threshold: 0.1
+  drift_stability_threshold: 0.3
+  max_consecutive_failures: 3
+  performance_window: 63  # rolling evaluation window

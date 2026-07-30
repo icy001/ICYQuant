@@ -1,0 +1,64 @@
+# Trading Agent Configuration
+# Controls the Trading Decision Agent behavior
+
+trading:
+  # Agent identity
+  name: "trading_agent"
+  enabled: true
+
+  # Decision parameters
+  decision:
+    min_confidence: 0.5        # Minimum confidence to propose a trade
+    min_size_pct: 0.5          # Minimum position size (%)
+    max_size_pct: 10.0         # Maximum position size (%)
+    default_size_pct: 2.0      # Default position size when not specified
+    max_proposals_per_tick: 5  # Max trade proposals per tick
+
+  # Alpha signal weights
+  signal_weights:
+    momentum: 0.25
+    value: 0.15
+    quality: 0.15
+    sentiment: 0.20
+    technical: 0.15
+    macro: 0.10
+
+  # Signal thresholds
+  signal_thresholds:
+    strong_buy: 0.8
+    buy: 0.6
+    hold: 0.4
+    sell: 0.3
+    strong_sell: 0.2
+
+  # Market condition adjustments
+  market_adjustments:
+    risk_on:
+      confidence_multiplier: 1.1
+      size_multiplier: 1.2
+    risk_off:
+      confidence_multiplier: 0.8
+      size_multiplier: 0.5
+    high_volatility:
+      confidence_multiplier: 0.7
+      size_multiplier: 0.5
+
+  # Symbols of interest
+  watchlist:
+    - NVDA
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - META
+    - TSLA
+    - AMD
+    - INTC
+    - QCOM
+
+  # Sector focus
+  sectors:
+    - technology
+    - semiconductors
+    - ai_ml
+    - cloud_computing
