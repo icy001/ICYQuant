@@ -8,3 +8,8 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+
+# Test output artifacts
+*_result.txt
+err.txt
+test_*.txt
