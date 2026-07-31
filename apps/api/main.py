@@ -1,75 +1,63 @@
-"""
-ICYQuant API Gateway.
-"""
-
+"""ICYQuant API Gateway - Production entry point."""
+from __future__ import annotations
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from apps.api.routers import (
-    reconciliation,
-)
+from core.bootstrap import Bootstrap
+from core.settings import get_settings
+from shared.constants import APP_NAME, APP_VERSION
 
-from apps.api.middleware.tracing import (
-    TraceMiddleware,
-)
+bootstrap = Bootstrap()
 
-from apps.api.middleware.logging import (
-    LoggingMiddleware,
-)
-
-from apps.api.middleware.otel import (
-    OpenTelemetryMiddleware,
-)
-
-from apps.api.exception_handler import (
-    global_exception_handler,
-)
-
-from apps.api.health import (
-    router as health_router,
-)
-
-from apps.api.metrics import (
-    router as metrics_router,
-)
-
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    bootstrap.initialize()
+    app.state.bootstrap = bootstrap
+    yield
+    bootstrap.shutdown()
 
 app = FastAPI(
-    title="ICYQuant API",
-    version="0.3.0-beta2"
+    title=APP_NAME,
+    version=APP_VERSION,
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
-
 
 app.add_middleware(
-    TraceMiddleware
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "docs": "/docs",
+    }
 
-app.add_middleware(
-    LoggingMiddleware
-)
+@app.get("/health")
+async def health():
+    return bootstrap.health_checker.get_status()
 
+@app.get("/ready")
+async def ready():
+    return {"ready": bootstrap.is_ready()}
 
-app.add_middleware(
-    OpenTelemetryMiddleware
-)
+@app.get("/version")
+async def version():
+    settings = get_settings()
+    return {
+        "version": settings.APP_VERSION,
+        "env": settings.APP_ENV,
+        "status": "stable" if bootstrap.is_ready() else "starting",
+    }
 
-
-app.add_exception_handler(
-    Exception,
-    global_exception_handler
-)
-
-
-app.include_router(
-    health_router
-)
-
-
-app.include_router(
-    metrics_router
-)
-
-
-app.include_router(
-    reconciliation.router
-)
+@app.get("/status")
+async def status():
+    return bootstrap.get_status()
