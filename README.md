@@ -8,7 +8,15 @@ ICYQuant is a production-grade quantitative trading infrastructure designed for 
 
 ## Current Module
 
-### Ledger Service (v0.3.0-beta2)
+### Core & Shared Foundation (v0.4.0-alpha2)
+
+ICYQuant is built on a modular core/shared foundation that provides:
+
+- **Core Domain**: Base classes, entities, and value objects
+- **Shared Contracts**: Event/command definitions shared across all services
+- **Infrastructure Abstractions**: Pluggable database, cache, and messaging adapters
+
+### Ledger Service (v0.4.0-alpha2)
 
 ICYQuant Ledger uses an event sourced architecture.
 
@@ -32,19 +40,16 @@ Supported stores:
 
 - MemoryEventStore
 - SQLiteEventStore
-
-Future:
-
 - PostgreSQL Event Store
 - Kafka Event Stream
 
-### Reconciliation Engine (v0.2.4)
+### Reconciliation Engine (v0.4.0-alpha2)
 
 **Purpose:** Detect, Analyze, Replay, Repair, Verify, Audit state inconsistency between trading components.
 
 ## Features
 
-### Production Reconciliation Engine (v0.2.4)
+### Production Reconciliation Engine (v0.4.0-alpha2)
 
 - **Domain Models**: PositionSnapshot, LedgerSnapshot, ReconciliationResult
 - **Compare Engine**: Ledger vs Position difference detection
@@ -61,48 +66,44 @@ Future:
 
 ## Technology Stack
 
-- Python 3.9+
+- Python 3.12+
 - FastAPI
 - PostgreSQL 16
 - Redis 7
-- Kafka (Confluent)
+- Kafka 3.8 (Bitnami)
 - Docker / Docker Compose
 - Pytest
 - Ruff
 - Prometheus
 - Grafana
+- OpenTelemetry
 
 ## Repository Structure
 
 ```
 ICYQuant/
-├── common/              # Base classes and exceptions
-├── contracts/           # Shared event/command contracts
-│   └── events/          # Event definitions (BaseEvent, TradeEvent)
-├── infrastructure/      # Infrastructure layer
-│   ├── database/        # PostgreSQL + migrations
-│   ├── cache/           # Redis cache
-│   └── messaging/       # Kafka adapter
-├── services/
-│   ├── eventstore/      # Event sourcing abstraction
-│   ├── ledger/          # Ledger service
-│   ├── position/        # Position service
-│   ├── execution/       # Execution service
-│   ├── eventbus/        # Event bus
+├── apps/               # Application modules
+│   ├── api/            # FastAPI REST API
+│   ├── worker/         # Background worker
+│   ├── ledger/         # Ledger service
+│   ├── reconciliation/ # Reconciliation engine
+│   └── execution/      # Execution service
+├── core/               # Core domain foundation
+│   ├── domain/         # Base classes, entities, value objects
+│   ├── contracts/      # Shared event/command contracts
+│   └── exceptions/     # Domain exceptions
+├── shared/             # Shared utilities and abstractions
+│   ├── infrastructure/ # Database, cache, messaging adapters
+│   └── config/         # Configuration management
+├── services/           # Business logic services
+│   ├── eventstore/     # Event sourcing abstraction
+│   ├── ledger/         # Ledger service
+│   ├── position/       # Position service
+│   ├── execution/      # Execution service
 │   └── reconciliation/  # Reconciliation Engine
-│       ├── api/         # REST API v1 endpoints
-│       ├── domain/      # Domain layer (ReconciliationEngine)
-│       ├── application/ # Application service
-│       ├── repository/  # Repository layer
-│       ├── compare/     # Comparator framework
-│       ├── repair/      # Repair workflow
-│       ├── replay/      # Event replay engine
-│       ├── scheduler/   # Scheduling
-│       ├── snapshot/    # Snapshot management
-│       └── metrics/     # Prometheus metrics
 ├── monitoring/          # Monitoring stack
-│   ├── prometheus/      # Prometheus configuration
-│   └── grafana/         # Grafana dashboards
+│   ├── prometheus/     # Prometheus configuration
+│   └── grafana/        # Grafana dashboards
 ├── tests/               # Unit tests
 ├── docs/                # Documentation
 ├── docker-compose.yml   # Docker environment
@@ -112,12 +113,14 @@ ICYQuant/
 
 ## Development Status
 
-**Current Version:** v0.2.4 (Production Release)
+**Current Version:** v0.4.0-alpha2 (Alpha Release)
 
-### v0.2.4 Production Status
+### v0.4.0-alpha2 Status
 
 | Feature | Status |
 |---------|--------|
+| Core & Shared Foundation | ✅ |
+| Modular Application Architecture | ✅ |
 | Production Reconciliation Engine | ✅ |
 | Event Sourcing | ✅ |
 | Snapshot Recovery | ✅ |
@@ -127,12 +130,14 @@ ICYQuant/
 | Monitoring Stack | ✅ |
 | Deployment Workflow | ✅ |
 | API v1 | ✅ |
+| Kafka Integration | ✅ |
+| OpenTelemetry Tracing | ✅ |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.12+
 - Docker
 - Docker Compose
 
@@ -183,6 +188,7 @@ docker compose up -d
 - **Sprint 2.4**: Reconciliation Engine (Completed)
 - **Sprint 2.5**: Position Context & Comparator Implementations
 - **Sprint 3.0**: Broker Adapters (IBKR, MT5, CTP, FIX)
+- **Sprint 4.0**: Core/Shared Foundation & Modular Architecture (In Progress)
 
 ## License
 

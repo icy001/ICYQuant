@@ -1,16 +1,16 @@
-"""
-Dependency container.
+"""API dependency injection."""
+from __future__ import annotations
+from fastapi import Request
 
-Provides application services.
-"""
+from core.bootstrap import Bootstrap
+from core.settings import Settings, get_settings
 
-from services.reconciliation import (
-    ReconciliationEngine,
-)
+def get_bootstrap(request: Request) -> Bootstrap:
+    return request.app.state.bootstrap
 
+def get_config() -> Settings:
+    return get_settings()
 
-_engine = ReconciliationEngine()
-
-
-def get_reconciliation_engine():
-    return _engine
+def get_container(request: Request):
+    bootstrap = get_bootstrap(request)
+    return bootstrap.container

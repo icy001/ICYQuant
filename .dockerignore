@@ -1,8 +1,13 @@
-.git
 __pycache__
 *.pyc
+*.pyo
+.git
+.gitignore
 .pytest_cache
+.coverage
+htmlcov
 .env
-.venv
-dist
-build
+*.log
+*.md
+!docs
+tests/

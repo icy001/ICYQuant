@@ -8,13 +8,54 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ICYQuant"
-version = "0.3.0"
-description = "Quantitative Trading Framework"
+version = "0.4.0-alpha2"
+description = "Institutional Quantitative Trading Platform"
 requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "redis>=5.0.0",
+    "kafka-python>=2.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "structlog>=24.0.0",
+    "prometheus-client>=0.19.0",
+    "opentelemetry-api>=1.23.0",
+    "opentelemetry-sdk>=1.23.0",
+    "pyyaml>=6.0",
+]
 
 [project.scripts]
-icyquant = "services.main:main"
+icyquant-api = "apps.api.main:app"
+icyquant-worker = "apps.worker.main:main"
+icyquant = "core.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["services", "research", "contracts", "common", "infrastructure"]
+include = [
+    "apps",
+    "core",
+    "shared",
+    "services",
+    "research",
+    "contracts",
+    "common",
+    "infrastructure",
+    "platform",
+    "configs",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
