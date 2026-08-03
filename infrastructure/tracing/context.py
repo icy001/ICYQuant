@@ -1,18 +1,62 @@
 """
-Trace context propagation.
+Trace context.
+
+Provides contextvar-based trace context
+propagation across async tasks, ensuring
+the current trace and span are accessible
+anywhere within a request scope.
 """
 
+from __future__ import annotations
 
-class TraceContext:
+from contextvars import ContextVar
+from typing import Optional
 
-    def __init__(self):
-        self.trace_id = None
+from .models import SpanModel, TraceModel
 
-    def set_trace(
-        self,
-        trace_id,
-    ):
-        self.trace_id = trace_id
+# Current trace context
+trace_context: ContextVar[Optional[TraceModel]] = ContextVar(
+    "trace_context",
+    default=None,
+)
 
-    def get_trace(self):
-        return self.trace_id
+# Current span context
+span_context: ContextVar[Optional[SpanModel]] = ContextVar(
+    "span_context",
+    default=None,
+)
+
+
+def current_trace() -> Optional[TraceModel]:
+    """Get the current trace."""
+
+    return trace_context.get()
+
+
+def current_span() -> Optional[SpanModel]:
+    """Get the current span."""
+
+    return span_context.get()
+
+
+def set_trace(
+    trace: Optional[TraceModel],
+) -> None:
+    """Set the current trace."""
+
+    trace_context.set(trace)
+
+
+def set_span(
+    span: Optional[SpanModel],
+) -> None:
+    """Set the current span."""
+
+    span_context.set(span)
+
+
+def clear_trace() -> None:
+    """Clear the current trace context."""
+
+    trace_context.set(None)
+    span_context.set(None)
