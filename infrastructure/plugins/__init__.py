@@ -51,6 +51,17 @@ from .exceptions import (
     PluginStateError,
     PluginInstallError,
     PluginReloadError,
+    PluginSandboxError,
+    PluginSecurityError,
+    PluginSignatureError,
+    PluginTrustError,
+    PluginResourceLimitError,
+    PluginIsolationError,
+    PluginSandboxViolationError,
+    PluginNetworkAccessError,
+    PluginFilesystemAccessError,
+    PluginSecretAccessError,
+    PluginWatchError,
 )
 
 # Models
@@ -102,6 +113,22 @@ from .registry import PluginRegistry
 # Loader
 from .loader import PluginLoader
 
+# Loader sub-components
+from .loader import (
+    DirectoryScanner,
+    PluginImporter,
+    DependencyResolver2,
+    PluginInstaller,
+    PluginUninstaller,
+    PluginReloader,
+    FileWatcher,
+    PluginVerifier,
+    LoaderCache,
+    LoaderMetrics,
+    LoaderDiagnostics,
+    LoaderValidator,
+)
+
 # Dependency
 from .dependency import DependencyResolver
 
@@ -126,6 +153,34 @@ from .manager import PluginManager
 # Service
 from .service import PluginService
 
+# Sandbox
+from .sandbox import (
+    Sandbox,
+    SandboxRuntime,
+    IsolationManager,
+    SandboxPermissionGuard,
+    SandboxCapabilityGuard,
+    ResourceQuota,
+    ResourceQuotaManager,
+    FilesystemPolicy,
+    NetworkPolicy,
+    SecretAccessControl,
+    CryptoProvider,
+    SignatureVerifier,
+    TrustStore,
+    SandboxPolicy,
+    PolicyEngine,
+    PolicyDecision,
+    PolicyRule,
+    SandboxValidator,
+    SandboxMonitor,
+    SandboxMetrics,
+    AuditLog,
+    SandboxDiagnostics,
+    RecoveryManager,
+    SecurityPolicy,
+)
+
 __all__ = [
     # Exceptions
     "PluginError", "PluginNotFoundError", "PluginAlreadyExistsError",
@@ -136,6 +191,12 @@ __all__ = [
     "PluginCapabilityError", "PluginManifestError",
     "PluginConfigError", "PluginStateError", "PluginInstallError",
     "PluginReloadError",
+    "PluginSandboxError", "PluginSecurityError",
+    "PluginSignatureError", "PluginTrustError",
+    "PluginResourceLimitError", "PluginIsolationError",
+    "PluginSandboxViolationError", "PluginNetworkAccessError",
+    "PluginFilesystemAccessError", "PluginSecretAccessError",
+    "PluginWatchError",
     # Models
     "Plugin", "PluginInstance", "PluginInfo",
     "PluginState", "PluginPriority",
@@ -161,6 +222,10 @@ __all__ = [
     "PluginRegistry",
     # Loader
     "PluginLoader",
+    "DirectoryScanner", "PluginImporter", "DependencyResolver2",
+    "PluginInstaller", "PluginUninstaller", "PluginReloader",
+    "FileWatcher", "PluginVerifier", "LoaderCache",
+    "LoaderMetrics", "LoaderDiagnostics", "LoaderValidator",
     # Dependency
     "DependencyResolver",
     # Lifecycle
@@ -177,4 +242,17 @@ __all__ = [
     "PluginManager",
     # Service
     "PluginService",
+    # Sandbox
+    "Sandbox", "SandboxRuntime", "IsolationManager",
+    "SandboxPermissionGuard", "SandboxCapabilityGuard",
+    "ResourceQuota", "ResourceQuotaManager",
+    "FilesystemPolicy", "NetworkPolicy",
+    "SecretAccessControl", "CryptoProvider",
+    "SignatureVerifier", "TrustStore",
+    "SandboxPolicy", "PolicyEngine",
+    "PolicyDecision", "PolicyRule",
+    "SandboxValidator", "SandboxMonitor",
+    "SandboxMetrics", "AuditLog",
+    "SandboxDiagnostics", "RecoveryManager",
+    "SecurityPolicy",
 ]

@@ -461,7 +461,7 @@ def test_loader():
     module = loader.load_module("json")
     check("Load module", module is not None)
 
-    check("Loader stats", "modules_loaded" in loader.get_stats())
+    check("Loader stats", "importer" in loader.get_stats())
 
 
 # ── 14. Dependency ──
