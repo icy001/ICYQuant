@@ -30,6 +30,13 @@ class ServiceEventType(Enum):
     NAMESPACE_DELETED = "namespace.deleted"
     REGISTRY_RECOVERED = "registry.recovered"
     REGISTRY_SYNCED = "registry.synced"
+    HEARTBEAT_RECEIVED = "heartbeat.received"
+    HEARTBEAT_LOST = "heartbeat.lost"
+    LEASE_CREATED = "lease.created"
+    SERVICE_HEALTHY = "service.healthy"
+    SERVICE_UNHEALTHY = "service.unhealthy"
+    SERVICE_RECOVERED = "service.recovered"
+    SERVICE_QUARANTINED = "service.quarantined"
 
 
 class ServiceEvent:

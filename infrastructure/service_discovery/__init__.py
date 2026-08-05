@@ -92,6 +92,24 @@ from .metrics import ServiceDiscoveryMetrics
 from .health import ServiceDiscoveryHealth
 from .diagnostics import ServiceDiscoveryDiagnostics
 
+# Part 1.2 - Heartbeat, Health & Recovery
+from .heartbeat import HeartbeatService
+from .heartbeat_scheduler import HeartbeatScheduler
+from .lease_manager import AsyncLeaseManager
+from .probe import Probe, ProbeResult, TCPProbe, HTTPProbe, GRPCProbe, InternalProbe, ProbeFactory
+from .health_checker import HealthChecker
+from .health_monitor import HealthMonitor
+from .readiness import ReadinessProbe
+from .liveness import LivenessProbe
+from .startup import StartupProbe
+from .detector import PhiAccrualDetector
+from .quarantine import QuarantineManager
+from .expiration import LeaseExpiration
+from .recovery import ServiceRecovery
+from .scheduler import HealthScheduler
+from .telemetry import ServiceDiscoveryTelemetry
+from .policies import HealthPolicy, AlwaysHealthyPolicy, ThresholdPolicy, ConsecutiveFailurePolicy, AdaptivePolicy, PolicyFactory
+
 __all__ = [
     # Exceptions
     "ServiceDiscoveryError", "ServiceRegistrationError",
@@ -123,4 +141,16 @@ __all__ = [
     "ServiceEventType", "ServiceEvent", "ServiceEventBus",
     "ServiceDiscoveryMetrics", "ServiceDiscoveryHealth",
     "ServiceDiscoveryDiagnostics",
+    # Part 1.2 - Heartbeat, Health & Recovery
+    "HeartbeatService", "HeartbeatScheduler",
+    "AsyncLeaseManager",
+    "Probe", "ProbeResult", "TCPProbe", "HTTPProbe", "GRPCProbe",
+    "InternalProbe", "ProbeFactory",
+    "HealthChecker", "HealthMonitor",
+    "ReadinessProbe", "LivenessProbe", "StartupProbe",
+    "PhiAccrualDetector", "QuarantineManager",
+    "LeaseExpiration", "ServiceRecovery",
+    "HealthScheduler", "ServiceDiscoveryTelemetry",
+    "HealthPolicy", "AlwaysHealthyPolicy", "ThresholdPolicy",
+    "ConsecutiveFailurePolicy", "AdaptivePolicy", "PolicyFactory",
 ]
