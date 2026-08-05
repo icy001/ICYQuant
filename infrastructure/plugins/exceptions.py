@@ -95,3 +95,47 @@ class PluginInstallError(PluginError):
 
 class PluginReloadError(PluginError):
     """Raised when a plugin fails to reload."""
+
+
+class PluginSandboxError(PluginError):
+    """Base exception for sandbox-related errors."""
+
+
+class PluginSecurityError(PluginError):
+    """Base exception for security-related errors."""
+
+
+class PluginSignatureError(PluginSecurityError):
+    """Raised when plugin signature verification fails."""
+
+
+class PluginTrustError(PluginSecurityError):
+    """Raised when a plugin is not in the trust store."""
+
+
+class PluginResourceLimitError(PluginSandboxError):
+    """Raised when a plugin exceeds its resource limits."""
+
+
+class PluginIsolationError(PluginSandboxError):
+    """Raised when plugin isolation fails."""
+
+
+class PluginSandboxViolationError(PluginSandboxError):
+    """Raised when a plugin violates sandbox constraints."""
+
+
+class PluginNetworkAccessError(PluginSandboxError):
+    """Raised when a plugin violates network policy."""
+
+
+class PluginFilesystemAccessError(PluginSandboxError):
+    """Raised when a plugin violates filesystem policy."""
+
+
+class PluginSecretAccessError(PluginSecurityError):
+    """Raised when a plugin attempts unauthorized secret access."""
+
+
+class PluginWatchError(PluginError):
+    """Raised when a file watch error occurs."""
