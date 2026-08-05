@@ -153,6 +153,31 @@ from .manager import PluginManager
 # Service
 from .service import PluginService
 
+# Marketplace
+from .marketplace import (
+    PluginMarketplace,
+    MarketplaceRepository,
+    MarketplaceRegistry,
+    MarketplacePublisher,
+    MarketplacePackage,
+    MarketplaceInstaller,
+    MarketplaceUpdater,
+    MarketplaceRollback,
+    MarketplaceChannels,
+    MarketplaceCompatibility,
+    MarketplaceDependency,
+    MarketplaceResolver,
+    MarketplaceSearch,
+    MarketplaceDownloader,
+    MarketplaceSignature,
+    MarketplaceValidator,
+    MarketplaceCache,
+    MarketplaceAudit,
+    MarketplaceMetrics,
+    MarketplaceHealth,
+    MarketplaceDiagnostics,
+)
+
 # Sandbox
 from .sandbox import (
     Sandbox,
@@ -242,6 +267,18 @@ __all__ = [
     "PluginManager",
     # Service
     "PluginService",
+    # Marketplace
+    "PluginMarketplace", "MarketplaceRepository",
+    "MarketplaceRegistry", "MarketplacePublisher",
+    "MarketplacePackage", "MarketplaceInstaller",
+    "MarketplaceUpdater", "MarketplaceRollback",
+    "MarketplaceChannels", "MarketplaceCompatibility",
+    "MarketplaceDependency", "MarketplaceResolver",
+    "MarketplaceSearch", "MarketplaceDownloader",
+    "MarketplaceSignature", "MarketplaceValidator",
+    "MarketplaceCache", "MarketplaceAudit",
+    "MarketplaceMetrics", "MarketplaceHealth",
+    "MarketplaceDiagnostics",
     # Sandbox
     "Sandbox", "SandboxRuntime", "IsolationManager",
     "SandboxPermissionGuard", "SandboxCapabilityGuard",
