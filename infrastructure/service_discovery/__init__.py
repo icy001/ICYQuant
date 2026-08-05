@@ -179,4 +179,23 @@ __all__ = [
     "IntelligentServiceResolver",
     # Individual LB components
     "RoundRobin", "Weighted", "LeastConnection", "LeastLatency", "Random", "ConsistentHash",
+    # Part 1.4 - High Availability & Self Healing
+    "FailoverManager", "SelfHealingEngine", "AdaptiveRetryEngine", "RetryBudget",
+    "ReplicaManager", "TrafficDrain", "GracefulEviction",
+    "RegistryRecovery", "RegistrySnapshot", "ClusterRebalancer",
+    "SplitBrainDetector", "MultiRegistryFailover",
+    "HAController", "HAState", "HAStateMachine", "HAScheduler",
+    "HAPolicy", "HAPolicyManager",
+    "HAMetrics", "HATelemetry", "HAAudit", "HADiagnostics", "HAHealth",
 ]
+
+# Part 1.4 - High Availability
+from .ha import (
+    FailoverManager, SelfHealingEngine, AdaptiveRetryEngine, RetryBudget,
+    ReplicaManager, TrafficDrain, GracefulEviction,
+    RegistryRecovery, RegistrySnapshot, ClusterRebalancer,
+    SplitBrainDetector, MultiRegistryFailover,
+    HAController, HAState, HAStateMachine, HAScheduler,
+    HAPolicy, HAPolicyManager,
+    HAMetrics, HATelemetry, HAAudit, HADiagnostics, HAHealth,
+)
