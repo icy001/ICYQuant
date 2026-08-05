@@ -22,6 +22,8 @@ class PluginEventType:
     FAILED = "plugin.failed"
     REMOVED = "plugin.removed"
     CONFIG_CHANGED = "plugin.config_changed"
+    ROLLBACK = "plugin.rollback"
+    RECOVERED = "plugin.recovered"
 
 
 @dataclass

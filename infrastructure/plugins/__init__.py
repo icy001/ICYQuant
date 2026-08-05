@@ -178,6 +178,26 @@ from .marketplace import (
     MarketplaceDiagnostics,
 )
 
+# Bootstrap / Runtime
+from .bootstrap import PluginBootstrap
+from .platform import PluginPlatform
+from .runtime import PluginRuntime
+from .runtime_context import RuntimeContext
+from .container import Container
+from .integration import PlatformIntegration
+from .scheduler import PluginScheduler
+from .synchronization import PluginSynchronization
+from .discovery import RuntimeDiscovery
+from .snapshot import PluginSnapshot, SnapshotManager
+from .version import PluginVersion, VersionManager
+from .publisher import PluginPublisher
+from .subscriber import PluginSubscriber
+from .monitoring import PluginMonitoring
+from .telemetry import PluginTelemetry
+from .protection import PluginProtection
+from .shutdown import GracefulShutdown
+from .api import PluginAPI
+
 # Sandbox
 from .sandbox import (
     Sandbox,
@@ -279,6 +299,17 @@ __all__ = [
     "MarketplaceCache", "MarketplaceAudit",
     "MarketplaceMetrics", "MarketplaceHealth",
     "MarketplaceDiagnostics",
+    # Bootstrap / Runtime
+    "PluginBootstrap", "PluginPlatform",
+    "PluginRuntime", "RuntimeContext",
+    "Container", "PlatformIntegration",
+    "PluginScheduler", "PluginSynchronization",
+    "RuntimeDiscovery", "PluginSnapshot", "SnapshotManager",
+    "PluginVersion", "VersionManager",
+    "PluginPublisher", "PluginSubscriber",
+    "PluginMonitoring", "PluginTelemetry",
+    "PluginProtection", "GracefulShutdown",
+    "PluginAPI",
     # Sandbox
     "Sandbox", "SandboxRuntime", "IsolationManager",
     "SandboxPermissionGuard", "SandboxCapabilityGuard",
