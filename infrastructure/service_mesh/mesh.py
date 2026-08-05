@@ -38,6 +38,7 @@ from .runtime import MeshRuntime
 from .sidecar import Sidecar
 from .synchronization import MeshSynchronizer
 from .telemetry import MeshTelemetry
+from .traffic import TrafficManager
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ class ServiceMesh:
         self._configuration = MeshConfiguration(self._context)
         self._synchronizer = MeshSynchronizer(self._context)
         self._manager = MeshManager(self._context)
+        self._traffic_manager = TrafficManager()
 
         # Wire publishers
         for comp in [
@@ -137,6 +139,10 @@ class ServiceMesh:
             "configuration",
             lambda: self._configuration.get_stats()["version"] >= 0,
         )
+        self._health.register_check(
+            "traffic_manager",
+            lambda: self._traffic_manager.is_running,
+        )
 
         # Register telemetry listener
         self._publisher.subscribe(
@@ -167,6 +173,7 @@ class ServiceMesh:
             await self._control_plane.start()
             await self._data_plane.start()
             await self._proxy.start()
+            self._traffic_manager.start()
 
             # Set up default routing rules
             from .models import RoutingRule
@@ -218,6 +225,7 @@ class ServiceMesh:
         # Stop data plane
         await self._data_plane.stop()
         await self._proxy.stop()
+        self._traffic_manager.stop()
 
         # Stop runtime
         await self._runtime.stop()
@@ -333,6 +341,10 @@ class ServiceMesh:
     def health_service(self) -> MeshHealth:
         return self._health
 
+    @property
+    def traffic_manager(self) -> TrafficManager:
+        return self._traffic_manager
+
     # Event handler
     async def _on_mesh_event(
         self, event: Dict[str, Any]
@@ -404,6 +416,7 @@ class ServiceMesh:
             "bootstrap": self._bootstrap.get_stats(),
             "metrics": self._metrics.get_summary(),
             "health": self._health.get_stats(),
+            "traffic": self._traffic_manager.get_stats(),
         }
 
     def __repr__(self) -> str:
