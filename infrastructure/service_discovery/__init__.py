@@ -110,6 +110,20 @@ from .scheduler import HealthScheduler
 from .telemetry import ServiceDiscoveryTelemetry
 from .policies import HealthPolicy, AlwaysHealthyPolicy, ThresholdPolicy, ConsecutiveFailurePolicy, AdaptivePolicy, PolicyFactory
 
+# Part 1.3 - Intelligent Resolver & Load Balancer
+from .resolver import (
+    ResolveContext, ResolveStrategy, StrategyConfig,
+    LoadBalancerSelector, RoundRobinLoadBalancer, WeightedLoadBalancer,
+    LeastConnectionLoadBalancer, LeastLatencyLoadBalancer,
+    RandomLoadBalancer, ConsistentHashLoadBalancer,
+    LoadBalancer, ServiceRouter,
+    LocalityRouter, VersionRouter, CanaryRouter, FeatureFlagRouter,
+    HealthFilter, CircuitFilter,
+    ResolverCache, ResolverMetrics, ResolverDiagnostics, ResolverTelemetry,
+    IntelligentServiceResolver,
+    RoundRobin, Weighted, LeastConnection, LeastLatency, Random, ConsistentHash,
+)
+
 __all__ = [
     # Exceptions
     "ServiceDiscoveryError", "ServiceRegistrationError",
@@ -153,4 +167,16 @@ __all__ = [
     "HealthScheduler", "ServiceDiscoveryTelemetry",
     "HealthPolicy", "AlwaysHealthyPolicy", "ThresholdPolicy",
     "ConsecutiveFailurePolicy", "AdaptivePolicy", "PolicyFactory",
+    # Part 1.3 - Intelligent Resolver & Load Balancer
+    "ResolveContext", "ResolveStrategy", "StrategyConfig",
+    "LoadBalancerSelector", "RoundRobinLoadBalancer", "WeightedLoadBalancer",
+    "LeastConnectionLoadBalancer", "LeastLatencyLoadBalancer",
+    "RandomLoadBalancer", "ConsistentHashLoadBalancer",
+    "LoadBalancer", "ServiceRouter",
+    "LocalityRouter", "VersionRouter", "CanaryRouter", "FeatureFlagRouter",
+    "HealthFilter", "CircuitFilter",
+    "ResolverCache", "ResolverMetrics", "ResolverDiagnostics", "ResolverTelemetry",
+    "IntelligentServiceResolver",
+    # Individual LB components
+    "RoundRobin", "Weighted", "LeastConnection", "LeastLatency", "Random", "ConsistentHash",
 ]
