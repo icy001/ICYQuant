@@ -35,6 +35,7 @@ from .models import (
 from .proxy import MeshProxy
 from .registry import MeshRegistry
 from .runtime import MeshRuntime
+from .security import SecurityManager, SecurityScheduler
 from .sidecar import Sidecar
 from .synchronization import MeshSynchronizer
 from .telemetry import MeshTelemetry
@@ -78,6 +79,8 @@ class ServiceMesh:
         self._synchronizer = MeshSynchronizer(self._context)
         self._manager = MeshManager(self._context)
         self._traffic_manager = TrafficManager()
+        self._security_manager = SecurityManager()
+        self._security_scheduler = SecurityScheduler()
 
         # Wire publishers
         for comp in [
@@ -143,6 +146,17 @@ class ServiceMesh:
             "traffic_manager",
             lambda: self._traffic_manager.is_running,
         )
+        self._health.register_check(
+            "security_manager",
+            lambda: self._security_manager.is_running,
+        )
+
+        # Register security scheduler tasks
+        self._security_scheduler.register_task(
+            "certificate_rotation",
+            self._security_manager.cert_manager.get_expiring_soon,
+            interval_s=300.0,
+        )
 
         # Register telemetry listener
         self._publisher.subscribe(
@@ -174,6 +188,8 @@ class ServiceMesh:
             await self._data_plane.start()
             await self._proxy.start()
             self._traffic_manager.start()
+            await self._security_manager.initialize()
+            await self._security_scheduler.start()
 
             # Set up default routing rules
             from .models import RoutingRule
@@ -226,6 +242,8 @@ class ServiceMesh:
         await self._data_plane.stop()
         await self._proxy.stop()
         self._traffic_manager.stop()
+        await self._security_scheduler.stop()
+        await self._security_manager.shutdown()
 
         # Stop runtime
         await self._runtime.stop()
@@ -345,6 +363,14 @@ class ServiceMesh:
     def traffic_manager(self) -> TrafficManager:
         return self._traffic_manager
 
+    @property
+    def security_manager(self) -> SecurityManager:
+        return self._security_manager
+
+    @property
+    def security_scheduler(self) -> SecurityScheduler:
+        return self._security_scheduler
+
     # Event handler
     async def _on_mesh_event(
         self, event: Dict[str, Any]
@@ -417,6 +443,7 @@ class ServiceMesh:
             "metrics": self._metrics.get_summary(),
             "health": self._health.get_stats(),
             "traffic": self._traffic_manager.get_stats(),
+            "security": self._security_manager.get_stats(),
         }
 
     def __repr__(self) -> str:
