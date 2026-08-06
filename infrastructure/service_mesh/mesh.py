@@ -36,6 +36,7 @@ from .proxy import MeshProxy
 from .registry import MeshRegistry
 from .runtime import MeshRuntime
 from .security import SecurityManager, SecurityScheduler
+from .observability import MeshObservability
 from .sidecar import Sidecar
 from .synchronization import MeshSynchronizer
 from .telemetry import MeshTelemetry
@@ -81,6 +82,7 @@ class ServiceMesh:
         self._traffic_manager = TrafficManager()
         self._security_manager = SecurityManager()
         self._security_scheduler = SecurityScheduler()
+        self._observability = MeshObservability()
 
         # Wire publishers
         for comp in [
@@ -150,6 +152,10 @@ class ServiceMesh:
             "security_manager",
             lambda: self._security_manager.is_running,
         )
+        self._health.register_check(
+            "observability",
+            lambda: self._observability.is_running,
+        )
 
         # Register security scheduler tasks
         self._security_scheduler.register_task(
@@ -190,6 +196,7 @@ class ServiceMesh:
             self._traffic_manager.start()
             await self._security_manager.initialize()
             await self._security_scheduler.start()
+            await self._observability.initialize()
 
             # Set up default routing rules
             from .models import RoutingRule
@@ -244,6 +251,7 @@ class ServiceMesh:
         self._traffic_manager.stop()
         await self._security_scheduler.stop()
         await self._security_manager.shutdown()
+        await self._observability.shutdown()
 
         # Stop runtime
         await self._runtime.stop()
@@ -371,6 +379,10 @@ class ServiceMesh:
     def security_scheduler(self) -> SecurityScheduler:
         return self._security_scheduler
 
+    @property
+    def observability(self) -> MeshObservability:
+        return self._observability
+
     # Event handler
     async def _on_mesh_event(
         self, event: Dict[str, Any]
@@ -444,6 +456,7 @@ class ServiceMesh:
             "health": self._health.get_stats(),
             "traffic": self._traffic_manager.get_stats(),
             "security": self._security_manager.get_stats(),
+            "observability": self._observability.get_stats(),
         }
 
     def __repr__(self) -> str:
