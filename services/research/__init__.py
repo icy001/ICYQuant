@@ -142,6 +142,89 @@ from .platform_bootstrap import ResearchPlatformBootstrap
 from .research_platform import UnifiedResearchPlatform
 from .research_api import ResearchAPI
 
+# ===== Commit 11: Research Platform Foundation =====
+# --- Core Engine ---
+from .research_engine import ResearchEngine, EngineState
+from .research_manager import ResearchManager, ResearchManagerState
+from .research_runtime import ResearchRuntime, RuntimePhase, ExecutionState as RuntimeExecutionState
+from .research_context import ResearchContext
+from .research_config import ResearchConfig
+from .research_registry import ResearchRegistry
+from .research_repository import ResearchRepository
+from .research_factory import ResearchFactory
+from .research_validator import ResearchValidator, ValidationError as ResearchValidationError
+
+# --- Experiment Sub-package (V1) ---
+from .experiment import (
+    Experiment as ExperimentV1,
+    ExperimentStatus as ExperimentStatusV1,
+    ExperimentManager as ExperimentManagerV1,
+    ExperimentManagerState,
+    ExperimentRun,
+    RunStatus,
+    ExperimentRegistry as ExperimentRegistryV1,
+    ExperimentVersion,
+    ExperimentSnapshot as ExperimentV1Snapshot,
+    ExperimentMetadata as ExperimentMetadataV1,
+    ExperimentTags,
+    ExperimentArtifact,
+    ArtifactType,
+    ExperimentLineage,
+    LineageNode,
+    LineageEdge,
+)
+
+# --- Dataset Sub-package (V1) ---
+from .dataset import (
+    DatasetManager as DatasetManagerV1,
+    DatasetManagerState,
+    DatasetRegistry as DatasetRegistryV1,
+    DatasetCatalog,
+    CatalogEntry,
+    DatasetLoader,
+    LoadStrategy,
+    DatasetSchema,
+    ColumnSchema,
+    DatasetValidator,
+    ValidationRule,
+    ValidationReport,
+    DatasetVersion as DatasetVersionV1,
+    DatasetSnapshot,
+    SnapshotType,
+    DatasetPartition,
+    PartitionStrategy,
+    DatasetCache,
+    CacheBackend,
+    CacheEntry,
+    DatasetProfile,
+    DatasetStatistics,
+    ColumnStatistics,
+    DatasetQuality as DatasetQualityV1,
+    QualityCheck,
+    QualityReport,
+)
+
+# --- Runtime Sub-package (V1) ---
+from .runtime import (
+    RuntimeManager,
+    RuntimeEnvironment,
+    RuntimeContext as V1RuntimeContext,
+    ExecutionConfig,
+    RuntimeState,
+    RuntimeStatus,
+    RuntimeScheduler,
+    ScheduleResult,
+    RuntimeMetrics,
+    ResourceUsage,
+    RuntimeHealth,
+    HealthStatus as RuntimeHealthStatus,
+)
+
+# --- API & Observability ---
+from .api import ResearchAPIServer, APIResponse
+from .telemetry import ResearchTracer, TraceSpan, SpanContext as TraceSpanContext
+from .diagnostics import ResearchDiagnostics, DiagnosticReport, DiagnosticStatus
+
 __all__ = [
     "Experiment",
     "ExperimentMetadata",
@@ -285,4 +368,85 @@ __all__ = [
     "ResearchPlatformBootstrap",
     "LegacyResearchPlatform",
     "ResearchAPI",
+    # ===== Commit 11: Research Platform Foundation =====
+    # Core Engine
+    "ResearchEngine",
+    "EngineState",
+    "ResearchManager",
+    "ResearchManagerState",
+    "ResearchRuntime",
+    "RuntimePhase",
+    "RuntimeExecutionState",
+    "ResearchContext",
+    "ResearchConfig",
+    "ResearchRegistry",
+    "ResearchRepository",
+    "ResearchFactory",
+    "ResearchValidator",
+    "ResearchValidationError",
+    # Experiment V1
+    "ExperimentV1",
+    "ExperimentStatusV1",
+    "ExperimentManagerV1",
+    "ExperimentManagerState",
+    "ExperimentRun",
+    "RunStatus",
+    "ExperimentRegistryV1",
+    "ExperimentVersion",
+    "ExperimentV1Snapshot",
+    "ExperimentMetadataV1",
+    "ExperimentTags",
+    "ExperimentArtifact",
+    "ArtifactType",
+    "ExperimentLineage",
+    "LineageNode",
+    "LineageEdge",
+    # Dataset V1
+    "DatasetManagerV1",
+    "DatasetRegistryV1",
+    "DatasetCatalog",
+    "CatalogEntry",
+    "DatasetLoader",
+    "LoadStrategy",
+    "DatasetSchema",
+    "ColumnSchema",
+    "DatasetValidator",
+    "ValidationRule",
+    "ValidationReport",
+    "DatasetVersionV1",
+    "DatasetSnapshot",
+    "SnapshotType",
+    "DatasetPartition",
+    "PartitionStrategy",
+    "DatasetCache",
+    "CacheBackend",
+    "CacheEntry",
+    "DatasetProfile",
+    "DatasetStatistics",
+    "ColumnStatistics",
+    "DatasetQualityV1",
+    "QualityCheck",
+    "QualityReport",
+    # Runtime V1
+    "RuntimeManager",
+    "RuntimeEnvironment",
+    "V1RuntimeContext",
+    "ExecutionConfig",
+    "RuntimeState",
+    "RuntimeStatus",
+    "RuntimeScheduler",
+    "ScheduleResult",
+    "RuntimeMetrics",
+    "ResourceUsage",
+    "RuntimeHealth",
+    "RuntimeHealthStatus",
+    # API & Observability
+    "ResearchAPIServer",
+    "APIResponse",
+    "ResearchTracer",
+    "TraceSpan",
+    "TraceSpanContext",
+    "ResearchDiagnostics",
+    "DiagnosticReport",
+    "DiagnosticStatus",
 ]
