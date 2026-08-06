@@ -449,6 +449,68 @@ from .portfolio import (
     PortfolioHealthCheck,
 )
 
+# ===== Commit 11 Part 1.5: Unified Research Platform Integration =====
+from .integration import (
+    ResearchIntegrationManager,
+    PlatformState,
+    PlatformRuntime,
+    PlatformRuntimeState,
+    # Adapters
+    WorkflowAdapter,
+    WorkflowAdapterState,
+    SchedulerAdapter,
+    SchedulerAdapterState,
+    EventBusAdapter,
+    EventBusAdapterState,
+    StrategyRuntimeAdapter,
+    StrategyRuntimeAdapterState,
+    ExecutionAdapter,
+    ExecutionAdapterState,
+    MarketDataAdapter,
+    MarketDataAdapterState,
+    FeatureStoreAdapter,
+    FeatureStoreAdapterState,
+    # Model Registry
+    ModelRegistry,
+    ModelRegistryState,
+    ModelVersion,
+    ModelVersionState,
+    ModelArtifact,
+    ModelArtifactState,
+    ModelDeployment,
+    ModelDeploymentState,
+    # APIs
+    ExperimentAPI,
+    DatasetAPI,
+    FactorAPI,
+    BacktestAPI,
+    PortfolioAPI,
+    # AI Runtime
+    AIRuntimeAdapter,
+    AIRuntimeAdapterState,
+    LLMAdapter,
+    LLMAdapterState,
+    AgentAdapter,
+    AgentAdapterState,
+    NotebookRuntime,
+    NotebookRuntimeState,
+    # Report & Dashboard
+    ReportCenter,
+    ReportCenterState,
+    DashboardAPI,
+    # SDK / CLI
+    ResearchSDK,
+    ResearchCLI,
+    # Observability
+    IntegrationMetrics,
+    IntegrationTracer,
+    IntegrationSpan,
+    IntegrationSpanContext,
+    IntegrationDiagnostics,
+    IntegrationDiagnosticReport,
+    IntegrationHealthCheck,
+)
+
 __all__ = [
     "Experiment",
     "ExperimentMetadata",
@@ -891,4 +953,64 @@ __all__ = [
     "PortfolioDiagnosticReport",
     "PortfolioDiagnosticStatus",
     "PortfolioHealthCheck",
+    # ===== Commit 11 Part 1.5: Unified Research Platform Integration =====
+    # Core
+    "ResearchIntegrationManager",
+    "PlatformState",
+    "PlatformRuntime",
+    "PlatformRuntimeState",
+    # Adapters
+    "WorkflowAdapter",
+    "WorkflowAdapterState",
+    "SchedulerAdapter",
+    "SchedulerAdapterState",
+    "EventBusAdapter",
+    "EventBusAdapterState",
+    "StrategyRuntimeAdapter",
+    "StrategyRuntimeAdapterState",
+    "ExecutionAdapter",
+    "ExecutionAdapterState",
+    "MarketDataAdapter",
+    "MarketDataAdapterState",
+    "FeatureStoreAdapter",
+    "FeatureStoreAdapterState",
+    # Model Registry
+    "ModelRegistry",
+    "ModelRegistryState",
+    "ModelVersion",
+    "ModelVersionState",
+    "ModelArtifact",
+    "ModelArtifactState",
+    "ModelDeployment",
+    "ModelDeploymentState",
+    # APIs
+    "ExperimentAPI",
+    "DatasetAPI",
+    "FactorAPI",
+    "BacktestAPI",
+    "PortfolioAPI",
+    # AI Runtime
+    "AIRuntimeAdapter",
+    "AIRuntimeAdapterState",
+    "LLMAdapter",
+    "LLMAdapterState",
+    "AgentAdapter",
+    "AgentAdapterState",
+    "NotebookRuntime",
+    "NotebookRuntimeState",
+    # Report & Dashboard
+    "ReportCenter",
+    "ReportCenterState",
+    "DashboardAPI",
+    # SDK / CLI
+    "ResearchSDK",
+    "ResearchCLI",
+    # Observability
+    "IntegrationMetrics",
+    "IntegrationTracer",
+    "IntegrationSpan",
+    "IntegrationSpanContext",
+    "IntegrationDiagnostics",
+    "IntegrationDiagnosticReport",
+    "IntegrationHealthCheck",
 ]
