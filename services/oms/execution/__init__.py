@@ -25,6 +25,15 @@ def __getattr__(name: str):
         "ExecutionRecovery": ".execution_recovery",
         "RecoveryTrigger": ".execution_recovery",
         "RecoveryResult": ".execution_recovery",
+        # Confirmation
+        "ConfirmationStatus": ".confirmation",
+        "TradeConfirmation": ".confirmation",
+        "TradeConfirmationEngine": ".confirmation",
+        # Tracker
+        "FillEvent": ".tracker",
+        "FillEventType": ".tracker",
+        "ExecutionSnapshot": ".tracker",
+        "ExecutionTracker": ".tracker",
     }
     if name in _imports:
         mod = importlib.import_module(_imports[name], __package__)
@@ -43,4 +52,6 @@ __all__ = [
     "RequestIdReuseConflictError", "ExecutionQuantityExceededError",
     "ExecutionRouter", "ExecutionAckHandler", "ExecutionReportHandler",
     "ExecutionRecovery", "RecoveryTrigger", "RecoveryResult",
+    "ConfirmationStatus", "TradeConfirmation", "TradeConfirmationEngine",
+    "FillEvent", "FillEventType", "ExecutionSnapshot", "ExecutionTracker",
 ]

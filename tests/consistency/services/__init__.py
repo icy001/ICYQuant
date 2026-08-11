@@ -1,0 +1,1 @@
+"""Tests for cross-domain consistency check."""
