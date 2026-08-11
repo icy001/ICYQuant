@@ -1,196 +1,283 @@
-"""ICYQuant Institutional Data Platform.
+"""
+ICYQuant Unified Data Platform — enterprise data infrastructure.
 
-Enterprise-grade data infrastructure providing:
-    - Data Lakehouse (hot/warm/cold tiering, time-travel)
-    - Unified Data Fabric (single source of truth)
-    - Metadata Catalog (searchable data asset registry)
-    - Schema Registry (versioned schema management)
-    - Data Lineage (end-to-end provenance tracking)
-    - Quality Engine (automated data validation)
-    - Governance Engine (ownership, classification, compliance)
-    - Access Controller (RBAC permissions)
-    - Version Manager (snapshots and point-in-time recovery)
-    - Time Travel (historical data queries)
-    - Partition Manager (partitioned storage)
-    - Lifecycle Manager (tier transitions, cost optimization)
+Provides a single unified data entry point for the entire ICYQuant platform,
+integrating market connectivity, normalization, data lake, streaming,
+governance, catalog, and unified APIs.
 
-Usage::
+Architecture:
+    Exchange → Connectivity → Normalization → [Data Lake / Streaming]
+    → Unified Data Platform → Research / Strategy / Risk / OMS / EMS / AI Agent
 
-    from services.data_platform import DataPlatformService, DataPlatformConfig
-
-    svc = DataPlatformService(DataPlatformConfig())
-    svc.initialize()
-    svc.ingest("market_tick", data, producer="market_data")
-    result = svc.query("market_tick", consumer="research")
+Modules:
+    - data_platform:         Unified platform entry point
+    - data_runtime:          Runtime execution environment
+    - data_manager:          Service lifecycle management
+    - data_gateway:          Unified data access gateway
+    - data_controller:       Operational control plane
+    - data_orchestrator:     Cross-subsystem request orchestration
+    - data_pipeline:         Unified data processing pipeline
+    - connectivity_adapter:  Market connectivity subsystem adapter
+    - normalization_adapter: Data normalization subsystem adapter
+    - data_lake_adapter:     Historical data lake adapter
+    - streaming_adapter:     Real-time streaming adapter
+    - market_data_service:   Market data service
+    - historical_data_service: Historical data service
+    - replay_service:        Historical replay service
+    - data_catalog:          Data catalog & discovery
+    - metadata_service:      Metadata management
+    - schema_service:        Schema management & versioning
+    - data_governance:       Governance center
+    - lineage_service:       Data lineage tracking
+    - quality_service:       Data quality management
+    - retention_service:     Data retention & lifecycle
+    - data_access_control:   Enterprise access control (RBAC/ABAC)
+    - permission_manager:    Role & permission management
+    - audit_service:         Comprehensive audit logging
+    - api_gateway:           Unified API gateway
+    - sdk:                   Python Data SDK
+    - api/:                  REST, gRPC, WebSocket, GraphQL endpoints
+    - observability:         Platform observability
+    - control_plane:         Administrative control plane
+    - metrics:               Prometheus metrics
+    - telemetry:             Distributed tracing
+    - diagnostics:           Platform diagnostics
+    - health:                Health check & circuit breaker
 """
 
-from services.data_platform.config import (
-    DataPlatformConfig,
-    LakehouseConfig,
-    CatalogConfig,
-    SchemaRegistryConfig,
-    LineageConfig,
-    QualityConfig,
-    GovernanceConfig,
-    AccessControlConfig,
-    VersionConfig,
-    TimeTravelConfig,
-    PartitionConfig,
-    LifecycleConfig,
-    StorageTier,
+from __future__ import annotations
+
+# ── Core Platform ──
+from services.data_platform.data_platform import (
+    DataPlatform,
+    PlatformConfig,
+    PlatformInfo,
+    PlatformStatus,
+)
+from services.data_platform.data_runtime import (
+    DataRuntime,
+    RuntimeConfig,
+    RuntimeState,
+)
+from services.data_platform.data_manager import (
+    DataManager,
+    DataManagerConfig,
+)
+from services.data_platform.data_gateway import (
+    DataGateway,
+    GatewayConfig,
+)
+from services.data_platform.data_controller import (
+    DataController,
+    ControllerConfig,
+)
+from services.data_platform.data_orchestrator import (
+    DataOrchestrator,
+    OrchestratorContext,
+    OrchestrationPhase,
+)
+from services.data_platform.data_pipeline import (
+    DataPipeline,
+    PipelineStage,
+)
+
+# ── Adapters ──
+from services.data_platform.connectivity_adapter import ConnectivityAdapter
+from services.data_platform.normalization_adapter import NormalizationAdapter
+from services.data_platform.data_lake_adapter import DataLakeAdapter
+from services.data_platform.streaming_adapter import StreamingAdapter
+
+# ── Services ──
+from services.data_platform.market_data_service import MarketDataService
+from services.data_platform.historical_data_service import HistoricalDataService
+from services.data_platform.replay_service import ReplayService
+
+# ── Catalog & Metadata ──
+from services.data_platform.data_catalog import DataCatalog
+from services.data_platform.metadata_service import MetadataService
+from services.data_platform.schema_service import SchemaService
+
+# ── Governance ──
+from services.data_platform.data_governance import (
+    DataGovernance,
+    GovernanceStatus,
     DataClassification,
-    QualityRuleType,
-    AccessLevel,
-    SchemaCompatibility,
-    PartitionType,
-    LifecycleAction,
-    SnapshotFrequency,
-    CatalogEntryType,
+    GovernancePolicy,
+    GovernanceCheck,
 )
-from services.data_platform.lakehouse import (
-    DataLakehouse,
-    DatasetSchema,
-    DatasetType,
-    WriteMode,
-    DataFile,
-    TableSnapshot,
+from services.data_platform.lineage_service import (
+    LineageService,
+    LineageEvent,
+    LineageEventType,
 )
-from services.data_platform.data_fabric import (
-    DataFabric,
-    FabricQuery,
-    FabricWriteRequest,
-    FabricResult,
-    FabricAccessPattern,
-    DataView,
-)
-from services.data_platform.metadata_catalog import (
-    MetadataCatalog,
-    CatalogEntry,
-    ColumnMetadata,
-    DatasetStatistics,
-    SearchResult,
-)
-from services.data_platform.schema_registry import (
-    SchemaRegistry,
-    SchemaDefinition,
-    FieldDefinition,
-    FieldType,
-    CompatibilityReport,
-    ValidationResult,
-)
-from services.data_platform.lineage import (
-    LineageTracker,
-    LineageNode,
-    LineageEdge,
-    LineageChain,
-    OperationType,
-    ImpactAnalysis,
-)
-from services.data_platform.quality_engine import (
-    QualityEngine,
+from services.data_platform.quality_service import (
+    QualityService,
     QualityRule,
-    QualityReport,
-    NotNullRule,
-    UniqueRule,
-    RangeRule,
-    EnumRule,
-    RegexRule,
-    CustomRule,
-    TimelinessRule,
+    QualityRuleType,
+    QualityCheckResult,
 )
-from services.data_platform.governance import (
-    GovernanceEngine,
-    DataOwner,
+from services.data_platform.retention_service import (
+    RetentionService,
     RetentionPolicy,
-    ComplianceReport,
-    AuditEntry,
+    StorageTier,
+    RetentionAction,
 )
-from services.data_platform.access_controller import (
-    AccessController,
-    AccessDecision,
-    UserAccess,
+
+# ── Access Control ──
+from services.data_platform.data_access_control import (
+    DataAccessControl,
+    AccessPolicy,
+    AccessLevel,
+    ResourceType,
+)
+from services.data_platform.permission_manager import (
+    PermissionManager,
+    Permission,
     Role,
-    AccessRequest,
+    User,
 )
-from services.data_platform.version_manager import (
-    VersionManager,
-    VersionInfo,
-    SnapshotDiff,
+from services.data_platform.audit_service import (
+    AuditService,
+    AuditEvent,
+    AuditAction,
+    AuditSeverity,
 )
-from services.data_platform.time_travel import (
-    TimeTravel,
-    TimeTravelResult,
-    TimeBranch,
-    TimeTag,
+
+# ── API ──
+from services.data_platform.api_gateway import (
+    APIGateway,
+    GatewayProtocol,
+    GatewayRequest,
+    GatewayResponse,
 )
-from services.data_platform.partition_manager import (
-    PartitionManager,
-    PartitionInfo,
-    PartitionSpec,
-    CompactionResult,
+from services.data_platform.sdk import (
+    DataSDK,
+    SDKConfig,
+    QueryResult,
 )
-from services.data_platform.lifecycle import (
-    LifecycleManager,
-    LifecyclePolicy,
-    LifecycleReport,
-    TierTransition,
-    CostEstimate,
-)
-from services.data_platform.service import DataPlatformService
-from services.data_platform.api.data_platform_api import (
-    DataPlatformAPI,
+from services.data_platform.api.rest import (
+    DataPlatformREST,
+    RESTConfig,
     APIResponse,
-    IngestRequest,
-    QueryRequest,
-    TimeTravelRequest,
-    SnapshotRequest,
-    SchemaRegisterRequest,
+)
+from services.data_platform.api.grpc import (
+    DataPlatformGRPC,
+    GRPCConfig,
+    GRPCResponse,
+    ServiceMethod,
+)
+from services.data_platform.api.websocket import (
+    DataPlatformWebSocket,
+    WSConfig,
+    WSMessage,
+    WSMessageType,
+)
+from services.data_platform.api.graphql import (
+    DataPlatformGraphQL,
+    GraphQLConfig,
+    GraphQLResponse,
+)
+
+# ── Observability ──
+from services.data_platform.observability import (
+    DataPlatformObservability,
+    ObservabilitySnapshot,
+)
+from services.data_platform.control_plane import (
+    DataControlPlane,
+    ControlAction,
+    Subsystem,
+    ControlCommand,
+)
+from services.data_platform.metrics import (
+    DataPlatformMetrics,
+    MetricSnapshot,
+)
+from services.data_platform.telemetry import (
+    DataPlatformTelemetry,
+    Trace,
+    Span,
+    TraceKind,
+    SpanStatus,
+)
+from services.data_platform.diagnostics import (
+    DataPlatformDiagnostics,
+    DiagnosticResult,
+)
+from services.data_platform.health import (
+    DataPlatformHealthChecker,
+    ComponentHealth,
+    HealthStatus,
 )
 
 __all__ = [
-    # Config
-    "DataPlatformConfig", "LakehouseConfig", "CatalogConfig",
-    "SchemaRegistryConfig", "LineageConfig", "QualityConfig",
-    "GovernanceConfig", "AccessControlConfig", "VersionConfig",
-    "TimeTravelConfig", "PartitionConfig", "LifecycleConfig",
-    # Enums
-    "StorageTier", "DataClassification", "QualityRuleType",
-    "AccessLevel", "SchemaCompatibility", "PartitionType",
-    "LifecycleAction", "SnapshotFrequency", "CatalogEntryType",
-    "DatasetType", "WriteMode", "FabricAccessPattern", "OperationType",
-    "FieldType",
-    # Lakehouse
-    "DataLakehouse", "DatasetSchema", "DataFile", "TableSnapshot",
-    # Data Fabric
-    "DataFabric", "FabricQuery", "FabricWriteRequest", "FabricResult", "DataView",
-    # Metadata Catalog
-    "MetadataCatalog", "CatalogEntry", "ColumnMetadata",
-    "DatasetStatistics", "SearchResult",
-    # Schema Registry
-    "SchemaRegistry", "SchemaDefinition", "FieldDefinition",
-    "CompatibilityReport", "ValidationResult",
-    # Lineage
-    "LineageTracker", "LineageNode", "LineageEdge", "LineageChain", "ImpactAnalysis",
-    # Quality Engine
-    "QualityEngine", "QualityRule", "QualityReport",
-    "NotNullRule", "UniqueRule", "RangeRule", "EnumRule",
-    "RegexRule", "CustomRule", "TimelinessRule",
+    # Core
+    "DataPlatform",
+    "PlatformConfig",
+    "PlatformInfo",
+    "PlatformStatus",
+    "DataRuntime",
+    "RuntimeConfig",
+    "RuntimeState",
+    "DataManager",
+    "DataManagerConfig",
+    "DataGateway",
+    "GatewayConfig",
+    "DataController",
+    "ControllerConfig",
+    "DataOrchestrator",
+    "OrchestratorContext",
+    "OrchestrationPhase",
+    "DataPipeline",
+    "PipelineStage",
+    # Adapters
+    "ConnectivityAdapter",
+    "NormalizationAdapter",
+    "DataLakeAdapter",
+    "StreamingAdapter",
+    # Services
+    "MarketDataService",
+    "HistoricalDataService",
+    "ReplayService",
+    # Catalog
+    "DataCatalog",
+    "MetadataService",
+    "SchemaService",
     # Governance
-    "GovernanceEngine", "DataOwner", "RetentionPolicy",
-    "ComplianceReport", "AuditEntry",
+    "DataGovernance",
+    "GovernanceStatus",
+    "DataClassification",
+    "LineageService",
+    "LineageEventType",
+    "QualityService",
+    "QualityRuleType",
+    "RetentionService",
+    "StorageTier",
     # Access Control
-    "AccessController", "AccessDecision", "UserAccess", "Role", "AccessRequest",
-    # Versioning
-    "VersionManager", "VersionInfo", "SnapshotDiff",
-    # Time Travel
-    "TimeTravel", "TimeTravelResult", "TimeBranch", "TimeTag",
-    # Partition
-    "PartitionManager", "PartitionInfo", "PartitionSpec", "CompactionResult",
-    # Lifecycle
-    "LifecycleManager", "LifecyclePolicy", "LifecycleReport",
-    "TierTransition", "CostEstimate",
-    # Service & API
-    "DataPlatformService", "DataPlatformAPI", "APIResponse",
-    "IngestRequest", "QueryRequest", "TimeTravelRequest",
-    "SnapshotRequest", "SchemaRegisterRequest",
+    "DataAccessControl",
+    "AccessLevel",
+    "PermissionManager",
+    "Permission",
+    "AuditService",
+    "AuditAction",
+    "AuditSeverity",
+    # API
+    "APIGateway",
+    "GatewayProtocol",
+    "DataSDK",
+    "DataPlatformREST",
+    "DataPlatformGRPC",
+    "DataPlatformWebSocket",
+    "DataPlatformGraphQL",
+    # Observability
+    "DataPlatformObservability",
+    "DataControlPlane",
+    "ControlAction",
+    "Subsystem",
+    "DataPlatformMetrics",
+    "DataPlatformTelemetry",
+    "TraceKind",
+    "DataPlatformDiagnostics",
+    "DataPlatformHealthChecker",
+    "HealthStatus",
 ]

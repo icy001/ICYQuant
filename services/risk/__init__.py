@@ -147,6 +147,138 @@ from .repository import RiskRepository
 from .manager import RiskManager
 from .result import SimpleRiskResult
 
+# -------------------------------------------------------------------
+# New Foundation Layer Imports
+# -------------------------------------------------------------------
+
+from .risk_context import FoundationRiskContext
+from .risk_repository import FoundationRiskRepository
+from .risk_factory import RiskComponentFactory
+from .risk_event import (
+    RiskLifecycleEventType,
+    RiskPolicyEventType,
+    RiskEvaluationEventType,
+    RiskApprovalEventType,
+    RiskRecoveryEventType,
+    RiskLifecycleEvent,
+    RiskPolicyEvent,
+    RiskEvaluationEvent,
+    RiskApprovalEvent,
+    RiskRecoveryEvent,
+)
+from .risk_engine import (
+    RiskDecision as FoundationRiskDecision,
+    EngineStatus,
+    RiskEvaluationRequest,
+    RiskEvaluationResult,
+    RiskEngine as FoundationRiskEngine,
+)
+from .risk_runtime import (
+    RuntimeStatus,
+    RuntimeConfig,
+    RuntimeState,
+    RiskRuntime,
+)
+from .risk_lifecycle import (
+    LifecycleState,
+    LifecycleAction,
+    LifecycleTransition,
+    ComponentLifecycle,
+    RiskLifecycle,
+)
+from .risk_executor import (
+    ExecutionResult,
+    BatchExecutionResult,
+    RiskExecutor,
+)
+from .risk_policy import (
+    PolicyType,
+    PolicySeverity,
+    RiskPolicy,
+    PolicyEvaluationResult,
+    RiskPolicyEngine,
+)
+from .risk_profile import (
+    RiskLevel as FoundationRiskLevel,
+    ProfileScope,
+    RiskProfile,
+    RiskProfileManager,
+)
+from .risk_snapshot import (
+    RiskSnapshot,
+    RiskSnapshotManager,
+)
+from .risk_recovery import (
+    RecoveryStatus,
+    RecoveryPlan,
+    RecoveryResult,
+    RiskRecovery,
+)
+from .risk_controller import (
+    ControllerDecision,
+    EvaluationContext,
+    RiskController,
+)
+from .risk_configuration import (
+    RiskConfiguration as FoundationRiskConfiguration,
+    RiskConfigManager,
+)
+from .risk_manager import (
+    ManagerEvent,
+    ManagerState,
+    RiskManager as FoundationRiskManager,
+)
+from .risk_registry import (
+    RegistryStatus,
+    PolicyEntry,
+    RegistryQuery,
+    RiskRegistry,
+)
+from .risk_scheduler import (
+    ScheduleType,
+    ScheduleStatus,
+    RiskSchedule,
+    RiskScheduler,
+)
+from .risk_state import (
+    StateStatus,
+    RiskState,
+    StateTransition,
+    RiskStateManager,
+)
+from .risk_metadata import (
+    RiskMetadata,
+    RiskMetadataRegistry,
+)
+from .control_plane import (
+    ControlCommand,
+    ControlResult,
+    RiskControlPlane,
+)
+from .api import (
+    APIResponse,
+    RiskAPI,
+)
+from .metrics import RiskPlatformMetrics
+from .telemetry import (
+    TelemetrySpan,
+    TelemetryTrace,
+    RiskTelemetry,
+)
+from .diagnostics import (
+    DiagnosticStatus,
+    DiagnosticCheck,
+    RiskDiagnosticReport,
+    RiskDiagnostics,
+)
+from .health import (
+    HealthStatus,
+    ProbeType,
+    ComponentHealth,
+    RiskHealthReport,
+    RiskHealthChecker,
+)
+
 __all__ = [
     "RiskDecision",
     "RiskResult",
@@ -296,4 +428,90 @@ __all__ = [
     "Margin",
     "SimpleRiskEngine",
     "RiskManager",
+    # ---- Foundation Layer ----
+    "FoundationRiskContext",
+    "FoundationRiskRepository",
+    "RiskComponentFactory",
+    "RiskLifecycleEventType",
+    "RiskPolicyEventType",
+    "RiskEvaluationEventType",
+    "RiskApprovalEventType",
+    "RiskRecoveryEventType",
+    "RiskLifecycleEvent",
+    "RiskPolicyEvent",
+    "RiskEvaluationEvent",
+    "RiskApprovalEvent",
+    "RiskRecoveryEvent",
+    "FoundationRiskDecision",
+    "EngineStatus",
+    "RiskEvaluationRequest",
+    "RiskEvaluationResult",
+    "FoundationRiskEngine",
+    "RuntimeStatus",
+    "RuntimeConfig",
+    "RuntimeState",
+    "RiskRuntime",
+    "LifecycleState",
+    "LifecycleAction",
+    "LifecycleTransition",
+    "ComponentLifecycle",
+    "RiskLifecycle",
+    "ExecutionResult",
+    "BatchExecutionResult",
+    "RiskExecutor",
+    "PolicyType",
+    "PolicySeverity",
+    "RiskPolicy",
+    "PolicyEvaluationResult",
+    "RiskPolicyEngine",
+    "FoundationRiskLevel",
+    "ProfileScope",
+    "RiskProfile",
+    "RiskProfileManager",
+    "RiskSnapshot",
+    "RiskSnapshotManager",
+    "RecoveryStatus",
+    "RecoveryPlan",
+    "RecoveryResult",
+    "RiskRecovery",
+    "ControllerDecision",
+    "EvaluationContext",
+    "RiskController",
+    "FoundationRiskConfiguration",
+    "RiskConfigManager",
+    "ManagerEvent",
+    "ManagerState",
+    "FoundationRiskManager",
+    "RegistryStatus",
+    "PolicyEntry",
+    "RegistryQuery",
+    "RiskRegistry",
+    "ScheduleType",
+    "ScheduleStatus",
+    "RiskSchedule",
+    "RiskScheduler",
+    "StateStatus",
+    "RiskState",
+    "StateTransition",
+    "RiskStateManager",
+    "RiskMetadata",
+    "RiskMetadataRegistry",
+    "ControlCommand",
+    "ControlResult",
+    "RiskControlPlane",
+    "APIResponse",
+    "RiskAPI",
+    "RiskPlatformMetrics",
+    "TelemetrySpan",
+    "TelemetryTrace",
+    "RiskTelemetry",
+    "DiagnosticStatus",
+    "DiagnosticCheck",
+    "RiskDiagnosticReport",
+    "RiskDiagnostics",
+    "HealthStatus",
+    "ProbeType",
+    "ComponentHealth",
+    "RiskHealthReport",
+    "RiskHealthChecker",
 ]
