@@ -7,7 +7,7 @@ all financial transactions and state changes.
 
 from .event import LedgerEvent
 from .event_type import LedgerEventType
-from .exceptions import EventValidationError
+from .exceptions import DuplicateEventError, EventValidationError
 from .models import LedgerEntry, LedgerType
 from .models import LedgerDirection as ModelsLedgerDirection
 from .account import LedgerAccount, LedgerDirection
