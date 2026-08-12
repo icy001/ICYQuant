@@ -12,7 +12,10 @@ remains auditable (spec section 37).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
+
+if TYPE_CHECKING:
+    from ..kill_switch.kill_switch import KillSwitchEntry
 
 
 @dataclass
