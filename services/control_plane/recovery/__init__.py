@@ -7,6 +7,17 @@ produces requests for domain services and persists durable checkpoints so a
 crashed orchestrator can resume instead of restarting.
 """
 
+from .audit import (
+    RecoveryAuditEventType,
+    RecoveryAuditRecord,
+)
+from .controller import (
+    RecoveryController,
+    RecoveryTransitionError,
+)
+from .decision import RecoveryDecision
+from .gate import RecoveryChecks, RecoveryGate
+from .policy import RecoveryPolicy
 from .recovery_checkpoint import RecoveryCheckpoint, compute_checksum
 from .recovery_context import RecoveryContext, RecoveryScope
 from .recovery_orchestrator import (
@@ -45,6 +56,16 @@ from .recovery_strategy import (
 )
 
 __all__ = [
+    # Part 1.5: recovery gate / controller
+    "RecoveryController",
+    "RecoveryTransitionError",
+    "RecoveryDecision",
+    "RecoveryPolicy",
+    "RecoveryChecks",
+    "RecoveryGate",
+    "RecoveryAuditEventType",
+    "RecoveryAuditRecord",
+    # Commit 24: recovery orchestration
     "RecoveryState",
     "RecoveryStateMachine",
     "FailureClass",
