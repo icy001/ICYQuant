@@ -4,6 +4,11 @@ from .component_state_changed import ComponentStateChanged
 from .component_unresponsive import ComponentUnresponsive
 from .health_status_changed import HealthStatusChanged
 from .heartbeat_missed import HeartbeatMissed
+from .incident_acknowledged import IncidentAcknowledged
+from .incident_created import IncidentCreated
+from .incident_escalated import IncidentEscalated
+from .incident_resolved import IncidentResolved
+from .incident_updated import IncidentUpdated
 from .kill_switch_activated import KillSwitchActivated
 from .kill_switch_released import KillSwitchReleased
 from .policy_action_requested import PolicyActionRequested
@@ -25,6 +30,11 @@ __all__ = [
     "ComponentUnresponsive",
     "HealthStatusChanged",
     "HeartbeatMissed",
+    "IncidentAcknowledged",
+    "IncidentCreated",
+    "IncidentEscalated",
+    "IncidentResolved",
+    "IncidentUpdated",
     "KillSwitchActivated",
     "KillSwitchReleased",
     "SystemStateChanged",
