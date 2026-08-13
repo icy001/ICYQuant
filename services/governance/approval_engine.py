@@ -30,6 +30,7 @@ from .approval import (
 )
 from .approval_rule import ApprovalRule, is_eligible as _is_eligible
 from .audit import ApprovalAuditEvent, ApprovalAuditEventType, ApprovalAuditStore
+from .authority import AuthoritySnapshot
 from .decision import DecisionEffect, GovernanceDecision
 
 
@@ -224,6 +225,7 @@ class GovernanceApprovalEngine:
         self,
         rules: tuple[ApprovalRule, ...] = (),
         auditor: Optional[ApprovalAuditStore] = None,
+        authority_resolver=None,
     ):
         self._rules: List[ApprovalRule] = list(rules)
         self._auditor = auditor if auditor is not None else ApprovalAuditStore()
@@ -231,10 +233,73 @@ class GovernanceApprovalEngine:
         # the engine tracks the latest lifecycle state by approval_id.
         # This is what makes replay protection possible.
         self._states: Dict[str, ApprovalState] = {}
+        # Part 1.4: optional current-authority resolver (ROLE + DELEGATION)
+        # and audit-only authority snapshots recorded at approval time.
+        self._authority_resolver = authority_resolver
+        self._snapshots: Dict[str, AuthoritySnapshot] = {}
 
     @property
     def auditor(self) -> ApprovalAuditStore:
         return self._auditor
+
+    @property
+    def snapshots(self) -> Dict[str, AuthoritySnapshot]:
+        """Audit-only authority snapshots recorded at approval time.
+
+        A snapshot explains *why* an approver had authority when they
+        approved. It never grants current authority (Snapshot != Current
+        Authority); execution always re-evaluates.
+        """
+        return dict(self._snapshots)
+
+    def record_snapshot(
+        self,
+        approval_id: str,
+        approver_id: str,
+        roles,
+        resource: str,
+        action: str,
+        policy_id: str | None = None,
+        source: str = "ROLE",
+        source_id: str | None = None,
+        captured_at: Optional[datetime] = None,
+    ) -> AuthoritySnapshot:
+        """Record why this approver had authority at approval time."""
+        snapshot = AuthoritySnapshot(
+            approval_id=approval_id,
+            approver_id=approver_id,
+            roles=tuple(roles or ()),
+            resource=resource,
+            action=action,
+            policy_id=policy_id,
+            source=source,
+            source_id=source_id,
+            captured_at=captured_at or datetime.now(timezone.utc),
+        )
+        self._snapshots[approval_id] = snapshot
+        return snapshot
+
+    def _delegation_authority(self, approver_id: str, approval: Approval, now=None):
+        """Part 1.4: a DELEGATION-sourced Authority covering the approval's
+        resource+action, or None when no resolver / no valid delegation.
+
+        Delegation answers "who can stand in for an offline principal":
+        a currently-valid scoped delegation makes the delegate eligible
+        even when they do not hold the rule's role themselves.
+        """
+        if self._authority_resolver is None:
+            return None
+        now = now or datetime.now(timezone.utc)
+        for authority in self._authority_resolver.resolve(
+            approver_id,
+            approval.resource,
+            approval.action,
+            roles=(),
+            now=now,
+        ):
+            if authority.source == "DELEGATION":
+                return authority
+        return None
 
     def current_state(self, approval_id: str) -> Optional[ApprovalState]:
         """Latest tracked lifecycle state of an approval, if known."""
@@ -290,12 +355,16 @@ class GovernanceApprovalEngine:
         approver_id: str,
         approver_roles,
         approval: Approval,
+        now=None,
     ) -> bool:
-        """Four-eyes eligibility: different principal + required role."""
+        """Four-eyes eligibility: different principal + required role, or
+        a currently-valid delegated authority (Part 1.4)."""
         rule = self.find_rule(approval.resource, approval.action)
         if rule is None:
             return False
-        return _is_eligible(approver_id, approver_roles, approval, rule)
+        if _is_eligible(approver_id, approver_roles, approval, rule):
+            return True
+        return self._delegation_authority(approver_id, approval, now) is not None
 
     def approve(
         self,
@@ -308,11 +377,18 @@ class GovernanceApprovalEngine:
 
         Self-approval and missing roles raise PermissionError; an
         expired or non-pending approval raises ValueError.
+
+        Part 1.4: eligibility is Role Authority OR a currently-valid
+        Delegated Authority, and the approval records an audit-only
+        Authority Snapshot (approver + roles + authority + policy).
         """
         rule = self.find_rule(approval.resource, approval.action)
         if rule is None:
             raise ValueError("approval rule not found")
-        if not _is_eligible(approver_id, approver_roles, approval, rule):
+
+        role_ok = _is_eligible(approver_id, approver_roles, approval, rule)
+        delegated = self._delegation_authority(approver_id, approval, now)
+        if not (role_ok or delegated):
             if approval.requested_by == approver_id:
                 raise PermissionError("requester cannot approve own request")
             raise PermissionError("approver lacks required role")
@@ -331,6 +407,23 @@ class GovernanceApprovalEngine:
                 incident_id=approval.incident_id,
             )
         )
+        self.record_snapshot(
+            approval_id=approval.approval_id,
+            approver_id=approver_id,
+            roles=tuple(approver_roles or ()),
+            resource=approval.resource,
+            action=approval.action,
+            policy_id=approval.policy_id,
+            source=(
+                "DELEGATION" if (delegated and not role_ok) else "ROLE"
+            ),
+            source_id=(
+                delegated.source_id
+                if (delegated and not role_ok)
+                else None
+            ),
+            captured_at=now,
+        )
         self._track(result)
         return result
 
@@ -341,14 +434,21 @@ class GovernanceApprovalEngine:
         reason: str,
         approver_roles=(),
     ) -> Approval:
-        """Reject a pending approval with a mandatory reason."""
+        """Reject a pending approval with a mandatory reason.
+
+        Part 1.4: eligibility is Role Authority OR Delegated Authority.
+        """
         rule = self.find_rule(approval.resource, approval.action)
         if rule is None:
             raise ValueError("approval rule not found")
         if not _is_eligible(approver_id, approver_roles, approval, rule):
-            if approval.requested_by == approver_id:
-                raise PermissionError("requester cannot reject own request")
-            raise PermissionError("approver lacks required role")
+            if (
+                self._delegation_authority(approver_id, approval)
+                is None
+            ):
+                if approval.requested_by == approver_id:
+                    raise PermissionError("requester cannot reject own request")
+                raise PermissionError("approver lacks required role")
 
         result = _reject(approval, approver_id, reason)
         self._auditor.record(
