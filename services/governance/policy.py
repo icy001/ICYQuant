@@ -147,3 +147,5 @@ class Policy:
     required_roles: tuple[str, ...] = ()
     requires_approval: bool = False
     enabled: bool = True
+    # Commit 28 Part 1.5 — policy version snapshot
+    version: str | None = None

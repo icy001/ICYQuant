@@ -95,6 +95,37 @@ from .delegation import (
 )
 from .quorum import QuorumEvaluator, QuorumRule
 
+# Commit 28 Part 1.5 — Decision Ledger, Evidence & Replay
+from .audit import (
+    GovernanceAuditEventType,
+    GovernanceAuditStore,
+    decision_to_audit_event,
+)
+from .decision import ReasonCode
+from .decision_ledger import (
+    DecisionEntry,
+    DecisionLedger,
+    DecisionLedgerEngine,
+    GovernanceRequest,
+    RequestReuseConflictError,
+    calculate_hash,
+    request_fingerprint,
+)
+from .decision_replay import (
+    DecisionChainValidator,
+    DecisionReplayer,
+    ReplayResult,
+)
+from .evidence import (
+    EvidenceEnvelope,
+    GovernanceEvidence,
+    build_evidence,
+    canonicalize_context,
+    context_hash,
+    evidence_hash,
+    verify_envelope,
+)
+
 
 __all__ = [
     # Core
@@ -409,4 +440,26 @@ __all__ = [
     "RolePermissionView",
     "ScopedDelegationValidator",
     "can_delegate",
+    # Commit 28 Part 1.5 — Decision Ledger, Evidence & Replay
+    "DecisionChainValidator",
+    "DecisionEntry",
+    "DecisionLedger",
+    "DecisionLedgerEngine",
+    "DecisionReplayer",
+    "EvidenceEnvelope",
+    "GovernanceAuditEventType",
+    "GovernanceAuditStore",
+    "GovernanceEvidence",
+    "GovernanceRequest",
+    "ReasonCode",
+    "ReplayResult",
+    "RequestReuseConflictError",
+    "build_evidence",
+    "calculate_hash",
+    "canonicalize_context",
+    "context_hash",
+    "decision_to_audit_event",
+    "evidence_hash",
+    "request_fingerprint",
+    "verify_envelope",
 ]
