@@ -18,6 +18,7 @@ GovernanceEngine 是确定性策略评估引擎（Part 1.2）：
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 from .condition import ConditionEvaluator
@@ -32,6 +33,57 @@ class DecisionEffect(str, Enum):
     ALLOW = "ALLOW"
     DENY = "DENY"
     REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
+
+
+class ReasonCode(str, Enum):
+    """Standardised governance reason codes (Commit 28 Part 1.5).
+
+    Every decision carries a machine readable ``reason_code`` so that
+    logs and ledgers never degrade to "something went wrong". A code is
+    always one of:
+
+        outcome codes    -> GOV_ALLOWED / GOV_DENIED / GOV_APPROVAL_REQUIRED
+        authority codes  -> AUTHORITY_MISSING / EXPIRED / SCOPE_MISMATCH
+        policy codes     -> POLICY_DENIED / POLICY_CONDITION_FAILED
+        approval codes   -> APPROVAL_MISSING / EXPIRED / REJECTED / CONSUMED
+        quorum codes     -> QUORUM_NOT_MET / SELF_APPROVAL_FORBIDDEN
+        delegation codes -> DELEGATION_EXPIRED / DELEGATION_SCOPE_MISMATCH
+        replay codes     -> REQUEST_ID_REUSE_CONFLICT /
+                            POLICY_VERSION_MISMATCH / AUTHORITY_STATE_CHANGED
+    """
+
+    # Outcome
+    GOV_ALLOWED = "GOV_ALLOWED"
+    GOV_DENIED = "GOV_DENIED"
+    GOV_APPROVAL_REQUIRED = "GOV_APPROVAL_REQUIRED"
+
+    # Authority
+    AUTHORITY_MISSING = "AUTHORITY_MISSING"
+    AUTHORITY_EXPIRED = "AUTHORITY_EXPIRED"
+    AUTHORITY_SCOPE_MISMATCH = "AUTHORITY_SCOPE_MISMATCH"
+
+    # Policy
+    POLICY_DENIED = "POLICY_DENIED"
+    POLICY_CONDITION_FAILED = "POLICY_CONDITION_FAILED"
+
+    # Approval
+    APPROVAL_MISSING = "APPROVAL_MISSING"
+    APPROVAL_EXPIRED = "APPROVAL_EXPIRED"
+    APPROVAL_REJECTED = "APPROVAL_REJECTED"
+    APPROVAL_CONSUMED = "APPROVAL_CONSUMED"
+
+    # Quorum
+    QUORUM_NOT_MET = "QUORUM_NOT_MET"
+    SELF_APPROVAL_FORBIDDEN = "SELF_APPROVAL_FORBIDDEN"
+
+    # Delegation
+    DELEGATION_EXPIRED = "DELEGATION_EXPIRED"
+    DELEGATION_SCOPE_MISMATCH = "DELEGATION_SCOPE_MISMATCH"
+
+    # Request / Replay
+    REQUEST_ID_REUSE_CONFLICT = "REQUEST_ID_REUSE_CONFLICT"
+    POLICY_VERSION_MISMATCH = "POLICY_VERSION_MISMATCH"
+    AUTHORITY_STATE_CHANGED = "AUTHORITY_STATE_CHANGED"
 
 
 @dataclass(frozen=True)
@@ -60,12 +112,33 @@ class GovernanceContext:
 
 @dataclass(frozen=True)
 class GovernanceDecision:
-    """The outcome of a governance evaluation."""
+    """The outcome of a governance evaluation.
+
+    Commit 28 Part 1.5 extends the decision with ledger / evidence
+    fields so every decision can be permanently explained, replayed,
+    audited and proven: who decided, which policy, whose authority,
+    which approval, when, and in what context.
+
+    ``decision_id`` is the identity (UUID-like), ``sequence`` is the
+    ledger ordering — the two have distinct responsibilities.
+    """
 
     effect: DecisionEffect
     reason: str
     policy_id: str | None = None
     approval_required: bool = False
+    # Commit 28 Part 1.5 — Decision Ledger / Evidence / Replay
+    decision_id: str | None = None
+    request_id: str | None = None
+    principal_id: str | None = None
+    resource: str | None = None
+    action: str | None = None
+    authority_source: str | None = None
+    approval_id: str | None = None
+    reason_code: str | None = None
+    decided_at: datetime | None = None
+    sequence: int | None = None
+    context_hash: str | None = None
 
 
 class GovernanceEngine:
