@@ -6,6 +6,7 @@ Policy Store / Configuration Service。
 
 from __future__ import annotations
 
+from .condition import ConditionOperator, PolicyCondition
 from .models import Principal
 from .permission import Permission, build_standard_permissions
 from .policy import Policy
@@ -13,11 +14,16 @@ from .role import Role, STANDARD_ROLE_PERMISSIONS, build_standard_roles
 
 
 def build_standard_policies() -> tuple[Policy, ...]:
-    """Build the first batch of standard production governance policies.
+    """Build the standard production governance policy set (Commit 28 Part 1.2).
 
-    Priority: smaller number means higher priority (Commit 28 Part 1.1, section 24).
+    Priority: smaller number means higher priority (section 24).
         10  -> Emergency Kill Policy
-        50  -> Production Control Policy
+        20  -> Explicit Deny (non-production pause is blocked)
+        50  -> Production Control Policies (pause-critical / resume / failover)
+        100 -> Default Allow (non-critical production pause)
+
+    The policies are context-aware: conditions carry environment /
+    severity / recovery state, required_roles enforce least privilege.
     """
     return (
         Policy(
@@ -25,28 +31,122 @@ def build_standard_policies() -> tuple[Policy, ...]:
             name="Emergency Trading Kill",
             resource="trading",
             action="kill",
+            effect="ALLOW",
             priority=10,
+            conditions=(
+                PolicyCondition(
+                    field="severity",
+                    operator=ConditionOperator.IN,
+                    value=("EMERGENCY",),
+                ),
+            ),
+            required_roles=("CONTROL_OPERATOR",),
+        ),
+        Policy(
+            policy_id="POLICY-TRADING-PAUSE-BLOCKED-001",
+            name="Non-Production Trading Pause Blocked",
+            resource="trading",
+            action="pause",
+            effect="DENY",
+            priority=20,
+            conditions=(
+                PolicyCondition(
+                    field="environment",
+                    operator=ConditionOperator.NOT_EQUALS,
+                    value="production",
+                ),
+            ),
         ),
         Policy(
             policy_id="POLICY-TRADING-PAUSE-001",
-            name="Production Trading Pause",
+            name="Critical Production Trading Pause",
             resource="trading",
             action="pause",
+            effect="REQUIRE_APPROVAL",
             priority=50,
+            conditions=(
+                PolicyCondition(
+                    field="environment",
+                    operator=ConditionOperator.EQUALS,
+                    value="production",
+                ),
+                PolicyCondition(
+                    field="severity",
+                    operator=ConditionOperator.IN,
+                    value=("CRITICAL", "EMERGENCY"),
+                ),
+            ),
+            required_roles=("OPERATOR", "CONTROL_OPERATOR", "INCIDENT_COMMANDER"),
+            requires_approval=True,
+        ),
+        Policy(
+            policy_id="POLICY-TRADING-PAUSE-DEFAULT-001",
+            name="Production Trading Pause Default",
+            resource="trading",
+            action="pause",
+            effect="ALLOW",
+            priority=100,
+            conditions=(
+                PolicyCondition(
+                    field="environment",
+                    operator=ConditionOperator.EQUALS,
+                    value="production",
+                ),
+                PolicyCondition(
+                    field="severity",
+                    operator=ConditionOperator.NOT_IN,
+                    value=("CRITICAL", "EMERGENCY"),
+                ),
+            ),
+            required_roles=("OPERATOR", "CONTROL_OPERATOR", "INCIDENT_COMMANDER"),
         ),
         Policy(
             policy_id="POLICY-TRADING-RESUME-001",
             name="Production Trading Resume",
             resource="trading",
             action="resume",
+            effect="ALLOW",
             priority=50,
+            conditions=(
+                PolicyCondition(
+                    field="environment",
+                    operator=ConditionOperator.EQUALS,
+                    value="production",
+                ),
+                PolicyCondition(
+                    field="recovery_status",
+                    operator=ConditionOperator.EQUALS,
+                    value="READY",
+                ),
+                PolicyCondition(
+                    field="reconciliation_status",
+                    operator=ConditionOperator.EQUALS,
+                    value="PASSED",
+                ),
+                PolicyCondition(
+                    field="approval_id",
+                    operator=ConditionOperator.EXISTS,
+                    value=None,
+                ),
+            ),
+            required_roles=("CONTROL_OPERATOR", "INCIDENT_COMMANDER"),
+            requires_approval=True,
         ),
         Policy(
             policy_id="POLICY-TRADING-FAILOVER-001",
             name="Production Venue Failover",
             resource="trading",
             action="failover",
+            effect="ALLOW",
             priority=50,
+            conditions=(
+                PolicyCondition(
+                    field="environment",
+                    operator=ConditionOperator.EQUALS,
+                    value="production",
+                ),
+            ),
+            required_roles=("CONTROL_OPERATOR",),
         ),
     )
 

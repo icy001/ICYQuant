@@ -55,6 +55,10 @@ from .registry import (
 )
 from .role import Role, build_standard_roles
 
+# Commit 28 Part 1.2 — Deterministic Policy Evaluation Engine
+from .condition import ConditionEvaluator
+from .resolver import PermissionResolver
+
 
 __all__ = [
     # Core
@@ -338,4 +342,7 @@ __all__ = [
     "build_standard_policies",
     "build_standard_roles",
     "register_standard_governance",
+    # Commit 28 Part 1.2 — Deterministic Policy Evaluation Engine
+    "ConditionEvaluator",
+    "PermissionResolver",
 ]

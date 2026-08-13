@@ -67,10 +67,12 @@ def test_build_standard_governance():
 
     assert len(registry.roles) == 7
     assert len(registry.permissions) == 18
-    assert len(registry.policies) == 4
+    assert len(registry.policies) == 6
 
     assert registry.get_policy("POLICY-TRADING-KILL-001") is not None
     assert registry.get_policy("POLICY-TRADING-PAUSE-001") is not None
+    assert registry.get_policy("POLICY-TRADING-PAUSE-BLOCKED-001") is not None
+    assert registry.get_policy("POLICY-TRADING-PAUSE-DEFAULT-001") is not None
     assert registry.get_policy("POLICY-TRADING-RESUME-001") is not None
     assert registry.get_policy("POLICY-TRADING-FAILOVER-001") is not None
 

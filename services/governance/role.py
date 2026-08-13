@@ -30,6 +30,9 @@ class Role:
 
 # Standard role -> permission mapping (Commit 28 Part 1.1, section 21).
 # trading:kill is NOT granted to the ordinary OPERATOR.
+# trading:pause IS granted to OPERATOR (spec section 28 example): an
+# operator may request a pause, but policies decide whether it is
+# ALLOW / DENY / REQUIRE_APPROVAL in the current context (Part 1.2).
 STANDARD_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "OBSERVER": (
         "incident:read",
@@ -47,6 +50,7 @@ STANDARD_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         "incident:update",
         "runbook:execute",
         "recovery:execute",
+        "trading:pause",
     ),
     "INCIDENT_COMMANDER": (
         "incident:read",
