@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
-from .policy import Policy
+from .policy import InstitutionalPolicy as Policy
 from .policy_rule import PolicyRule
 from .policy_evaluator import PolicyEvaluator
 from .decision_context import DecisionContext

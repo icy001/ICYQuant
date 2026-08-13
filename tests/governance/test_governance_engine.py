@@ -13,7 +13,7 @@ from services.governance.governance_engine import (
     GovernanceEngine, GovernanceEvaluation, GovernanceVerdict,
 )
 from services.governance.policy_engine import PolicyEngine
-from services.governance.policy import Policy, PolicyScope
+from services.governance.policy import InstitutionalPolicy as Policy, PolicyScope
 from services.governance.policy_rule import PolicyRule, RuleSeverity
 from services.governance.authority_engine import AuthorityEngine, AuthorityLevel
 from services.governance.approval_engine import ApprovalEngine

@@ -24,9 +24,38 @@ Part 1.5 adds:
   - Structured intervention plans with verification
   - Watchdog for governance system health monitoring
   - Fail-closed principle for critical governance failures
+
+Commit 28 Part 1.1 adds:
+  - Production Governance Layer (Identity / Role / Permission / Policy)
+  - Governance Context, Decision (ALLOW / DENY / REQUIRE_APPROVAL)
+  - Governance Approval and immutable Governance Audit Evidence
+  - In-memory Governance Registry with standard roles, permissions, policies
+  - Default Deny / Fail Closed / Least Privilege / Separation of Duties
 """
 
 __version__ = "0.4.0"
+
+# Commit 28 Part 1.1 — Production Governance Layer
+from .approval import Approval, ApprovalState
+from .audit import GovernanceAuditEvent
+from .decision import (
+    DecisionEffect,
+    GovernanceContext,
+    GovernanceDecision,
+    GovernanceEngine,
+)
+from .models import Principal
+from .permission import Permission, build_standard_permissions
+from .policy import Policy
+from .registry import (
+    GovernanceRegistry,
+    build_standard_governance,
+    build_standard_policies,
+    register_standard_governance,
+)
+from .role import Role, build_standard_roles
+
+
 __all__ = [
     # Core
     "GovernanceEngine",
@@ -293,4 +322,20 @@ __all__ = [
     "GovernanceTelemetry",
     "GovernanceDiagnostics",
     "GovernanceHealth",
+    # Commit 28 Part 1.1 — Production Governance Layer
+    "Approval",
+    "ApprovalState",
+    "DecisionEffect",
+    "GovernanceAuditEvent",
+    "GovernanceContext",
+    "GovernanceDecision",
+    "GovernanceRegistry",
+    "Permission",
+    "Principal",
+    "Role",
+    "build_standard_governance",
+    "build_standard_permissions",
+    "build_standard_policies",
+    "build_standard_roles",
+    "register_standard_governance",
 ]

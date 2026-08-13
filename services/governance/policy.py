@@ -36,7 +36,7 @@ class PolicyScope:
 
 
 @dataclass
-class Policy:
+class InstitutionalPolicy:
     """An institutional policy consisting of multiple rules."""
 
     policy_id: str = field(default_factory=lambda: f"POL-{uuid.uuid4().hex[:8]}")
@@ -91,7 +91,7 @@ class Policy:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Policy":
+    def from_dict(cls, data: Dict[str, Any]) -> "InstitutionalPolicy":
         policy = cls(
             policy_id=data.get("policy_id", ""),
             name=data.get("name", ""),
@@ -105,3 +105,31 @@ class Policy:
         for rd in data.get("rules", []):
             policy.add_rule(PolicyRule.from_dict(rd))
         return policy
+
+
+# ---------------------------------------------------------------------------
+# Commit 28 Part 1.1 — Production Governance Layer
+#
+# 注意：上方 InstitutionalPolicy 是 Commit 20 的规则型机构策略（scope + rules）。
+# 下方的 Policy 是 Commit 28 的权限型生产治理策略（resource + action）。
+# 两者同名不同义：
+#   Permission 回答"你有没有资格申请？"
+#   Policy 回答"现在能不能执行？"
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Policy:
+    """Production governance policy (Commit 28 Part 1.1).
+
+    A permission-style policy binding a resource+action to a priority.
+    Conditions / severity / approval evaluation is added by the next
+    commit part (Policy Evaluation Engine).
+    """
+
+    policy_id: str
+    name: str
+    resource: str
+    action: str
+    enabled: bool = True
+    priority: int = 100

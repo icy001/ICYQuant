@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from .policy_engine import PolicyEngine, PolicyEvaluationResult
-from .policy import Policy
+from .policy import InstitutionalPolicy as Policy
 from .decision_context import DecisionContext
 from .decision_request import DecisionRequest
 

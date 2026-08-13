@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
-from .policy import Policy
+from .policy import InstitutionalPolicy as Policy
 from .policy_rule import PolicyRule, RuleSeverity
 from .policy_condition import PolicyCondition, ConditionLogic
 from .decision_context import DecisionContext

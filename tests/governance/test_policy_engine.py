@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from services.governance.policy_engine import PolicyEngine, PolicySeverity, PolicyEvaluationResult
-from services.governance.policy import Policy, PolicyScope
+from services.governance.policy import InstitutionalPolicy as Policy, PolicyScope
 from services.governance.policy_rule import PolicyRule, RuleSeverity
 from services.governance.policy_condition import PolicyCondition, ConditionLogic, ConditionOperator
 from services.governance.decision_context import DecisionContext
