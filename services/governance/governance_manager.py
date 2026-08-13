@@ -18,7 +18,7 @@ from .approval_engine import ApprovalEngine
 from .decision_guard import DecisionGuard
 from .decision_audit import DecisionAudit
 from .governance_event_store import GovernanceEventStore
-from .policy import Policy
+from .policy import InstitutionalPolicy as Policy
 from .governance_constraint import GovernanceConstraint
 
 
