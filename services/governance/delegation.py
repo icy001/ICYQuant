@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .delegation_status import DelegationStatus
@@ -146,3 +147,148 @@ class Delegation:
             "activated_at": self.activated_at,
             "revoked_at": self.revoked_at,
         }
+
+
+# ----------------------------------------------------------------------
+# Commit 28 Part 1.4 — Approval Delegation & Authority Boundary
+#
+# The classes above (Delegation / DelegationValidator) are the Commit 20
+# legacy delegation model.  Part 1.4 introduces a *scoped, time-bound*
+# delegation model that answers "有资格批准 != 现在有权批准":
+#
+#   AuthorityDelegation          — who delegates what, for how long
+#   ScopedDelegationValidator    — runtime validity (enabled / principal /
+#                                  resource / action / time window)
+#   DelegationAuthorityValidator — authority boundary: delegated authority
+#                                  must be a SUBSET of the delegator's
+#                                  effective authority (no escalation)
+#   can_delegate()               — chain prevention: delegated authority
+#                                  cannot delegate again (A->B ok, A->B->C no)
+#   EmergencyDelegation          — short, fixed-scope, auto-expiring
+#                                  emergency delegation (never permanent)
+# ----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuthorityDelegation:
+    """A scoped, time-bound transfer of approval authority.
+
+    Delegation is NOT a role transfer: it grants the delegate a *limited*
+    slice of the delegator's authority for one resource and a fixed set of
+    actions, inside a hard validity window.
+    """
+
+    delegation_id: str
+    delegator_id: str
+    delegate_id: str
+    resource: str
+    actions: tuple[str, ...]
+    valid_from: datetime
+    valid_until: datetime
+    enabled: bool = True
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "actions", tuple(self.actions))
+
+
+class ScopedDelegationValidator:
+    """Runtime validity check for an :class:`AuthorityDelegation`.
+
+    A delegation is valid only when ALL of the following hold:
+      - the delegation is enabled;
+      - the acting principal is the delegate;
+      - the resource matches exactly;
+      - the action is inside the delegated action set;
+      - ``now`` is inside [valid_from, valid_until).
+    """
+
+    def is_valid(
+        self,
+        delegation: AuthorityDelegation,
+        principal_id: str,
+        resource: str,
+        action: str,
+        now: datetime,
+    ) -> bool:
+        if not delegation.enabled:
+            return False
+        if delegation.delegate_id != principal_id:
+            return False
+        if delegation.resource != resource:
+            return False
+        if action not in delegation.actions:
+            return False
+        if now < delegation.valid_from:
+            return False
+        if now >= delegation.valid_until:
+            return False
+        return True
+
+
+class DelegationAuthorityValidator:
+    """No privilege escalation: delegated authority must fit inside the
+    delegator's effective authority.
+
+        Delegated Authority ⊆ Delegator Authority
+
+    A principal holding only ``trading: pause, resume`` may delegate
+    ``pause`` but never ``kill``.
+    """
+
+    def validate(
+        self,
+        delegator_authority,
+        delegation: AuthorityDelegation,
+    ) -> bool:
+        if delegation.resource != delegator_authority.resource:
+            return False
+        allowed = set(delegator_authority.actions)
+        requested = set(delegation.actions)
+        return requested.issubset(allowed)
+
+
+def can_delegate(authority) -> bool:
+    """Chain prevention: delegated authority cannot delegate again.
+
+    ``A -> B`` is allowed; ``A -> B -> C`` is forbidden, because B's
+    authority has source DELEGATION.
+    """
+    return getattr(authority, "source", "ROLE") != "DELEGATION"
+
+
+@dataclass(frozen=True)
+class EmergencyDelegation:
+    """A short-lived, fixed-scope emergency delegation.
+
+    Emergency delegation must be:
+      - time-bound (valid_from / valid_until);
+      - scope-bound (exactly one resource and one action);
+      - auto-expiring (never a permanent grant);
+      - capped in duration (max_duration_seconds).
+    """
+
+    delegation_id: str
+    delegator_id: str
+    delegate_id: str
+    resource: str
+    action: str
+    valid_from: datetime
+    valid_until: datetime
+    max_duration_seconds: int = 1800
+    enabled: bool = True
+
+    @property
+    def duration_seconds(self) -> float:
+        return (self.valid_until - self.valid_from).total_seconds()
+
+    def is_expired(self, now: datetime) -> bool:
+        return now >= self.valid_until
+
+    def is_valid(self, now: datetime) -> bool:
+        if not self.enabled:
+            return False
+        if now < self.valid_from or now >= self.valid_until:
+            return False
+        if self.duration_seconds > self.max_duration_seconds:
+            return False
+        return True

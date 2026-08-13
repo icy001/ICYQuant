@@ -78,6 +78,23 @@ from .audit import (
     ApprovalAuditStore,
 )
 
+# Commit 28 Part 1.4 — Approval Delegation, Quorum & Authority Boundary
+from .authority import (
+    Authority,
+    AuthorityResolver,
+    AuthoritySnapshot,
+    AuthoritySource,
+    RolePermissionView,
+)
+from .delegation import (
+    AuthorityDelegation,
+    DelegationAuthorityValidator,
+    EmergencyDelegation,
+    ScopedDelegationValidator,
+    can_delegate,
+)
+from .quorum import QuorumEvaluator, QuorumRule
+
 
 __all__ = [
     # Core
@@ -379,4 +396,17 @@ __all__ = [
     "reject",
     "validate_approver",
     "validate_binding",
+    # Commit 28 Part 1.4 — Delegation, Quorum & Authority Boundary
+    "Authority",
+    "AuthorityDelegation",
+    "AuthorityResolver",
+    "AuthoritySnapshot",
+    "AuthoritySource",
+    "DelegationAuthorityValidator",
+    "EmergencyDelegation",
+    "QuorumEvaluator",
+    "QuorumRule",
+    "RolePermissionView",
+    "ScopedDelegationValidator",
+    "can_delegate",
 ]
