@@ -19,8 +19,26 @@ Recovery   = 决定系统什么时候可以重新做
 3. Telemetry 只负责记录，不参与交易决策（Part 1.2 spec section 23）：
    Metrics 描述"系统现在怎么样"，Telemetry 描述"系统刚刚发生了什么"。
    错误：if latency > 500: reject_order()
+
+4. Alert 是"发现异常"，不是"执行交易控制"（Part 1.3 spec section 29）：
+   Kill / Pause / Freeze / Failover / Recovery 仍由 Control Plane 执行。
 """
 
+from .alerting import (
+    Alert,
+    AlertDeduplicator,
+    AlertFingerprint,
+    AlertManager,
+    AlertRule,
+    AlertRuleEvaluator,
+    AlertRouter,
+    AlertSeverity,
+    AlertState,
+    AlertStormProtector,
+    ConditionEvaluator,
+    FlappingDetector,
+    standard_rules,
+)
 from .health import ServiceHealthMonitor
 from .models import (
     OperationalSnapshot,
@@ -60,7 +78,19 @@ from .telemetry import (
 )
 
 __all__ = [
+    "Alert",
+    "AlertDeduplicator",
+    "AlertFingerprint",
+    "AlertManager",
+    "AlertRule",
+    "AlertRuleEvaluator",
+    "AlertRouter",
+    "AlertSeverity",
+    "AlertState",
+    "AlertStormProtector",
+    "ConditionEvaluator",
     "Counter",
+    "FlappingDetector",
     "FORBIDDEN_LABELS",
     "Gauge",
     "Histogram",
@@ -87,6 +117,7 @@ __all__ = [
     "recovery_metrics",
     "register_standard_metrics",
     "standard_metrics",
+    "standard_rules",
     "system_gauges",
     "trading_metrics",
     "validate_dependency",
