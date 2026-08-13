@@ -1,15 +1,18 @@
-"""Decision — governance context, decision model and engine (Commit 28 Part 1.1).
+"""Decision — governance context, decision model and engine (Commit 28 Part 1.2).
 
 一次请求不再只有 True / False，而是：
     ALLOW / DENY / REQUIRE_APPROVAL
 
-GovernanceEngine 是本 Part 的基础骨架：
-    Principal -> Active? -> Role -> Permission -> Policy -> Decision
+GovernanceEngine 是确定性策略评估引擎（Part 1.2）：
+    Principal -> Active? -> Permission -> Policy Match -> Conditions
+    -> Priority Sort -> Conflict Resolution -> Decision
 
-原则（Commit 28 Part 1.1, section 38）：
+原则（Commit 28 Part 1.1/1.2）：
     - Default Deny：无明确授权即拒绝。
     - Fail Closed：引擎异常时拒绝（或进入显式 Emergency Safety Policy）。
     - Permission != Authorization：有权限不等于当前一定允许。
+    - Explicit Deny > REQUIRE_APPROVAL > ALLOW。
+    - Deterministic：同一 Context 必然得到同一 Decision。
 """
 
 from __future__ import annotations
@@ -17,7 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from .condition import ConditionEvaluator
+from .evaluator import PolicyEvaluator
 from .registry import GovernanceRegistry
+from .resolver import PermissionResolver
 
 
 class DecisionEffect(str, Enum):
@@ -33,7 +39,10 @@ class GovernanceContext:
     """Request context evaluated by the governance engine.
 
     Captures WHO (principal + roles), WHAT (resource + action),
-    WHERE (environment), WHY (incident/severity) and approval state.
+    WHERE (environment), WHY (incident/severity), approval state and
+    recovery state. Recovery fields (Commit 28 Part 1.2) let the
+    engine authorise resume only after recovery completed:
+        recovery_status / reconciliation_status / risk_status
     """
 
     principal_id: str
@@ -44,6 +53,9 @@ class GovernanceContext:
     incident_id: str | None = None
     severity: str | None = None
     approval_id: str | None = None
+    recovery_status: str | None = None
+    reconciliation_status: str | None = None
+    risk_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -57,16 +69,35 @@ class GovernanceDecision:
 
 
 class GovernanceEngine:
-    """Production governance decision engine (Part 1.1 skeleton).
+    """Deterministic production governance decision engine (Part 1.2).
 
-    REQUIRES_APPROVAL / condition evaluation is added by the next
-    commit part (Policy Evaluation Engine); this part fixes the
-    Principal / Permission / Policy chain with Default Deny and
-    Fail Closed semantics.
+    Evaluates a GovernanceContext through:
+
+        Principal -> Active? -> Permission -> Policy Match -> Conditions
+        -> Priority Sort -> Conflict Resolution
+
+    Policy ordering is stable: policies are sorted by
+    ``(priority, policy_id)`` so the same context always yields the
+    same decision regardless of registry insertion order.
+
+    Never raises: fails closed on any engine error.
     """
 
-    def __init__(self, registry: GovernanceRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: GovernanceRegistry | None = None,
+        permission_resolver: PermissionResolver | None = None,
+        policy_evaluator: PolicyEvaluator | None = None,
+        condition_evaluator: ConditionEvaluator | None = None,
+    ) -> None:
         self._registry = registry if registry is not None else GovernanceRegistry()
+        self._condition_evaluator = condition_evaluator or ConditionEvaluator()
+        self._permission_resolver = permission_resolver or PermissionResolver(
+            self._registry
+        )
+        self._policy_evaluator = policy_evaluator or PolicyEvaluator(
+            self._condition_evaluator
+        )
 
     @property
     def registry(self) -> GovernanceRegistry:
@@ -101,35 +132,60 @@ class GovernanceEngine:
                 reason="principal inactive",
             )
 
-        if not self._has_permission(context):
+        if not self._permission_resolver.has_permission(
+            context.role_ids,
+            context.resource,
+            context.action,
+        ):
             return GovernanceDecision(
                 effect=DecisionEffect.DENY,
                 reason="permission denied",
             )
 
-        policies = self._registry.policies_for(context.resource, context.action)
-        if not policies:
+        matched = [
+            policy
+            for policy in self._registry.policies.values()
+            if self._policy_evaluator.matches(policy, context)
+        ]
+
+        if not matched:
             return GovernanceDecision(
                 effect=DecisionEffect.DENY,
                 reason="no policy matched",
             )
 
-        best = policies[0]
-        return GovernanceDecision(
-            effect=DecisionEffect.ALLOW,
-            reason="policy matched",
-            policy_id=best.policy_id,
-        )
+        matched.sort(key=lambda policy: (policy.priority, policy.policy_id))
 
-    def _has_permission(self, context: GovernanceContext) -> bool:
-        for role_id in context.role_ids:
-            for permission_id in self._registry.permissions_for_role(role_id):
-                permission = self._registry.get_permission(permission_id)
-                if permission is None:
-                    continue
-                if (
-                    permission.resource == context.resource
-                    and permission.action == context.action
-                ):
-                    return True
-        return False
+        return self._resolve(matched)
+
+    def _resolve(self, policies: list) -> GovernanceDecision:
+        """Conflict resolution: Explicit Deny > REQUIRE_APPROVAL > ALLOW."""
+        for policy in policies:
+            if policy.effect == "DENY":
+                return GovernanceDecision(
+                    effect=DecisionEffect.DENY,
+                    reason=f"denied by {policy.policy_id}",
+                    policy_id=policy.policy_id,
+                )
+
+        for policy in policies:
+            if policy.effect == "REQUIRE_APPROVAL":
+                return GovernanceDecision(
+                    effect=DecisionEffect.REQUIRE_APPROVAL,
+                    reason=f"approval required by {policy.policy_id}",
+                    policy_id=policy.policy_id,
+                    approval_required=True,
+                )
+
+        for policy in policies:
+            if policy.effect == "ALLOW":
+                return GovernanceDecision(
+                    effect=DecisionEffect.ALLOW,
+                    reason=f"allowed by {policy.policy_id}",
+                    policy_id=policy.policy_id,
+                )
+
+        return GovernanceDecision(
+            effect=DecisionEffect.DENY,
+            reason="no effective policy",
+        )

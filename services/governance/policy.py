@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from .condition import PolicyCondition as GovernanceCondition
 from .policy_rule import PolicyRule
 from .policy_condition import PolicyCondition
 
@@ -120,16 +121,29 @@ class InstitutionalPolicy:
 
 @dataclass(frozen=True)
 class Policy:
-    """Production governance policy (Commit 28 Part 1.1).
+    """Production governance policy (Commit 28 Part 1.1/1.2).
 
-    A permission-style policy binding a resource+action to a priority.
-    Conditions / severity / approval evaluation is added by the next
-    commit part (Policy Evaluation Engine).
+    A permission-style policy fully describing WHO / WHAT / WHERE / WHEN /
+    APPROVAL / EFFECT:
+
+        WHO      -> required_roles
+        WHAT     -> resource + action
+        WHERE    -> conditions (e.g. environment == production)
+        WHEN     -> conditions (e.g. severity IN (CRITICAL, EMERGENCY))
+        APPROVAL -> requires_approval
+        EFFECT   -> ALLOW / DENY / REQUIRE_APPROVAL
+
+    effect defaults to ALLOW so that Part 1.1 callers constructing a
+    plain resource+action policy keep working unchanged.
     """
 
     policy_id: str
     name: str
     resource: str
     action: str
-    enabled: bool = True
+    effect: str = "ALLOW"
     priority: int = 100
+    conditions: tuple[GovernanceCondition, ...] = ()
+    required_roles: tuple[str, ...] = ()
+    requires_approval: bool = False
+    enabled: bool = True

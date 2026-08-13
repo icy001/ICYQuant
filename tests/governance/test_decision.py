@@ -153,7 +153,7 @@ def test_allow_when_fully_authorized():
     )
 
     assert decision.effect == DecisionEffect.ALLOW
-    assert decision.reason == "policy matched"
+    assert decision.reason == "allowed by POLICY-PAUSE"
     assert decision.policy_id == "POLICY-PAUSE"
     assert decision.approval_required is False
 
