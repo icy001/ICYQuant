@@ -59,6 +59,25 @@ from .role import Role, build_standard_roles
 from .condition import ConditionEvaluator
 from .resolver import PermissionResolver
 
+# Commit 28 Part 1.3 — Four-Eyes Approval & Separation of Duties
+from .approval import (
+    ApprovalAggregator,
+    ApprovalDecision,
+    approve,
+    consume,
+    expire_approval,
+    reject,
+    validate_approver,
+    validate_binding,
+)
+from .approval_engine import GovernanceApprovalEngine
+from .approval_rule import ApprovalRule, is_eligible
+from .audit import (
+    ApprovalAuditEvent,
+    ApprovalAuditEventType,
+    ApprovalAuditStore,
+)
+
 
 __all__ = [
     # Core
@@ -345,4 +364,19 @@ __all__ = [
     # Commit 28 Part 1.2 — Deterministic Policy Evaluation Engine
     "ConditionEvaluator",
     "PermissionResolver",
+    # Commit 28 Part 1.3 — Four-Eyes Approval & Separation of Duties
+    "ApprovalAggregator",
+    "ApprovalAuditEvent",
+    "ApprovalAuditEventType",
+    "ApprovalAuditStore",
+    "ApprovalDecision",
+    "ApprovalRule",
+    "GovernanceApprovalEngine",
+    "approve",
+    "consume",
+    "expire_approval",
+    "is_eligible",
+    "reject",
+    "validate_approver",
+    "validate_binding",
 ]

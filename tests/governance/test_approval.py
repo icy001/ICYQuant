@@ -1,4 +1,4 @@
-"""Tests for services.governance.approval (Commit 28 Part 1.1)."""
+"""Tests for services.governance.approval (Commit 28 Part 1.1, Part 1.3)."""
 
 from dataclasses import FrozenInstanceError
 
@@ -25,6 +25,7 @@ def test_approval_states():
         "APPROVED",
         "REJECTED",
         "EXPIRED",
+        "CONSUMED",
     ]
 
 

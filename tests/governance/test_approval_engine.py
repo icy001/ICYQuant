@@ -189,3 +189,137 @@ class TestApprovalEngine:
         history = engine.get_history()
         assert len(history) == 1
         assert history[0].level == "INSTITUTIONAL"
+
+
+# ------------------------------------------------------------------
+# Commit 28 Part 1.3 — Governance Approval Engine (Four-Eyes Control)
+# ------------------------------------------------------------------
+
+
+class TestGovernanceApprovalEngine:
+
+    @pytest.fixture
+    def engine(self):
+        from services.governance.approval_engine import GovernanceApprovalEngine
+        from services.governance.approval_rule import ApprovalRule
+
+        return GovernanceApprovalEngine(
+            rules=(
+                ApprovalRule(
+                    rule_id="RULE-RESUME-001",
+                    resource="trading",
+                    action="resume",
+                    min_approvers=1,
+                    required_roles=("INCIDENT_COMMANDER",),
+                    approval_timeout_seconds=900,
+                ),
+            )
+        )
+
+    @pytest.fixture
+    def pending_approval(self):
+        from datetime import datetime, timedelta, timezone
+        from services.governance.approval import Approval
+
+        now = datetime.now(timezone.utc)
+        return Approval(
+            approval_id="APR-001",
+            resource="trading",
+            action="resume",
+            requested_by="ops-001",
+            incident_id="INC-001",
+            requested_at=now,
+            expires_at=now + timedelta(seconds=900),
+        )
+
+    def test_create_request_finds_rule(self, engine, pending_approval):
+        result = engine.create_request(pending_approval)
+        assert result is pending_approval
+        assert engine.current_state("APR-001") == "PENDING"
+
+    def test_create_request_missing_rule_raises(self, engine):
+        from datetime import datetime, timedelta, timezone
+        from services.governance.approval import Approval
+
+        now = datetime.now(timezone.utc)
+        unknown = Approval(
+            approval_id="APR-999",
+            resource="portfolio",
+            action="liquidate",
+            requested_by="ops-001",
+            requested_at=now,
+            expires_at=now + timedelta(seconds=900),
+        )
+        with pytest.raises(ValueError):
+            engine.create_request(unknown)
+
+    def test_register_rule(self, engine, pending_approval):
+        from services.governance.approval_rule import ApprovalRule
+
+        engine.register_rule(
+            ApprovalRule(
+                rule_id="RULE-PORTFOLIO-001",
+                resource="portfolio",
+                action="liquidate",
+            )
+        )
+        assert engine.find_rule("portfolio", "liquidate") is not None
+
+    def test_create_request_records_audit(self, engine, pending_approval):
+        from services.governance.audit import ApprovalAuditEventType
+
+        engine.create_request(pending_approval)
+        events = engine.auditor.for_approval("APR-001")
+        assert len(events) == 1
+        assert events[0].event_type == ApprovalAuditEventType.APPROVAL_CREATED
+
+    def test_engine_approve_and_consume_records_audit(self, engine, pending_approval):
+        from datetime import datetime, timezone
+        from services.governance.approval import ApprovalState
+        from services.governance.audit import ApprovalAuditEventType
+
+        engine.create_request(pending_approval)
+        now = datetime.now(timezone.utc)
+        approved = engine.approve(
+            pending_approval,
+            "commander-001",
+            now,
+            approver_roles=("INCIDENT_COMMANDER",),
+        )
+        assert approved.state == ApprovalState.APPROVED
+
+        consumed = engine.consume(approved)
+        assert consumed.state == ApprovalState.CONSUMED
+
+        event_types = {
+            event.event_type for event in engine.auditor.for_approval("APR-001")
+        }
+        assert ApprovalAuditEventType.APPROVAL_APPROVED in event_types
+        assert ApprovalAuditEventType.APPROVAL_CONSUMED in event_types
+
+    def test_authorize_execution_denied_decision_not_consumed(self, engine, pending_approval):
+        from datetime import datetime, timezone
+        from services.governance.approval import ApprovalState
+        from services.governance.decision import (
+            DecisionEffect,
+            GovernanceDecision,
+        )
+
+        engine.create_request(pending_approval)
+        now = datetime.now(timezone.utc)
+        approved = engine.approve(
+            pending_approval,
+            "commander-001",
+            now,
+            approver_roles=("INCIDENT_COMMANDER",),
+        )
+        denied = GovernanceDecision(
+            effect=DecisionEffect.DENY,
+            reason="denied by POLICY-TRADING-RESUME-BLOCKED-001",
+            policy_id="POLICY-TRADING-RESUME-BLOCKED-001",
+        )
+
+        result = engine.authorize_execution(approved, denied, now)
+
+        assert result.effect == DecisionEffect.DENY
+        assert engine.current_state("APR-001") == ApprovalState.APPROVED
