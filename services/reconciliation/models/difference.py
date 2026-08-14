@@ -1,13 +1,19 @@
 from dataclasses import dataclass
-from typing import Any
+from decimal import Decimal
+from enum import Enum
 
-from .types import DifferenceType
+
+class DifferenceType(str, Enum):
+    QUANTITY_MISMATCH = "QUANTITY_MISMATCH"
+    AVERAGE_PRICE_MISMATCH = "AVERAGE_PRICE_MISMATCH"
+    REALIZED_PNL_MISMATCH = "REALIZED_PNL_MISMATCH"
+    MULTIPLE_MISMATCH = "MULTIPLE_MISMATCH"
+    UNKNOWN_MISMATCH = "UNKNOWN_MISMATCH"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Difference:
-    diff_type: DifferenceType
-    entity_id: str
-    expected: Any
-    actual: Any
-    message: str = ""
+    type: DifferenceType
+    expected: Decimal
+    actual: Decimal
+    delta: Decimal

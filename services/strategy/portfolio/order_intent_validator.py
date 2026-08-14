@@ -10,7 +10,7 @@ Validation stages:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, field as dataclass_field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -34,7 +34,7 @@ class ValidationIssue:
     message: str = ""
     severity: ValidationSeverity = ValidationSeverity.ERROR
     code: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: Dict[str, Any] = dataclass_field(default_factory=dict)
 
 
 @dataclass

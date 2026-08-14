@@ -13,3 +13,6 @@ build/
 *_result.txt
 err.txt
 test_*.txt
+
+# IDE project data
+.codebuddy/
