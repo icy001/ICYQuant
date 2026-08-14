@@ -79,27 +79,27 @@ class TestNewIncident:
 class TestExistingIncident:
     def test_same_fingerprint_returns_existing(self):
         repository = IncidentRepository()
-        repository.create(
-            _parent(
-                fingerprint=IncidentFingerprint(
-                    source=IncidentSource.HEALTH_MONITOR,
-                    incident_type=IncidentType.HEALTH_FAILURE,
-                    scope=IncidentScope.SERVICE,
-                    scope_id="gateway",
-                )
+        parent = _parent(
+            fingerprint=IncidentFingerprint(
+                source=IncidentSource.HEALTH_MONITOR,
+                incident_type=IncidentType.HEALTH_FAILURE,
+                scope=IncidentScope.SERVICE,
+                scope_id="gateway",
             )
         )
+        repository.create(parent)
         engine = CorrelationEngine(repository=repository)
         result = engine.correlate(_detection())
         assert result.decision is CorrelationDecision.EXISTING_INCIDENT
-        assert result.incident_id == "INC-20260812-000001"
+        assert result.incident_id == str(parent.incident_id)
         assert result.parent_incident_id is None
 
 
 class TestChildIncident:
     def test_child_attached_when_parent_active(self):
         repository = IncidentRepository()
-        repository.create(_parent())
+        parent = _parent()
+        repository.create(parent)
         rule = CorrelationRule(
             rule_id="HEALTH-EXEC-001",
             parent_incident_type=IncidentType.HEALTH_FAILURE,
@@ -116,7 +116,7 @@ class TestChildIncident:
         )
         result = engine.correlate(detection)
         assert result.decision is CorrelationDecision.CHILD_INCIDENT
-        assert result.parent_incident_id == "INC-20260812-000001"
+        assert result.parent_incident_id == str(parent.incident_id)
 
     def test_no_child_when_parent_outside_window(self):
         repository = IncidentRepository()

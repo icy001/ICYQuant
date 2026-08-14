@@ -279,6 +279,72 @@ from .health import (
     RiskHealthChecker,
 )
 
+# -------------------------------------------------------------------
+# Risk Decision Pipeline (Commit 40)
+# -------------------------------------------------------------------
+
+from .context import (
+    RiskDecisionContext,
+    RiskDecisionContextFactory,
+)
+from .decision import (
+    RiskDecisionRecord,
+    RiskDecisionStatus,
+)
+from .events import (
+    RISK_DECISION_APPROVED,
+    RISK_DECISION_REJECTED,
+    RiskDecisionApproved,
+    RiskDecisionRejected,
+)
+from .evaluator import RiskPolicyEvaluator
+from .policies import (
+    CashAvailabilityPolicy,
+    DailyLossLimitPolicy,
+    PositionLimitPolicy,
+)
+from .ports import (
+    RiskDecisionEvent,
+    RiskDecisionRepository,
+    RiskEventPublisher,
+)
+from .service import RiskDecisionService
+from .infrastructure import InMemoryRiskDecisionRepository
+from .policy_trace import RiskPolicyTrace
+
+# -------------------------------------------------------------------
+# Risk Decision Replay (Commit 41 Part 1.4)
+# -------------------------------------------------------------------
+
+from .context_snapshot import (
+    DEFAULT_POLICY_VERSION,
+    RiskDecisionContextSnapshot,
+)
+from .decision_comparator import RiskDecisionComparator
+from .infrastructure import InMemoryRiskDecisionReplayRepository
+from .ports import RiskDecisionReplayRepository
+from .replay import (
+    RiskDecisionReplayError,
+    RiskDecisionReplayService,
+    RiskDecisionReplayVersionMismatchError,
+)
+from .replay_record import RiskDecisionReplayRecord
+from .replay_result import (
+    ReplayStatus,
+    RiskDecisionReplayResult,
+)
+
+# -------------------------------------------------------------------
+# Risk Decision Trace & Audit (Commit 41 Part 1.5)
+# -------------------------------------------------------------------
+
+from .application import (
+    RiskDecisionService,
+    RiskDecisionTraceBuilder,
+)
+from .audit import RiskDecisionAudit
+from .domain import RiskDecisionTrace
+
 __all__ = [
     "RiskDecision",
     "RiskResult",
@@ -514,4 +580,42 @@ __all__ = [
     "ComponentHealth",
     "RiskHealthReport",
     "RiskHealthChecker",
+    # ---- Risk Decision Pipeline (Commit 40) ----
+    "CashAvailabilityPolicy",
+    "DailyLossLimitPolicy",
+    "PositionLimitPolicy",
+    "RiskDecisionApproved",
+    "RiskDecisionContext",
+    "RiskDecisionContextFactory",
+    "RiskDecisionRejected",
+    "RiskDecisionStatus",
+    "RiskPolicyEvaluator",
+    # ---- Risk Decision Orchestration (Commit 41 Part 1.1) ----
+    "RISK_DECISION_APPROVED",
+    "RISK_DECISION_REJECTED",
+    "RiskDecisionEvent",
+    "RiskDecisionService",
+    "RiskEventPublisher",
+    # ---- Risk Decision Persistence (Commit 41 Part 1.2) ----
+    "InMemoryRiskDecisionRepository",
+    "RiskDecisionRecord",
+    "RiskDecisionRepository",
+    # ---- Risk Policy Evaluation Trace (Commit 41 Part 1.3) ----
+    "RiskPolicyTrace",
+    # ---- Risk Decision Replay (Commit 41 Part 1.4) ----
+    "DEFAULT_POLICY_VERSION",
+    "InMemoryRiskDecisionReplayRepository",
+    "ReplayStatus",
+    "RiskDecisionComparator",
+    "RiskDecisionContextSnapshot",
+    "RiskDecisionReplayError",
+    "RiskDecisionReplayRecord",
+    "RiskDecisionReplayRepository",
+    "RiskDecisionReplayResult",
+    "RiskDecisionReplayService",
+    "RiskDecisionReplayVersionMismatchError",
+    # ---- Risk Decision Trace & Audit (Commit 41 Part 1.5) ----
+    "RiskDecisionAudit",
+    "RiskDecisionTrace",
+    "RiskDecisionTraceBuilder",
 ]

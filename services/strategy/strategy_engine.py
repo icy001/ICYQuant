@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .strategy_lifecycle import StrategyLifecycle, StateTransition
+from .strategy_lifecycle import StrategyLifecycleManager, StateTransition
 from .strategy_loader import StrategyLoader, PackageSource
 from .strategy_manager import StrategyManager
 from .strategy_package import StrategyPackage
@@ -122,7 +122,7 @@ class StrategyEngine:
         self.repository = StrategyRepository()
         self.runtime = StrategyRuntime()
         self.scheduler = StrategyScheduler()
-        self.lifecycle = StrategyLifecycle()
+        self.lifecycle = StrategyLifecycleManager()
         self.snapshot_manager = SnapshotManager()
         self.recovery = StrategyRecovery()
         self.manager = StrategyManager()

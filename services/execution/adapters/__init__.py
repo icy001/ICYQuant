@@ -1,9 +1,14 @@
-"""Broker adapters for different trading platforms."""
+"""Execution adapters (Commit 38 Part 1.3).
 
-from .base import BaseAdapter
-from .paper import PaperAdapter
-from .ibkr import IBKRAdapter
-from .mt5 import MT5Adapter
-from .ctp import CTPAdapter
+Concrete implementations of the :class:`ExecutionAdapter` port.  Each adapter
+wraps one external venue's protocol so that broker-specific logic never
+pollutes the Execution domain.
+"""
 
-__all__ = ["BaseAdapter", "PaperAdapter", "IBKRAdapter", "MT5Adapter", "CTPAdapter"]
+from services.execution.adapters.simulator import (
+    SimulatorExecutionAdapter,
+)
+
+__all__ = [
+    "SimulatorExecutionAdapter",
+]
