@@ -1,36 +1,36 @@
 import pytest
+from decimal import Decimal
 
 from services.reconciliation.models.difference import Difference
-from services.reconciliation.models.types import DifferenceType
+from services.reconciliation.models.difference import DifferenceType
 
 
 class TestDifference:
     def test_difference_creation(self):
         diff = Difference(
-            diff_type=DifferenceType.POSITION,
-            entity_id="AAPL",
-            expected=100.0,
-            actual=99.0,
-            message="Position mismatch",
+            type=DifferenceType.QUANTITY_MISMATCH,
+            expected=Decimal("100"),
+            actual=Decimal("99"),
+            delta=Decimal("-1"),
         )
-        assert diff.diff_type == DifferenceType.POSITION
-        assert diff.entity_id == "AAPL"
-        assert diff.expected == 100.0
-        assert diff.actual == 99.0
-        assert diff.message == "Position mismatch"
+        assert diff.type == DifferenceType.QUANTITY_MISMATCH
+        assert diff.expected == Decimal("100")
+        assert diff.actual == Decimal("99")
+        assert diff.delta == Decimal("-1")
 
-    def test_difference_default_message(self):
+    def test_difference_is_frozen(self):
         diff = Difference(
-            diff_type=DifferenceType.CASH,
-            entity_id="user1",
-            expected=1000.0,
-            actual=950.0,
+            type=DifferenceType.QUANTITY_MISMATCH,
+            expected=Decimal("100"),
+            actual=Decimal("99"),
+            delta=Decimal("-1"),
         )
-        assert diff.message == ""
+        with pytest.raises(Exception):
+            diff.delta = Decimal("0")
 
     def test_difference_enum_values(self):
-        assert DifferenceType.POSITION.value == "POSITION"
-        assert DifferenceType.CASH.value == "CASH"
-        assert DifferenceType.ORDER.value == "ORDER"
-        assert DifferenceType.TRADE.value == "TRADE"
-        assert DifferenceType.ACCOUNT.value == "ACCOUNT"
+        assert DifferenceType.QUANTITY_MISMATCH.value == "QUANTITY_MISMATCH"
+        assert DifferenceType.AVERAGE_PRICE_MISMATCH.value == "AVERAGE_PRICE_MISMATCH"
+        assert DifferenceType.REALIZED_PNL_MISMATCH.value == "REALIZED_PNL_MISMATCH"
+        assert DifferenceType.MULTIPLE_MISMATCH.value == "MULTIPLE_MISMATCH"
+        assert DifferenceType.UNKNOWN_MISMATCH.value == "UNKNOWN_MISMATCH"

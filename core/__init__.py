@@ -1,5 +1,6 @@
 """ICYQuant Core - Platform foundation layer."""
 from core.bootstrap import (
+    Bootstrap,
     BootstrapManager,
     BootstrapContext,
     StartupStage,
@@ -21,6 +22,7 @@ from core.health import HealthChecker
 from core.logging import setup_logging
 
 __all__ = [
+    "Bootstrap",
     "BootstrapManager",
     "BootstrapContext",
     "StartupStage",

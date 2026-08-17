@@ -1165,6 +1165,210 @@ class BootstrapManager:
 
 
 # ============================================================================
+# Legacy Bootstrap (sync orchestration API)
+# ============================================================================
+
+# Startup step names (phase transitions for the legacy status report).
+_CORE_MODULES: list[tuple[str, str, str]] = [
+    # (module name, module type, description)
+    ("platform", "platform", "Platform foundation"),
+    ("security", "security", "Security & RBAC"),
+    ("strategy", "data", "Strategy engine"),
+    ("risk", "risk", "Risk engine"),
+    ("order", "oms", "Order engine"),
+    ("execution", "ems", "Execution engine"),
+    ("position", "portfolio", "Position engine"),
+    ("ledger", "portfolio", "Ledger engine"),
+    ("reconciliation", "platform", "Reconciliation engine"),
+]
+
+
+class Bootstrap:
+    """
+    Application bootstrap orchestrator (synchronous).
+
+    Legacy public entry point used by ``apps.api.main``,
+    ``apps.worker.main`` and platform tests. Wraps the core
+    platform primitives (Container / ModuleRegistry /
+    LifecycleManager / HealthChecker) behind a simple
+    initialize -> run -> shutdown lifecycle.
+
+    This class is intentionally synchronous: it performs no
+    blocking I/O during initialization. Infrastructure health
+    (database / redis / kafka) is evaluated lazily through the
+    registered health checkers, so the process can boot even
+    when downstream services are not yet available.
+    """
+
+    def __init__(self) -> None:
+        from core.container import Container
+        from core.health import HealthChecker
+        from core.lifecycle import LifecycleManager
+        from core.registry import ModuleRegistry
+        from shared.constants import ServiceStatus
+
+        self._container = Container()
+        self._registry = ModuleRegistry()
+        self._lifecycle = LifecycleManager()
+        self._health_checker = HealthChecker()
+        self._shutdown_hooks: list[Callable[[], None]] = []
+        self._status: ServiceStatus = ServiceStatus.CREATED
+        self._phase: str = "created"
+        self._progress: int = 0
+        self._steps: list[str] = []
+
+    # --------------------------------------------------------
+    # Public properties
+    # --------------------------------------------------------
+
+    @property
+    def container(self) -> Any:
+        """Dependency injection container."""
+        return self._container
+
+    @property
+    def registry(self) -> Any:
+        """Module registry."""
+        return self._registry
+
+    @property
+    def lifecycle(self) -> Any:
+        """Module lifecycle manager."""
+        return self._lifecycle
+
+    @property
+    def health_checker(self) -> Any:
+        """Component health checker."""
+        return self._health_checker
+
+    # --------------------------------------------------------
+    # Lifecycle API
+    # --------------------------------------------------------
+
+    def register_shutdown_hook(
+        self,
+        callback: Callable[[], None],
+    ) -> None:
+        """Register a shutdown hook executed during shutdown()."""
+        self._shutdown_hooks.append(callback)
+
+    def initialize(self) -> bool:
+        """
+        Initialize the platform.
+
+        Registers core modules and health components. This is
+        idempotent: calling it more than once is safe.
+        """
+        from shared.constants import ModuleType, ServiceStatus
+
+        if self._status == ServiceStatus.RUNNING:
+            return True
+
+        self._status = ServiceStatus.INITIALIZING
+        self._phase = "initializing"
+        self._steps.clear()
+
+        # Register core modules and start their lifecycle.
+        for name, type_value, description in _CORE_MODULES:
+            self._registry.register(
+                name,
+                ModuleType(type_value),
+                version="0.4.0-alpha2",
+                description=description,
+            )
+            self._lifecycle.register(name)
+            self._lifecycle.start(name)
+            self._steps.append(f"module:{name}")
+
+        # Register health components (lazy, non-blocking).
+        self._health_checker.register(
+            "container",
+            lambda: self._health_component(
+                "container",
+                self._container is not None,
+            ),
+        )
+        self._health_checker.register(
+            "registry",
+            lambda: self._health_component(
+                "registry",
+                len(self._registry) > 0,
+            ),
+        )
+        self._health_checker.register(
+            "lifecycle",
+            lambda: self._health_component(
+                "lifecycle",
+                self._lifecycle.get_status()["total_modules"] > 0,
+            ),
+        )
+
+        self._steps.append("health:components")
+        self._status = ServiceStatus.RUNNING
+        self._phase = "ready"
+        self._progress = 100
+        return True
+
+    def is_ready(self) -> bool:
+        """Whether the platform is initialized and healthy."""
+        from shared.constants import ServiceStatus
+
+        return (
+            self._status == ServiceStatus.RUNNING
+            and self._health_checker.is_ready()
+        )
+
+    def shutdown(self) -> None:
+        """Shut down the platform and run shutdown hooks."""
+        from shared.constants import ServiceStatus
+
+        if self._status == ServiceStatus.STOPPED:
+            return
+
+        for hook in reversed(self._shutdown_hooks):
+            try:
+                hook()
+            except Exception:
+                pass
+
+        self._status = ServiceStatus.STOPPED
+        self._phase = "stopped"
+        self._progress = 0
+
+    # --------------------------------------------------------
+    # Status API
+    # --------------------------------------------------------
+
+    def get_status(self) -> dict[str, Any]:
+        """Return platform startup status report."""
+        from shared.constants import ServiceStatus
+
+        health = self._health_checker.get_status()
+        return {
+            "status": self._status.value,
+            "phase": self._phase,
+            "progress": self._progress,
+            "steps": list(self._steps),
+            "health": health,
+            "modules": self._registry.get_status()["by_type"],
+            "total_modules": self._registry.get_status()["total_modules"],
+        }
+
+    def _health_component(
+        self,
+        name: str,
+        healthy: bool,
+    ) -> Any:
+        """Build a HealthComponent for the given condition."""
+        from core.health import HealthComponent, HealthStatus
+
+        return HealthComponent(
+            name=name,
+            status=HealthStatus.HEALTHY if healthy else HealthStatus.UNHEALTHY,
+        )
+
+
+# ============================================================================
 # Default Bootstrap
 # ============================================================================
 

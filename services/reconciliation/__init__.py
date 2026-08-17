@@ -83,6 +83,7 @@ from .safety_guard import (
 )
 from .self_healing import SelfHealingCoordinator
 from .service import ReconciliationService
+from .workflow import ReconciliationWorkflow
 
 
 __all__ = [
@@ -126,4 +127,5 @@ __all__ = [
     "RepairStatus",
     "RepairVerification",
     "SelfHealingCoordinator",
+    "ReconciliationWorkflow",
 ]

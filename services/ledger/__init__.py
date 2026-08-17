@@ -20,6 +20,7 @@ from .store import EventStore
 from .memory_store import MemoryEventStore
 from .sqlite_store import SQLiteEventStore
 from .repository import EventRepository
+from .repository.event_repository import LedgerRepository
 from .postgres_repository import PostgreSQLLedgerRepository
 from .projector import Projection
 from .snapshot import Snapshot, LedgerSnapshot
