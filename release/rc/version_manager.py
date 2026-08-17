@@ -29,13 +29,14 @@ class PreReleaseTag(str, Enum):
 
 
 # Semantic version pattern: [v]major.minor.patch[-pre[.num]][+build]
-# Supports: v1.2.3, v1.2.3-alpha1, v1.2.3-rc.1, v1.2.3-alpha1-rc1, v1.2.3+build.42
+# Supports: v1.2.3, v1.2.3-alpha1, v1.2.3-alpha.1, v1.2.3-rc.1,
+#           v1.2.3-alpha1-rc1, v1.2.3+build.42
 _VERSION_RE = re.compile(
     r"^[vV]?"
     r"(?P<major>0|[1-9]\d*)"
     r"\.(?P<minor>0|[1-9]\d*)"
     r"\.(?P<patch>0|[1-9]\d*)"
-    r"(?:-(?P<pre>[a-zA-Z]+)(?P<pre_num>[0-9]+)?(?P<sub_tag>-[a-zA-Z]+[0-9]+)*)?"
+    r"(?:-(?P<pre>[a-zA-Z]+)\.?(?P<pre_num>[0-9]+)?(?P<sub_tag>-[a-zA-Z]+[0-9]+)*)?"
     r"(?:\+(?P<build>[a-zA-Z0-9.-]+))?$"
 )
 
