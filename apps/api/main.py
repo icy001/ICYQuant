@@ -8,6 +8,9 @@ from core.bootstrap import Bootstrap
 from core.settings import get_settings
 from shared.constants import APP_NAME, APP_VERSION
 
+from apps.api.health import router as health_router
+from apps.api.routers.reconciliation import router as reconciliation_router
+
 bootstrap = Bootstrap()
 
 @asynccontextmanager
@@ -61,3 +64,6 @@ async def version():
 @app.get("/status")
 async def status():
     return bootstrap.get_status()
+
+app.include_router(health_router)
+app.include_router(reconciliation_router)

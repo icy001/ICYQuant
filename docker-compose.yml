@@ -43,6 +43,12 @@ services:
       - DATABASE_URL=postgresql://icyquant:password@postgres:5432/icyquant
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f apps.worker.main || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   postgres:
     image: postgres:16
@@ -86,6 +92,12 @@ services:
       ALLOW_PLAINTEXT_LISTENER: "yes"
     ports:
       - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   postgres_data:
