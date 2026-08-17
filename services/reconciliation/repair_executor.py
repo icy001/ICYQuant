@@ -99,7 +99,9 @@ class RepairExecutor:
         if existing is not None:
             return self._result_from_record(existing, events)
 
-        repair_id = self._id_generator.generate()
+        repair_id = self._id_generator.generate(
+            now=self._now_provider()
+        )
         record = self._create_record(
             repair_id=repair_id,
             reconciliation_id=reconciliation_id or "",

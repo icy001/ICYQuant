@@ -1,10 +1,11 @@
 import pytest
+from decimal import Decimal
 from typing import List
 
 from services.reconciliation.compare.base import Comparator
 from services.reconciliation.compare.manager import ComparatorManager
 from services.reconciliation.models.difference import Difference
-from services.reconciliation.models.types import DifferenceType
+from services.reconciliation.models.difference import DifferenceType
 
 
 class MockComparator(Comparator[str]):
@@ -64,31 +65,31 @@ class TestComparatorManager:
     def test_manager_compare_all_with_comparator_returning_differences(self):
         manager = ComparatorManager()
         expected_diff = Difference(
-            diff_type=DifferenceType.POSITION,
-            entity_id="AAPL",
-            expected=100.0,
-            actual=99.0,
-            message="Position mismatch",
+            type=DifferenceType.QUANTITY_MISMATCH,
+            expected=Decimal("100"),
+            actual=Decimal("99"),
+            delta=Decimal("-1"),
         )
         comparator = MockComparator("test", [expected_diff])
         manager.register(comparator)
         differences = manager.compare_all({}, {})
         assert len(differences) == 1
-        assert differences[0].entity_id == "AAPL"
+        assert differences[0].type == DifferenceType.QUANTITY_MISMATCH
+        assert differences[0].delta == Decimal("-1")
 
     def test_manager_compare_all_aggregates_multiple_comparators(self):
         manager = ComparatorManager()
         diff1 = Difference(
-            diff_type=DifferenceType.POSITION,
-            entity_id="AAPL",
-            expected=100.0,
-            actual=99.0,
+            type=DifferenceType.QUANTITY_MISMATCH,
+            expected=Decimal("100"),
+            actual=Decimal("99"),
+            delta=Decimal("-1"),
         )
         diff2 = Difference(
-            diff_type=DifferenceType.CASH,
-            entity_id="user1",
-            expected=1000.0,
-            actual=950.0,
+            type=DifferenceType.AVERAGE_PRICE_MISMATCH,
+            expected=Decimal("1000"),
+            actual=Decimal("950"),
+            delta=Decimal("-50"),
         )
         manager.register(MockComparator("position", [diff1]))
         manager.register(MockComparator("cash", [diff2]))

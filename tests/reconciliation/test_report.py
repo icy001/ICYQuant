@@ -1,8 +1,9 @@
 import pytest
+from decimal import Decimal
 
 from services.reconciliation.models.difference import Difference
+from services.reconciliation.models.difference import DifferenceType
 from services.reconciliation.models.report import ReconciliationReport
-from services.reconciliation.models.types import DifferenceType
 
 
 class TestReconciliationReport:
@@ -14,10 +15,10 @@ class TestReconciliationReport:
         report = ReconciliationReport()
         report.differences.append(
             Difference(
-                diff_type=DifferenceType.POSITION,
-                entity_id="AAPL",
-                expected=100.0,
-                actual=99.0,
+                type=DifferenceType.QUANTITY_MISMATCH,
+                expected=Decimal("100"),
+                actual=Decimal("99"),
+                delta=Decimal("-1"),
             )
         )
         assert not report.healthy
@@ -26,16 +27,16 @@ class TestReconciliationReport:
         report = ReconciliationReport()
         report.differences.extend([
             Difference(
-                diff_type=DifferenceType.POSITION,
-                entity_id="AAPL",
-                expected=100.0,
-                actual=99.0,
+                type=DifferenceType.QUANTITY_MISMATCH,
+                expected=Decimal("100"),
+                actual=Decimal("99"),
+                delta=Decimal("-1"),
             ),
             Difference(
-                diff_type=DifferenceType.CASH,
-                entity_id="user1",
-                expected=1000.0,
-                actual=950.0,
+                type=DifferenceType.AVERAGE_PRICE_MISMATCH,
+                expected=Decimal("1000"),
+                actual=Decimal("950"),
+                delta=Decimal("-50"),
             ),
         ])
         assert len(report.differences) == 2
