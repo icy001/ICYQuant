@@ -5,14 +5,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
+    libpq-dev \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
 COPY Makefile .
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[all]"
+RUN pip install --no-cache-dir --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -e .
 
 COPY . .
 
