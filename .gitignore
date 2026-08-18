@@ -14,5 +14,9 @@ build/
 err.txt
 test_*.txt
 
+# Python package build metadata
+*.egg-info/
+
+
 # IDE project data
 .codebuddy/

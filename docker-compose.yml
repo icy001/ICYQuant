@@ -1,58 +1,39 @@
+# ICYQuant v0.4.0-alpha2 - Deployment & Validation Phase
+# docker compose up -d  starts the full system.
+#
+# Services (10):
+#   api, strategy-runtime, risk-engine, order-engine, execution-engine,
+#   position-ledger, reconciliation, database, event-bus, monitoring
 version: "3.9"
 
+x-icyquant-app: &icyquant-app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: icyquant:0.4.0-alpha2
+  restart: unless-stopped
+  depends_on:
+    database:
+      condition: service_healthy
+    event-bus:
+      condition: service_healthy
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    SECRET_KEY: icyquant-0.4.0-alpha2-local-validation-secret
+    AUDIT_LOG_ENABLED: "true"
+    DB_HOST: database
+    DB_PORT: "5432"
+    DB_USER: icyquant
+    DB_PASSWORD: password
+    DB_NAME: icyquant
+    REDIS_URL: redis://event-bus:6379/0
+
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: icyquant-api
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-      - redis
-      - kafka
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql://icyquant:password@postgres:5432/icyquant
-      - REDIS_URL=redis://redis:6379/0
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    command: >
-      bash -c "
-      alembic upgrade head &&
-      uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
-      "
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: icyquant-worker
-    command: python -m apps.worker.main
-    depends_on:
-      - postgres
-      - redis
-      - kafka
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql://icyquant:password@postgres:5432/icyquant
-      - REDIS_URL=redis://redis:6379/0
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f apps.worker.main || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-  postgres:
+  # ---------------- Infrastructure ----------------
+  database:
     image: postgres:16
-    container_name: icyquant-postgres
+    container_name: icyquant-database
     environment:
       POSTGRES_USER: icyquant
       POSTGRES_PASSWORD: password
@@ -62,42 +43,131 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U icyquant"]
+      test: ["CMD-SHELL", "pg_isready -U icyquant -d icyquant"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
 
-  redis:
+  event-bus:
     image: redis:7
-    container_name: icyquant-redis
+    container_name: icyquant-event-bus
     ports:
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
 
-  kafka:
-    image: bitnami/kafka:3.8
-    container_name: icyquant-kafka
-    environment:
-      KAFKA_CFG_NODE_ID: "1"
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+  # ---------------- Application services ----------------
+  api:
+    <<: *icyquant-app
+    container_name: icyquant-api
     ports:
-      - "9092:9092"
+      - "8000:8000"
+    command: >
+      bash -c "
+      alembic upgrade head &&
+      uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+      "
     healthcheck:
-      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1 || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
-      timeout: 10s
+      timeout: 5s
       retries: 5
-      start_period: 60s
+
+  strategy-runtime:
+    <<: *icyquant-app
+    container_name: icyquant-strategy-runtime
+    command: python -m apps.runtime health --port 8011
+    ports:
+      - "8011:8011"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  risk-engine:
+    <<: *icyquant-app
+    container_name: icyquant-risk-engine
+    command: python -m apps.runtime health --port 8012
+    ports:
+      - "8012:8012"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-engine:
+    <<: *icyquant-app
+    container_name: icyquant-order-engine
+    command: python -m apps.runtime health --port 8013
+    ports:
+      - "8013:8013"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8013/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  execution-engine:
+    <<: *icyquant-app
+    container_name: icyquant-execution-engine
+    command: python -m apps.runtime health --port 8014
+    ports:
+      - "8014:8014"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8014/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  position-ledger:
+    <<: *icyquant-app
+    container_name: icyquant-position-ledger
+    command: python -m apps.runtime health --port 8015
+    ports:
+      - "8015:8015"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  reconciliation:
+    <<: *icyquant-app
+    container_name: icyquant-reconciliation
+    command: python -m apps.runtime health --port 8016
+    ports:
+      - "8016:8016"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8016/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------- Monitoring ----------------
+  monitoring:
+    image: prom/prometheus:v2.52.0
+    container_name: icyquant-monitoring
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    volumes:
+      - ./deployment/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+  prometheus_data:
