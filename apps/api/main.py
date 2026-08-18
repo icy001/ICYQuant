@@ -4,18 +4,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.bootstrap import Bootstrap
+from core.bootstrap import BootstrapManager, get_bootstrap
 from core.settings import get_settings
 from shared.constants import APP_NAME, APP_VERSION
 
-bootstrap = Bootstrap()
+bootstrap: BootstrapManager = get_bootstrap()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bootstrap.initialize()
+    await bootstrap.startup()
     app.state.bootstrap = bootstrap
     yield
-    bootstrap.shutdown()
+    await bootstrap.shutdown()
 
 app = FastAPI(
     title=APP_NAME,
@@ -33,6 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from apps.api.metrics import router as metrics_router  # noqa: E402
+from apps.api.routers import router as ping_router  # noqa: E402
+
+app.include_router(metrics_router)
+app.include_router(ping_router)
+
 @app.get("/")
 async def root():
     return {
@@ -43,7 +49,13 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return bootstrap.health_checker.get_status()
+    """Aggregated health of all 10 logical services (real checks)."""
+    from apps.runtime.health_server import build_registry
+
+    registry = build_registry()
+    snapshot = registry.snapshot()
+    snapshot["bootstrap"] = bootstrap.report()
+    return snapshot
 
 @app.get("/ready")
 async def ready():
@@ -60,4 +72,4 @@ async def version():
 
 @app.get("/status")
 async def status():
-    return bootstrap.get_status()
+    return bootstrap.report()
