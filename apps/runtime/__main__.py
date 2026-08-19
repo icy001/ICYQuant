@@ -5,6 +5,7 @@ Usage:
     python -m apps.runtime scenarios [--json]        # Run Golden Scenarios 01-08
     python -m apps.runtime paper [--signals N]       # Phase 4: paper trading metrics
     python -m apps.runtime shadow [--signals N]      # Phase 5: shadow trading consistency
+    python -m apps.runtime strategy [--json]         # Phase 7: Strategy 001 backtest (research layer)
 """
 from __future__ import annotations
 
@@ -35,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     p_gate = sub.add_parser("gate", help="Phase 6: production readiness gate")
     p_gate.add_argument("--json", action="store_true", help="output raw JSON")
 
+    p_strategy = sub.add_parser("strategy", help="Phase 7: Strategy 001 backtest (research layer)")
+    p_strategy.add_argument("--json", action="store_true", help="output raw JSON")
+
     args = parser.parse_args(argv)
 
     if args.command == "health":
@@ -47,6 +51,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_shadow(args)
     if args.command == "gate":
         return _run_gate(args)
+    if args.command == "strategy":
+        return _run_strategy(args)
     parser.print_help()
     return 2
 
@@ -149,6 +155,12 @@ def _run_gate(args) -> int:
                 imark = "PASS" if item["passed"] else "FAIL"
                 print(f"      {item['id']} [{imark}] {item['title']}: {item['detail']}")
     return 0 if result["gate"] == "PASS" else 1
+
+
+def _run_strategy(args) -> int:
+    from apps.runtime.strategy_gate import main as strategy_main
+
+    return strategy_main(["--json"] if args.json else [])
 
 
 def _run_scenarios(args) -> int:

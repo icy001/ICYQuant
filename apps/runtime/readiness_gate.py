@@ -7,7 +7,8 @@ Hard acceptance checklist across six categories:
     Reliability     - crash recovery, event loss repair, mismatch repair
     Security        - production-mode enforcement, secret, audit log
     Operations      - health endpoints, container healthchecks, monitoring
-    Validation      - Golden Scenarios 01-08, version alignment
+    Validation      - Golden Scenarios 01-08, version alignment,
+                      Strategy 001 backtest (research layer)
 
 Every item performs a real programmatic check inside the deployed
 container (API /health over HTTP, direct DB ping, Redis ping,
@@ -237,6 +238,21 @@ def _container_healthchecks() -> tuple[str, bool]:
     return "aggregated /health READY" if ok else "aggregated /health DEGRADED", ok
 
 
+def _strategy_gate() -> tuple[str, bool]:
+    """Phase 7: research layer - Strategy 001 (NVDA 15m) backtest report."""
+    from apps.runtime.strategy_gate import run_strategy_gate
+
+    result = run_strategy_gate()
+    summary = result.get("report", {})
+    detail = (
+        f"S001 {summary.get('symbol', '?')} {summary.get('strategy', '?')}: "
+        f"{summary.get('num_trades', 0)} trades, "
+        f"return={summary.get('total_return', 0.0):.2%}, "
+        f"sharpe={summary.get('sharpe_ratio', 0.0):.2f}"
+    )
+    return detail, bool(result["ok"])
+
+
 def _version_aligned() -> tuple[str, bool]:
     try:
         from shared.constants import APP_VERSION
@@ -282,6 +298,7 @@ def build_gate() -> list[GateCategory]:
         GateCategory("Validation", [
             GateItem("V-01", "Golden Scenarios 01-08 all PASS", _run_scenarios),
             GateItem("V-02", "Version aligned (0.4.0-alpha2)", _version_aligned),
+            GateItem("V-03", "Strategy 001 backtest (NVDA 15m) report OK", _strategy_gate),
         ]),
     ]
     return categories

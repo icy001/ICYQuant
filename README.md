@@ -7,6 +7,7 @@
 | 文档 | 说明 |
 |------|------|
 | [使用文档](docs/USAGE_GUIDE.md) | **已部署环境的使用指南**：API、验证 CLI、日常运维、排查 |
+| [验证报告](docs/VALIDATION_REPORT.md) | 各阶段验证结果汇总（Gate / Paper / Shadow / Strategy） |
 | [入门指南](docs/getting_started.md) | 从零开始部署与使用 |
 | [操作手册](docs/operator_guide.md) | 生产运维、监控、备份与故障恢复 |
 | [Docker 部署](docs/03-operations/DOCKER_DEPLOYMENT.md) | Docker / Compose 部署细节 |
