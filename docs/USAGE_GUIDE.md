@@ -218,6 +218,72 @@ docker exec icyquant-api python -m apps.runtime gate --json
 
 通过标准：`PASS (21/21)`。退出码 `0` 为通过。
 
+### 门禁验收测试（pytest Gate）
+
+Definition-of-Done 门禁测试通过 pytest 运行。测试文件位于 `tests/`，由于 `.dockerignore` 排除了 `tests/`，需要先拷贝进容器（放在 `/app/tests` 而非 `/tmp`，否则 D-15 的 `docker-compose.yml` 路径解析失败）。
+
+**注意**：`tests/platform/` 目录会遮蔽 Python 标准库 `platform` 模块，必须使用 `--import-mode=importlib` 并从 `/app` 目录运行，否则报 `module 'platform' has no attribute 'system'`。
+
+```bash
+cd /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant
+
+# 第一步：拷贝测试进容器
+docker compose exec api sh -c 'mkdir -p /app/tests'
+docker cp tests/. icyquant-api:/app/tests/
+
+# Dashboard Gate（15 项，D-01~D-15：9 个页面 + API 数据一致性 + Docker 可部署性）
+docker compose exec api python -m pytest tests/test_dashboard_gate.py -q --import-mode=importlib
+
+# Adapter Gate（12 项，A-01~A-12：A股/期货/美股/外汇适配器）
+docker compose exec api python -m pytest tests/test_adapter_gate.py -q --import-mode=importlib
+
+# Bootstrap Gate（65 项：基础类型/生命周期/启动检查）
+docker compose exec api python -m pytest tests/test_bootstrap.py -q --import-mode=importlib
+
+# 一次运行全部三个门禁（92 项）
+docker compose exec api python -m pytest \
+  tests/test_dashboard_gate.py tests/test_adapter_gate.py tests/test_bootstrap.py \
+  -q --import-mode=importlib
+
+# 完成后清理（保持镜像干净）
+docker compose exec api rm -rf /app/tests
+```
+
+通过标准：`15 passed` / `12 passed` / `65 passed`（合计 `92 passed`）。
+
+### 一键全量验证
+
+以上所有验证组合起来，完整执行一遍：
+
+```bash
+cd /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant
+
+# 1) 部署状态（10 服务）
+docker compose ps
+
+# 2) 聚合健康检查
+curl http://localhost:8000/health
+
+# 3) Golden Scenarios（8 项）
+docker compose exec api python -m apps.runtime scenarios
+
+# 4) Production Readiness Gate（21 项）
+docker compose exec api python -m apps.runtime gate
+
+# 5) 门禁验收测试（92 项）
+docker compose exec api sh -c 'mkdir -p /app/tests'
+docker cp tests/. icyquant-api:/app/tests/
+docker compose exec api python -m pytest \
+  tests/test_dashboard_gate.py tests/test_adapter_gate.py tests/test_bootstrap.py \
+  -q --import-mode=importlib
+docker compose exec api rm -rf /app/tests
+
+# 6) API 端点检查
+for ep in health version ready status metrics; do
+  echo "/$ep -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/$ep)"
+done
+```
+
 ---
 
 ## 6. 日常运维
