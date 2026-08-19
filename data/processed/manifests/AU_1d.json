@@ -1,0 +1,35 @@
+{
+  "symbol": "AU",
+  "timeframe": "1d",
+  "source": "synthetic",
+  "timezone": "Asia/Shanghai",
+  "session": "09:00-15:00 break 11:30-13:00",
+  "continuous_contract": true,
+  "start": "2023-01-02T00:00:00",
+  "end": "2025-12-31T00:00:00",
+  "bars": 783,
+  "min_years": 3,
+  "quality_gate": {
+    "status": "PASS",
+    "checks": {
+      "bars_non_empty": true,
+      "coverage_years": true,
+      "no_missing_fields": true,
+      "no_duplicate_timestamps": true,
+      "monotonic_timestamps": true,
+      "ohlc_consistency": true,
+      "cadence": true,
+      "metadata": true
+    },
+    "detail": {
+      "span_years": 2.9952087611225187,
+      "calendar_years": 3,
+      "start": "2023-01-02T00:00:00",
+      "end": "2025-12-31T00:00:00",
+      "bars_outside_session": 783,
+      "session": "09:00-15:00 break 11:30-13:00; 783 bars outside session"
+    },
+    "run_at": "2026-08-19T16:01:21"
+  },
+  "generated_at": "2026-08-19T16:01:21"
+}

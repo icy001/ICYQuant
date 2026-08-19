@@ -23,3 +23,8 @@ test_*.txt
 
 # IDE project data
 .codebuddy/
+
+# Research synthetic OHLCV datasets (regenerable via
+# `python infra/scripts/generate_research_dataset.py`); manifests stay tracked
+data/processed/*.csv
+data/raw/
