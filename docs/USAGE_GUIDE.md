@@ -16,6 +16,7 @@
   - [Golden Scenarios（场景回归）](#golden-scenarios场景回归)
   - [Paper Trading（模拟盘）](#paper-trading模拟盘)
   - [Shadow Trading（影子交易）](#shadow-trading影子交易)
+  - [Strategy Gate（研究层回测门禁）](#strategy-gate研究层回测门禁)
   - [Readiness Gate（生产就绪门禁）](#readiness-gate生产就绪门禁)
 - [6. 日常运维](#6-日常运维)
   - [启动 / 停止 / 重启](#启动--停止--重启)
@@ -204,9 +205,31 @@ docker exec icyquant-api python -m apps.runtime shadow --json
 
 退出码 `0` 表示全部一致（`N/N consistent`），`1` 表示存在分歧。
 
+### Strategy Gate（研究层回测门禁）
+
+Phase 7：Research Layer 端到端回测——Strategy 001（S001，NVDA 15m 双均线金叉/死叉）
+加载 `data/lakehouse/NVDA_15m.csv` → 回测引擎 → 绩效报告，验证研究层已接入部署栈。
+
+前置：数据文件需同步进容器（宿主 `data/lakehouse/NVDA_15m.csv` 已生成，重新生成用
+`python infra/scripts/generate_nvda_15m.py`）。
+
+```bash
+# 同步数据到容器（若尚未同步）
+docker cp data/lakehouse icyquant-api:/app/data/
+
+# 运行 Strategy Gate（6 项检查）
+docker exec icyquant-api python -m apps.runtime strategy
+
+# 结构化输出
+docker exec icyquant-api python -m apps.runtime strategy --json
+```
+
+退出码 `0` 表示全部通过（6/6），`1` 表示存在失败。结果同时纳入 Readiness Gate 的
+V-03 检查项。
+
 ### Readiness Gate（生产就绪门禁）
 
-21 项检查覆盖 6 大类：Infrastructure / Trading / Security / Operations / Validation 等。
+22 项检查覆盖 6 大类：Infrastructure / Trading / Security / Operations / Validation 等。
 
 ```bash
 # 完整报告（含每项明细）
@@ -216,7 +239,7 @@ docker exec icyquant-api python -m apps.runtime gate
 docker exec icyquant-api python -m apps.runtime gate --json
 ```
 
-通过标准：`PASS (21/21)`。退出码 `0` 为通过。
+通过标准：`PASS (22/22)`。退出码 `0` 为通过。
 
 ---
 
@@ -368,7 +391,8 @@ curl http://localhost:8000/health                          # 聚合健康
 docker exec icyquant-api python -m apps.runtime scenarios  # Golden 8/8
 docker exec icyquant-api python -m apps.runtime paper      # 模拟盘
 docker exec icyquant-api python -m apps.runtime shadow     # 影子交易
-docker exec icyquant-api python -m apps.runtime gate       # 就绪门禁 21/21
+docker exec icyquant-api python -m apps.runtime strategy   # Strategy 001 回测
+docker exec icyquant-api python -m apps.runtime gate       # 就绪门禁 22/22
 
 # === 运维 ===
 docker compose logs -f <服务名>                             # 日志
