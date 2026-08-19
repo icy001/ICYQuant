@@ -161,6 +161,8 @@ code {
   font-weight: 600;
 }
 .nav-ico { width: 18px; text-align: center; font-size: 13px; opacity: 0.9; }
+.nav-zh { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+.nav-link.active .nav-zh { color: var(--accent); opacity: 0.85; }
 
 .sidebar-footer {
   display: flex;
