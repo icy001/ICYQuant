@@ -1,0 +1,1537 @@
+{
+  "experiment_id": "smoke-002",
+  "spec_version": "v1",
+  "split": {
+    "name": "v1-3y-60-20-20",
+    "train": [
+      "2023-01-01",
+      "2024-06-30"
+    ],
+    "validation": [
+      "2024-07-01",
+      "2024-12-31"
+    ],
+    "oos": [
+      "2025-01-01",
+      "2025-12-31"
+    ],
+    "note": "Adapted from the ideal 2021-2023/2024/2025-2026 split to the current 3-year dataset (no data extension in v1)."
+  },
+  "funnel": {
+    "candidates_total": 6,
+    "candidates_backtested": 12,
+    "validation_passed": 0,
+    "oos_passed": 0,
+    "robustness_passed": 0,
+    "final_candidates": 0
+  },
+  "top_candidates": [],
+  "family_analysis": {},
+  "asset_family_matrix": {
+    "NVDA": {
+      "family_counts": {},
+      "family_mean_sharpe": {}
+    },
+    "SPY": {
+      "family_counts": {},
+      "family_mean_sharpe": {}
+    }
+  },
+  "reject_reasons": {
+    "train_performance": 10,
+    "validation_performance": 2
+  },
+  "ranked": [],
+  "outcomes": {
+    "C0001": {
+      "NVDA": {
+        "candidate_id": "C0001",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0001/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=21 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.66 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val sharpe=1.44 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.21 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-11.32% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.62 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.86 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": true,
+            "detail": "wf windows=4/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-4.70% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.2126,
+          "total_return": -0.04705,
+          "max_drawdown": -0.11317,
+          "profit_factor": 0.8602,
+          "trade_count": 21
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.24645,
+            "sharpe": 0.6592,
+            "max_drawdown": -0.123001,
+            "profit_factor": 1.8347,
+            "trade_count": 27
+          },
+          "validation": {
+            "total_return": 0.23691,
+            "sharpe": 1.4411,
+            "max_drawdown": -0.031857,
+            "profit_factor": 8.322,
+            "trade_count": 6
+          },
+          "oos": {
+            "total_return": -0.04705,
+            "sharpe": -0.2126,
+            "max_drawdown": -0.11317,
+            "profit_factor": 0.8602,
+            "trade_count": 21
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0001",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0001/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=24 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.35 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.41 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.14 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-13.09% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.20 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.93 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=1/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-2.26% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.1372,
+          "total_return": -0.022555,
+          "max_drawdown": -0.130862,
+          "profit_factor": 0.9279,
+          "trade_count": 24
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.05212,
+            "sharpe": 0.3502,
+            "max_drawdown": -0.107866,
+            "profit_factor": 1.3007,
+            "trade_count": 23
+          },
+          "validation": {
+            "total_return": 0.021147,
+            "sharpe": 0.4138,
+            "max_drawdown": -0.083588,
+            "profit_factor": 1.2656,
+            "trade_count": 14
+          },
+          "oos": {
+            "total_return": -0.022555,
+            "sharpe": -0.1372,
+            "max_drawdown": -0.130862,
+            "profit_factor": 0.9279,
+            "trade_count": 24
+          }
+        }
+      }
+    },
+    "C0002": {
+      "NVDA": {
+        "candidate_id": "C0002",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "validation_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0002/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=29 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train sharpe=0.88 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.21 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=0.06 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-11.39% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.51 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=1.03 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=3/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-0.21% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": 0.0583,
+          "total_return": -0.002063,
+          "max_drawdown": -0.113902,
+          "profit_factor": 1.0277,
+          "trade_count": 29
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.242924,
+            "sharpe": 0.8805,
+            "max_drawdown": -0.155567,
+            "profit_factor": 1.5491,
+            "trade_count": 46
+          },
+          "validation": {
+            "total_return": 0.012104,
+            "sharpe": 0.2136,
+            "max_drawdown": -0.13273,
+            "profit_factor": 1.0886,
+            "trade_count": 20
+          },
+          "oos": {
+            "total_return": -0.002063,
+            "sharpe": 0.0583,
+            "max_drawdown": -0.113902,
+            "profit_factor": 1.0277,
+            "trade_count": 29
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0002",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0002/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=39 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.32 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val sharpe=1.08 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.33 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-10.91% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.29 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.87 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=2/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-3.52% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.3313,
+          "total_return": -0.035192,
+          "max_drawdown": -0.109063,
+          "profit_factor": 0.871,
+          "trade_count": 39
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.046531,
+            "sharpe": 0.3163,
+            "max_drawdown": -0.134656,
+            "profit_factor": 1.1807,
+            "trade_count": 49
+          },
+          "validation": {
+            "total_return": 0.073436,
+            "sharpe": 1.083,
+            "max_drawdown": -0.045579,
+            "profit_factor": 1.7855,
+            "trade_count": 16
+          },
+          "oos": {
+            "total_return": -0.035192,
+            "sharpe": -0.3313,
+            "max_drawdown": -0.109063,
+            "profit_factor": 0.871,
+            "trade_count": 39
+          }
+        }
+      }
+    },
+    "C0003": {
+      "NVDA": {
+        "candidate_id": "C0003",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "validation_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0003/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=27 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train sharpe=0.92 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.77 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.02 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-10.09% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.64 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.99 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": true,
+            "detail": "wf windows=4/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-1.39% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.0179,
+          "total_return": -0.013871,
+          "max_drawdown": -0.100882,
+          "profit_factor": 0.9909,
+          "trade_count": 27
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.2969,
+            "sharpe": 0.9156,
+            "max_drawdown": -0.194288,
+            "profit_factor": 1.6338,
+            "trade_count": 43
+          },
+          "validation": {
+            "total_return": 0.090634,
+            "sharpe": 0.7708,
+            "max_drawdown": -0.089144,
+            "profit_factor": 1.6138,
+            "trade_count": 15
+          },
+          "oos": {
+            "total_return": -0.013871,
+            "sharpe": -0.0179,
+            "max_drawdown": -0.100882,
+            "profit_factor": 0.9909,
+            "trade_count": 27
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0003",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0003/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=34 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.06 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val sharpe=0.82 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=0.17 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-9.37% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.23 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=1.08 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=2/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": true,
+            "detail": "oos return=1.25% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": 0.1671,
+          "total_return": 0.012471,
+          "max_drawdown": -0.093734,
+          "profit_factor": 1.0814,
+          "trade_count": 34
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.001001,
+            "sharpe": 0.0632,
+            "max_drawdown": -0.146029,
+            "profit_factor": 1.0338,
+            "trade_count": 44
+          },
+          "validation": {
+            "total_return": 0.051072,
+            "sharpe": 0.8234,
+            "max_drawdown": -0.055755,
+            "profit_factor": 1.5702,
+            "trade_count": 15
+          },
+          "oos": {
+            "total_return": 0.012471,
+            "sharpe": 0.1671,
+            "max_drawdown": -0.093734,
+            "profit_factor": 1.0814,
+            "trade_count": 34
+          }
+        }
+      }
+    },
+    "C0004": {
+      "NVDA": {
+        "candidate_id": "C0004",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0004/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=25 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.75 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.66 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.13 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-12.08% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.53 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.93 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": true,
+            "detail": "wf windows=4/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-2.82% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.1278,
+          "total_return": -0.028193,
+          "max_drawdown": -0.120781,
+          "profit_factor": 0.9335,
+          "trade_count": 25
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.295253,
+            "sharpe": 0.7539,
+            "max_drawdown": -0.20669,
+            "profit_factor": 1.6752,
+            "trade_count": 38
+          },
+          "validation": {
+            "total_return": 0.078239,
+            "sharpe": 0.6616,
+            "max_drawdown": -0.090413,
+            "profit_factor": 1.5312,
+            "trade_count": 14
+          },
+          "oos": {
+            "total_return": -0.028193,
+            "sharpe": -0.1278,
+            "max_drawdown": -0.120781,
+            "profit_factor": 0.9335,
+            "trade_count": 25
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0004",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0004/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=30 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.07 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.34 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.02 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-9.62% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.09 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.99 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=2/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-0.75% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.0235,
+          "total_return": -0.007483,
+          "max_drawdown": -0.096233,
+          "profit_factor": 0.9887,
+          "trade_count": 30
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.00221,
+            "sharpe": 0.0724,
+            "max_drawdown": -0.165651,
+            "profit_factor": 1.0421,
+            "trade_count": 39
+          },
+          "validation": {
+            "total_return": 0.017501,
+            "sharpe": 0.3437,
+            "max_drawdown": -0.068555,
+            "profit_factor": 1.1984,
+            "trade_count": 15
+          },
+          "oos": {
+            "total_return": -0.007483,
+            "sharpe": -0.0235,
+            "max_drawdown": -0.096233,
+            "profit_factor": 0.9887,
+            "trade_count": 30
+          }
+        }
+      }
+    },
+    "C0005": {
+      "NVDA": {
+        "candidate_id": "C0005",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0005/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=25 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.64 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val sharpe=1.00 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.25 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-14.13% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.51 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.86 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": true,
+            "detail": "wf windows=4/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-4.70% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.2544,
+          "total_return": -0.047012,
+          "max_drawdown": -0.141271,
+          "profit_factor": 0.8646,
+          "trade_count": 25
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.242987,
+            "sharpe": 0.6396,
+            "max_drawdown": -0.192888,
+            "profit_factor": 1.592,
+            "trade_count": 36
+          },
+          "validation": {
+            "total_return": 0.12979,
+            "sharpe": 0.9971,
+            "max_drawdown": -0.067032,
+            "profit_factor": 2.0657,
+            "trade_count": 11
+          },
+          "oos": {
+            "total_return": -0.047012,
+            "sharpe": -0.2544,
+            "max_drawdown": -0.141271,
+            "profit_factor": 0.8646,
+            "trade_count": 25
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0005",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0005/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=29 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.26 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.41 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=0.18 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-9.64% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.26 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=1.09 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=2/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": true,
+            "detail": "oos return=1.32% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": 0.1789,
+          "total_return": 0.013179,
+          "max_drawdown": -0.096355,
+          "profit_factor": 1.0919,
+          "trade_count": 29
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.038843,
+            "sharpe": 0.2596,
+            "max_drawdown": -0.14248,
+            "profit_factor": 1.1718,
+            "trade_count": 35
+          },
+          "validation": {
+            "total_return": 0.021765,
+            "sharpe": 0.4113,
+            "max_drawdown": -0.069332,
+            "profit_factor": 1.233,
+            "trade_count": 16
+          },
+          "oos": {
+            "total_return": 0.013179,
+            "sharpe": 0.1789,
+            "max_drawdown": -0.096355,
+            "profit_factor": 1.0919,
+            "trade_count": 29
+          }
+        }
+      }
+    },
+    "C0006": {
+      "NVDA": {
+        "candidate_id": "C0006",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0006/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=24 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.71 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val sharpe=1.46 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=-0.04 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-12.62% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.68 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": false,
+            "detail": "oos pf=0.97 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.17, cv=1.23"
+          },
+          {
+            "name": "walk_forward",
+            "passed": true,
+            "detail": "wf windows=4/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": false,
+            "detail": "oos return=-2.15% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": -0.0352,
+          "total_return": -0.021457,
+          "max_drawdown": -0.126194,
+          "profit_factor": 0.9743,
+          "trade_count": 24
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.2738,
+            "sharpe": 0.7109,
+            "max_drawdown": -0.15085,
+            "profit_factor": 1.8235,
+            "trade_count": 29
+          },
+          "validation": {
+            "total_return": 0.254907,
+            "sharpe": 1.4578,
+            "max_drawdown": -0.03493,
+            "profit_factor": 6.9023,
+            "trade_count": 7
+          },
+          "oos": {
+            "total_return": -0.021457,
+            "sharpe": -0.0352,
+            "max_drawdown": -0.126194,
+            "profit_factor": 0.9743,
+            "trade_count": 24
+          }
+        }
+      },
+      "SPY": {
+        "candidate_id": "C0006",
+        "asset": "ALL",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "train=2023-01-02 09:30:00->2024-06-28 15:30:00"
+          },
+          {
+            "name": "candidate_reproducible",
+            "passed": true,
+            "detail": "C0006/trend_ema_cross"
+          },
+          {
+            "name": "min_trades",
+            "passed": true,
+            "detail": "oos trades=25 >= 20"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train sharpe=0.33 >= 0.8"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val sharpe=0.40 >= 0.8"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos sharpe=0.28 >= 0.8"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-10.01% >= -30%"
+          },
+          {
+            "name": "sharpe_combined",
+            "passed": false,
+            "detail": "combined sharpe=0.33 >= 0.8"
+          },
+          {
+            "name": "profit_factor",
+            "passed": true,
+            "detail": "oos pf=1.15 >= 1.15"
+          },
+          {
+            "name": "parameter_stability",
+            "passed": false,
+            "detail": "neighbours=6, positive_frac=0.50, cv=10.39"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows=1/6 positive"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "signals evaluated at bar close; rolling channels use bars < current"
+          },
+          {
+            "name": "no_survivorship",
+            "passed": true,
+            "detail": "fixed 9-asset universe; dataset generated with full history"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          },
+          {
+            "name": "oos_return_positive",
+            "passed": true,
+            "detail": "oos return=2.52% >= 0%"
+          }
+        ],
+        "oos_metrics": {
+          "sharpe": 0.2787,
+          "total_return": 0.025197,
+          "max_drawdown": -0.100098,
+          "profit_factor": 1.152,
+          "trade_count": 25
+        },
+        "segments": {
+          "train": {
+            "total_return": 0.04956,
+            "sharpe": 0.3316,
+            "max_drawdown": -0.119576,
+            "profit_factor": 1.2429,
+            "trade_count": 28
+          },
+          "validation": {
+            "total_return": 0.018925,
+            "sharpe": 0.403,
+            "max_drawdown": -0.067678,
+            "profit_factor": 1.268,
+            "trade_count": 15
+          },
+          "oos": {
+            "total_return": 0.025197,
+            "sharpe": 0.2787,
+            "max_drawdown": -0.100098,
+            "profit_factor": 1.152,
+            "trade_count": 25
+          }
+        }
+      }
+    }
+  },
+  "runtime_seconds": 0.14,
+  "report_generated_at": "2026-08-19T09:16:20.490330+00:00",
+  "top_candidates_detail": [],
+  "candidate_lifecycle": {
+    "C0001": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "train_performance"
+    },
+    "C0002": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "validation_performance"
+    },
+    "C0003": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "validation_performance"
+    },
+    "C0004": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "train_performance"
+    },
+    "C0005": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "train_performance"
+    },
+    "C0006": {
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "assets_passed": 0,
+      "assets_total": 2,
+      "stage": "GENERATED",
+      "status": "REJECTED",
+      "fail_reason": "train_performance"
+    }
+  },
+  "lifecycle_summary": {
+    "REJECTED@GENERATED": 6
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "fetched_at": "2026-08-20T03:07:29.565338Z",
+  "range": [
+    "2024-01-01",
+    "2026-08-19"
+  ],
+  "assets": {
+    "SPY": {
+      "source": "EastMoney US daily, qfq",
+      "rows": 660,
+      "first": "2024-01-02",
+      "last": "2026-08-19",
+      "limitation": ""
+    }
+  }
+}

@@ -1,0 +1,16 @@
+label,strategy_id,strategy_structure,strategy_params,alpha_id,shared_assets,strategy_score,alpha_score,combined_score,status,next_step
+momentum_macd + Alpha008,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha008,AU|EURUSD|XAUUSD,0.7,0.9583,1.0,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha060,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha060,AU|EURUSD|XAUUSD,0.7,0.8407,0.9867,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha008,C0144,momentum_macd,"{""fast"": 8, ""signal"": 5, ""slow"": 21}",Alpha008,AU|EURUSD|XAUUSD,0.6946,0.9583,0.9759,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha060,C0144,momentum_macd,"{""fast"": 8, ""signal"": 5, ""slow"": 21}",Alpha060,AU|EURUSD|XAUUSD,0.6946,0.8407,0.9627,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha008,C0142,momentum_macd,"{""fast"": 5, ""signal"": 5, ""slow"": 21}",Alpha008,AU|EURUSD|XAUUSD,0.677,0.9583,0.8975,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha060,C0142,momentum_macd,"{""fast"": 5, ""signal"": 5, ""slow"": 21}",Alpha060,AU|EURUSD|XAUUSD,0.677,0.8407,0.8842,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha004,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha004,AU|EURUSD|XAUUSD,0.7,0.8372,0.8821,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha004,C0144,momentum_macd,"{""fast"": 8, ""signal"": 5, ""slow"": 21}",Alpha004,AU|EURUSD|XAUUSD,0.6946,0.8372,0.8581,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha047,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha047,AG|AU|EURUSD|XAUUSD,0.7,0.8537,0.8572,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha047,C0144,momentum_macd,"{""fast"": 8, ""signal"": 5, ""slow"": 21}",Alpha047,AU|EURUSD|XAUUSD,0.6946,0.8537,0.8331,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha029,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha029,EURUSD|XAUUSD,0.7,0.6324,0.8316,CANDIDATE,PAPER_TRADING
+momentum_stochastic + Alpha008,C0156,momentum_stochastic,"{""overbought"": 80.0, ""oversold"": 20.0, ""period"": 14}",Alpha008,AU|EURUSD|XAUUSD,0.6608,0.9583,0.8253,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha030,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha030,AU|EURUSD|XAUUSD,0.7,0.6557,0.8243,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha054,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha054,AU|EURUSD|XAUUSD,0.7,0.7792,0.8214,CANDIDATE,PAPER_TRADING
+momentum_macd + Alpha021,C0145,momentum_macd,"{""fast"": 9, ""signal"": 5, ""slow"": 21}",Alpha021,AU|EURUSD|XAUUSD,0.7,0.6435,0.8199,CANDIDATE,PAPER_TRADING

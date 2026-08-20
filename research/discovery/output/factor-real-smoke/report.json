@@ -1,0 +1,1622 @@
+{
+  "experiment_id": "factor-real-smoke",
+  "track": "factor",
+  "spec": {
+    "version": "factor-discovery-real-d1",
+    "universe": [
+      "SPY",
+      "AU"
+    ],
+    "timeframe": "1D",
+    "alphas_total": 101,
+    "thresholds": {
+      "min_coverage": 0.8,
+      "min_abs_ic": 0.02,
+      "min_abs_rank_ic": 0.02,
+      "min_abs_icir": 0.3,
+      "min_train_sharpe": 0.5,
+      "min_val_abs_ic": 0.01,
+      "min_val_return": 0.0,
+      "min_oos_abs_ic": 0.01,
+      "min_oos_sharpe": 0.5,
+      "max_drawdown": -0.5,
+      "max_turnover_per_bar": 0.5,
+      "wf_min_positive_frac": 0.66,
+      "min_assets_passed": 3,
+      "min_block_count": 2
+    },
+    "score_weights": {
+      "oos_icir": 0.3,
+      "oos_sharpe": 0.25,
+      "oos_ic": 0.15,
+      "validation_consistency": 0.1,
+      "stability": 0.1,
+      "walk_forward_frac": 0.1,
+      "turnover_penalty": -0.1
+    },
+    "alpha_score_weights": {
+      "oos_icir": 0.35,
+      "oos_sharpe": 0.25,
+      "oos_ic": 0.15,
+      "breadth": 0.25
+    },
+    "note": "Real-data validation of the factor-discovery-v1 candidates; identical Gate thresholds, windows rescaled for daily bars.",
+    "split": {
+      "name": "real-2y-60-20-20",
+      "train": {
+        "start": "2024-01-01",
+        "end": "2025-06-30"
+      },
+      "validation": {
+        "start": "2025-07-01",
+        "end": "2025-12-31"
+      },
+      "oos": {
+        "start": "2026-01-01",
+        "end": "2026-08-19"
+      },
+      "note": "Real free daily data (akshare): train 18m / val 6m / oos ~7.5m; AU/AG not roll-adjusted, EURUSD BOC cross rate, XAUUSD proxied by COMEX GC."
+    },
+    "adaptations": {
+      "rank": "rolling percentile over 120 bars among available values (min 50% coverage, None-tolerant)",
+      "scale": "rolling magnitude normalisation over 120 bars (None-tolerant, min 50% coverage)",
+      "indneutralize": "identity (single-asset mode)",
+      "vwap": "(high + low + close) / 3 proxy",
+      "cap": "20-bar average dollar volume proxy",
+      "delay": "all alphas evaluated delay-1",
+      "orientation": "long-short portfolio oriented by the sign of the train IC (train-only decision)",
+      "z_window": 120,
+      "z_clip": 3.0,
+      "entry_z": 1.0,
+      "exit_z": 0.25,
+      "ic_block_bars": 60
+    },
+    "alphas_run": 5
+  },
+  "split": {
+    "name": "real-2y-60-20-20",
+    "train": [
+      "2024-01-01",
+      "2025-06-30"
+    ],
+    "validation": [
+      "2025-07-01",
+      "2025-12-31"
+    ],
+    "oos": [
+      "2026-01-01",
+      "2026-08-19"
+    ],
+    "note": "Real free daily data (akshare): train 18m / val 6m / oos ~7.5m; AU/AG not roll-adjusted, EURUSD BOC cross rate, XAUUSD proxied by COMEX GC."
+  },
+  "funnel": {
+    "alphas_total": 5,
+    "pairs_backtested": 10,
+    "validation_passed": 0,
+    "oos_passed": 0,
+    "robustness_passed": 0,
+    "final_alphas": 0
+  },
+  "ranked_pairs": [],
+  "alpha_summary": [
+    {
+      "alpha_id": "Alpha001",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": -0.7181,
+      "mean_oos_ic": -0.03555,
+      "mean_oos_icir": -0.2849,
+      "reject_reasons": {
+        "train_icir": 1,
+        "train_rank_ic": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha002",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": -1.0972,
+      "mean_oos_ic": -0.04035,
+      "mean_oos_icir": 0.1077,
+      "reject_reasons": {
+        "train_performance": 1,
+        "train_ic": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha003",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": -0.6493,
+      "mean_oos_ic": 0.0863,
+      "mean_oos_icir": 1.1219,
+      "reject_reasons": {
+        "factor_computable": 1,
+        "validation_performance": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha004",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": -0.6577,
+      "mean_oos_ic": -0.01285,
+      "mean_oos_icir": 0.3451,
+      "reject_reasons": {
+        "validation_performance": 1,
+        "train_performance": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha005",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.377,
+      "mean_oos_ic": -0.09115,
+      "mean_oos_icir": -0.0228,
+      "reject_reasons": {
+        "train_ic": 2
+      }
+    }
+  ],
+  "cross_asset_matrix": {
+    "icir": {
+      "Alpha001": {
+        "SPY": -0.1308,
+        "AU": -0.4391
+      },
+      "Alpha002": {
+        "SPY": -0.4973,
+        "AU": 0.7128
+      },
+      "Alpha003": {
+        "SPY": 2.1734,
+        "AU": 0.0704
+      },
+      "Alpha004": {
+        "SPY": 0.4221,
+        "AU": 0.2681
+      },
+      "Alpha005": {
+        "SPY": 0.1751,
+        "AU": -0.2208
+      }
+    },
+    "passed": {
+      "Alpha001": {
+        "SPY": false,
+        "AU": false
+      },
+      "Alpha002": {
+        "SPY": false,
+        "AU": false
+      },
+      "Alpha003": {
+        "SPY": false,
+        "AU": false
+      },
+      "Alpha004": {
+        "SPY": false,
+        "AU": false
+      },
+      "Alpha005": {
+        "SPY": false,
+        "AU": false
+      }
+    },
+    "assets": [
+      "SPY",
+      "AU"
+    ]
+  },
+  "reject_reasons": {
+    "train_icir": 1,
+    "train_rank_ic": 1,
+    "train_performance": 2,
+    "train_ic": 3,
+    "factor_computable": 1,
+    "validation_performance": 2
+  },
+  "outcomes": {
+    "Alpha001": {
+      "AU": {
+        "alpha_id": "Alpha001",
+        "asset": "AU",
+        "passed": false,
+        "fail_reason": "train_icir",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.033"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0863"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.148"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=-0.39 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val IC=-0.0304, val LS return=2.53%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0229, oos LS sharpe=-0.40 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-16.61% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.349 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=3/6 (frac=0.50)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=6.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0229,
+          "rank_ic": -0.0708,
+          "icir": -0.4391,
+          "sharpe": -0.4001,
+          "total_return": -0.065164,
+          "max_drawdown": -0.16615,
+          "turnover_per_bar": 0.348684,
+          "trade_count": 26,
+          "blocks": 3
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha001",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_rank_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.82 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=0.0644"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=0.0095"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=0.426"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train LS sharpe=1.06 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val IC=0.0246, val LS return=0.23%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0482, oos LS sharpe=-1.04 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-13.20% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.449 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0482,
+          "rank_ic": -0.0337,
+          "icir": -0.1308,
+          "sharpe": -1.0361,
+          "total_return": -0.067733,
+          "max_drawdown": -0.132004,
+          "turnover_per_bar": 0.449367,
+          "trade_count": 36,
+          "blocks": 3
+        }
+      }
+    },
+    "Alpha002": {
+      "AU": {
+        "alpha_id": "Alpha002",
+        "asset": "AU",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=0.0429"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=0.082"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=0.642"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=-0.95 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val IC=0.0303, val LS return=12.20%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0257, oos LS sharpe=0.01 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-20.01% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.250 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=6.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0257,
+          "rank_ic": 0.0495,
+          "icir": 0.7128,
+          "sharpe": 0.007,
+          "total_return": -0.027238,
+          "max_drawdown": -0.200145,
+          "turnover_per_bar": 0.25,
+          "trade_count": 19,
+          "blocks": 3
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha002",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=0.0145"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=0.0124"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=0.339"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train LS sharpe=0.69 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val IC=0.0924, val LS return=7.87%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.1064, oos LS sharpe=-2.20 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-15.42% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.184 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=3/6 (frac=0.50)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.1064,
+          "rank_ic": -0.1332,
+          "icir": -0.4973,
+          "sharpe": -2.2015,
+          "total_return": -0.125446,
+          "max_drawdown": -0.15418,
+          "turnover_per_bar": 0.183544,
+          "trade_count": 14,
+          "blocks": 3
+        }
+      }
+    },
+    "Alpha003": {
+      "AU": {
+        "alpha_id": "Alpha003",
+        "asset": "AU",
+        "passed": false,
+        "fail_reason": "factor_computable",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": false,
+            "detail": "coverage=0.80 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=0.132"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=0.1698"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=2.436"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train LS sharpe=0.93 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.0519, val LS return=-1.35%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.103, oos LS sharpe=0.35 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-17.80% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.118 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=3/6 (frac=0.50)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=6.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.103,
+          "rank_ic": 0.0414,
+          "icir": 0.0704,
+          "sharpe": 0.3482,
+          "total_return": 0.036829,
+          "max_drawdown": -0.177984,
+          "turnover_per_bar": 0.118421,
+          "trade_count": 9,
+          "blocks": 3
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha003",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "validation_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0623"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0398"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-0.453"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train LS sharpe=0.80 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.011, val LS return=-1.85%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0696, oos LS sharpe=-1.65 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-9.44% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.203 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0696,
+          "rank_ic": 0.0595,
+          "icir": 2.1734,
+          "sharpe": -1.6468,
+          "total_return": -0.08886,
+          "max_drawdown": -0.094396,
+          "turnover_per_bar": 0.202532,
+          "trade_count": 16,
+          "blocks": 3
+        }
+      }
+    },
+    "Alpha004": {
+      "AU": {
+        "alpha_id": "Alpha004",
+        "asset": "AU",
+        "passed": false,
+        "fail_reason": "validation_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.80 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=0.0522"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=0.075"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=0.619"
+          },
+          {
+            "name": "train_performance",
+            "passed": true,
+            "detail": "train LS sharpe=1.39 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.0094, val LS return=-2.30%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0473, oos LS sharpe=-0.47 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-24.13% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.263 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=3/6 (frac=0.50)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=6.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0473,
+          "rank_ic": -0.0154,
+          "icir": 0.2681,
+          "sharpe": -0.472,
+          "total_return": -0.114528,
+          "max_drawdown": -0.241314,
+          "turnover_per_bar": 0.263158,
+          "trade_count": 20,
+          "blocks": 3
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha004",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0615"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0336"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-1.08"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.10 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.0075, val LS return=-5.05%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0216, oos LS sharpe=-0.84 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-9.85% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.316 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0216,
+          "rank_ic": 0.0743,
+          "icir": 0.4221,
+          "sharpe": -0.8433,
+          "total_return": -0.060503,
+          "max_drawdown": -0.098477,
+          "turnover_per_bar": 0.316456,
+          "trade_count": 25,
+          "blocks": 3
+        }
+      }
+    },
+    "Alpha005": {
+      "AU": {
+        "alpha_id": "Alpha005",
+        "asset": "AU",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.81 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=-0.006"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0645"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=0.256"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.09 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.0666, val LS return=-1.13%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": true,
+            "detail": "oos IC=-0.1091, oos LS sharpe=0.76 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-18.70% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.125 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=6.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.1091,
+          "rank_ic": -0.062,
+          "icir": -0.2208,
+          "sharpe": 0.7592,
+          "total_return": 0.104717,
+          "max_drawdown": -0.187042,
+          "turnover_per_bar": 0.125,
+          "trade_count": 10,
+          "blocks": 3
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha005",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.82 >= 0.8, train blocks=4 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=0.0027"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=0.0488"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=0.568"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=-0.50 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": true,
+            "detail": "val IC=0.1226, val LS return=7.18%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0732, oos LS sharpe=-0.01 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-12.99% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.222 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.67"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0732,
+          "rank_ic": 0.0304,
+          "icir": 0.1751,
+          "sharpe": -0.0052,
+          "total_return": -0.003775,
+          "max_drawdown": -0.12992,
+          "turnover_per_bar": 0.221519,
+          "trade_count": 18,
+          "blocks": 3
+        }
+      }
+    }
+  },
+  "runtime_seconds": 0.03,
+  "report_generated_at": "2026-08-20T03:15:34.033525+00:00",
+  "alpha_ranking": [
+    {
+      "alpha_id": "Alpha003",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": 0.0863,
+      "mean_oos_rank_ic": 0.05045,
+      "mean_oos_icir": 1.1219,
+      "mean_oos_sharpe": -0.6493,
+      "mean_turnover": 0.160476,
+      "status": "REJECTED",
+      "score": 0.6157,
+      "rank": 1
+    },
+    {
+      "alpha_id": "Alpha005",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.09115,
+      "mean_oos_rank_ic": -0.0158,
+      "mean_oos_icir": -0.02285,
+      "mean_oos_sharpe": 0.377,
+      "mean_turnover": 0.17326,
+      "status": "REJECTED",
+      "score": 0.525,
+      "rank": 2
+    },
+    {
+      "alpha_id": "Alpha001",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.03555,
+      "mean_oos_rank_ic": -0.05225,
+      "mean_oos_icir": -0.28495,
+      "mean_oos_sharpe": -0.7181,
+      "mean_turnover": 0.399026,
+      "status": "REJECTED",
+      "score": 0.252,
+      "rank": 3
+    },
+    {
+      "alpha_id": "Alpha004",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.01285,
+      "mean_oos_rank_ic": 0.02945,
+      "mean_oos_icir": 0.3451,
+      "mean_oos_sharpe": -0.65765,
+      "mean_turnover": 0.289807,
+      "status": "REJECTED",
+      "score": 0.2276,
+      "rank": 4
+    },
+    {
+      "alpha_id": "Alpha002",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.04035,
+      "mean_oos_rank_ic": -0.04185,
+      "mean_oos_icir": 0.10775,
+      "mean_oos_sharpe": -1.09725,
+      "mean_turnover": 0.216772,
+      "status": "REJECTED",
+      "score": 0.2047,
+      "rank": 5
+    }
+  ],
+  "pair_ranking": [],
+  "strategy_experiment_id": "lab-v1",
+  "convergence": {
+    "strategy_report_found": true,
+    "strategy_experiment_id": "lab-v1",
+    "strategy_final_candidates": 38,
+    "factor_candidates": [],
+    "factor_watch_list": [
+      "Alpha003",
+      "Alpha004",
+      "Alpha001",
+      "Alpha002",
+      "Alpha005"
+    ],
+    "watch_list_assets": {
+      "Alpha003": [
+        "SPY",
+        "AU"
+      ],
+      "Alpha004": [
+        "SPY",
+        "AU"
+      ],
+      "Alpha001": [
+        "AU",
+        "SPY"
+      ],
+      "Alpha002": [
+        "AU",
+        "SPY"
+      ],
+      "Alpha005": [
+        "AU",
+        "SPY"
+      ]
+    },
+    "combinations": [
+      {
+        "label": "momentum_macd + Alpha003",
+        "strategy_id": "C0145",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 9,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.7,
+        "alpha_score": 0.6157,
+        "combined_score": 1.0,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha003",
+        "strategy_id": "C0144",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 8,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6946,
+        "alpha_score": 0.6157,
+        "combined_score": 0.9759,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha003",
+        "strategy_id": "C0142",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 5,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.677,
+        "alpha_score": 0.6157,
+        "combined_score": 0.8975,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_stochastic + Alpha003",
+        "strategy_id": "C0156",
+        "strategy_structure": "momentum_stochastic",
+        "strategy_params": {
+          "period": 14,
+          "oversold": 20.0,
+          "overbought": 80.0
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6608,
+        "alpha_score": 0.6157,
+        "combined_score": 0.8253,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_stochastic + Alpha003",
+        "strategy_id": "C0150",
+        "strategy_structure": "momentum_stochastic",
+        "strategy_params": {
+          "period": 9,
+          "oversold": 30.0,
+          "overbought": 70.0
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6554,
+        "alpha_score": 0.6157,
+        "combined_score": 0.8012,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_mom + Alpha003",
+        "strategy_id": "C0128",
+        "strategy_structure": "momentum_mom",
+        "strategy_params": {
+          "period": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6365,
+        "alpha_score": 0.6157,
+        "combined_score": 0.717,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha003",
+        "strategy_id": "C0130",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6351,
+        "alpha_score": 0.6157,
+        "combined_score": 0.7108,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha004",
+        "strategy_id": "C0145",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 9,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha004",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.7,
+        "alpha_score": 0.2276,
+        "combined_score": 0.6466,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha004",
+        "strategy_id": "C0144",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 8,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha004",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6946,
+        "alpha_score": 0.2276,
+        "combined_score": 0.6225,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha001",
+        "strategy_id": "C0145",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 9,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha001",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.7,
+        "alpha_score": 0.252,
+        "combined_score": 0.6192,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_roc + Alpha003",
+        "strategy_id": "C0121",
+        "strategy_structure": "momentum_roc",
+        "strategy_params": {
+          "period": 5
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6135,
+        "alpha_score": 0.6157,
+        "combined_score": 0.6145,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha001",
+        "strategy_id": "C0144",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 8,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha001",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.6946,
+        "alpha_score": 0.252,
+        "combined_score": 0.5952,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_stochastic + Alpha003",
+        "strategy_id": "C0152",
+        "strategy_structure": "momentum_stochastic",
+        "strategy_params": {
+          "period": 21,
+          "oversold": 25.0,
+          "overbought": 75.0
+        },
+        "alpha_id": "Alpha003",
+        "shared_assets": [
+          "AU",
+          "SPY"
+        ],
+        "strategy_score": 0.6081,
+        "alpha_score": 0.6157,
+        "combined_score": 0.5905,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha004",
+        "strategy_id": "C0142",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 5,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha004",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.677,
+        "alpha_score": 0.2276,
+        "combined_score": 0.5441,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      },
+      {
+        "label": "momentum_macd + Alpha002",
+        "strategy_id": "C0145",
+        "strategy_structure": "momentum_macd",
+        "strategy_params": {
+          "fast": 9,
+          "slow": 21,
+          "signal": 5
+        },
+        "alpha_id": "Alpha002",
+        "shared_assets": [
+          "AU"
+        ],
+        "strategy_score": 0.7,
+        "alpha_score": 0.2047,
+        "combined_score": 0.5386,
+        "status": "PROVISIONAL",
+        "next_step": "WATCH_LIST"
+      }
+    ]
+  }
+}
