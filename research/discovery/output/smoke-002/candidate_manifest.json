@@ -1,0 +1,311 @@
+{
+  "spec": {
+    "version": "v1",
+    "name": "Strategy Discovery Lab v1",
+    "universe": [
+      "NVDA",
+      "SPY"
+    ],
+    "timeframe": "1H",
+    "candidates_total": 300,
+    "family_target": {
+      "Trend": 100,
+      "Momentum": 60,
+      "Breakout": 60,
+      "Mean Reversion": 50,
+      "Hybrid": 30
+    },
+    "split": {
+      "name": "v1-3y-60-20-20",
+      "train": {
+        "start": "2023-01-01",
+        "end": "2024-06-30"
+      },
+      "validation": {
+        "start": "2024-07-01",
+        "end": "2024-12-31"
+      },
+      "oos": {
+        "start": "2025-01-01",
+        "end": "2025-12-31"
+      },
+      "note": "Adapted from the ideal 2021-2023/2024/2025-2026 split to the current 3-year dataset (no data extension in v1)."
+    },
+    "structures": {
+      "trend_ema_cross": {
+        "family": "Trend",
+        "entry": "EMA(fast) > EMA(slow)",
+        "exit": "EMA(fast) < EMA(slow)"
+      },
+      "trend_sma_cross": {
+        "family": "Trend",
+        "entry": "SMA(fast) > SMA(slow)",
+        "exit": "SMA(fast) < SMA(slow)"
+      },
+      "trend_ema_supertrend": {
+        "family": "Trend",
+        "entry": "EMA(fast) > EMA(slow) AND Supertrend(atr_period, mult) = Bullish",
+        "exit": "EMA(fast) < EMA(slow) OR Supertrend = Bearish"
+      },
+      "trend_ema_adx": {
+        "family": "Trend",
+        "entry": "EMA(fast) > EMA(slow) AND ADX > entry_adx",
+        "exit": "EMA(fast) < EMA(slow) OR ADX < exit_adx"
+      },
+      "trend_donchian": {
+        "family": "Trend",
+        "entry": "Close > Donchian(period).Upper",
+        "exit": "Close < Donchian(period).Middle"
+      },
+      "momentum_rsi": {
+        "family": "Momentum",
+        "entry": "RSI crosses up through oversold",
+        "exit": "RSI crosses down through overbought"
+      },
+      "momentum_roc": {
+        "family": "Momentum",
+        "entry": "ROC(period) crosses up through 0",
+        "exit": "ROC(period) crosses down through 0"
+      },
+      "momentum_mom": {
+        "family": "Momentum",
+        "entry": "Momentum(period) crosses up through 0",
+        "exit": "Momentum(period) crosses down through 0"
+      },
+      "momentum_macd": {
+        "family": "Momentum",
+        "entry": "MACD(fast, slow, signal) crosses up through signal",
+        "exit": "MACD crosses down through signal"
+      },
+      "momentum_stochastic": {
+        "family": "Momentum",
+        "entry": "%K crosses up through oversold",
+        "exit": "%K crosses down through overbought"
+      },
+      "breakout_donchian": {
+        "family": "Breakout",
+        "entry": "Close > Donchian(period).Upper",
+        "exit": "Close < Donchian(period).Middle"
+      },
+      "breakout_highlow": {
+        "family": "Breakout",
+        "entry": "Close > rolling_high(period)",
+        "exit": "Close < rolling_low(period)"
+      },
+      "breakout_atr": {
+        "family": "Breakout",
+        "entry": "Close > Close[lookback] + k * ATR(period)",
+        "exit": "Close < Close[lookback] - k * ATR(period)"
+      },
+      "meanrev_bollinger": {
+        "family": "Mean Reversion",
+        "entry": "Close < BB(period, k).Lower",
+        "exit": "Close > BB(period, k).Middle"
+      },
+      "meanrev_rsi": {
+        "family": "Mean Reversion",
+        "entry": "RSI(period) < oversold",
+        "exit": "RSI(period) > mid"
+      },
+      "meanrev_ma": {
+        "family": "Mean Reversion",
+        "entry": "Close < SMA(entry_period) * (1 - pct)",
+        "exit": "Close > SMA(exit_period)"
+      },
+      "hybrid_ema_rsi": {
+        "family": "Hybrid",
+        "entry": "EMA(fast) > EMA(slow) AND RSI(period) > 50",
+        "exit": "EMA(fast) < EMA(slow) OR RSI(period) < exit_level"
+      },
+      "hybrid_ema_adx": {
+        "family": "Hybrid",
+        "entry": "EMA(fast) > EMA(slow) AND ADX(adx_period) > 25",
+        "exit": "EMA(fast) < EMA(slow) OR ADX(adx_period) < 20"
+      },
+      "hybrid_breakout_atr": {
+        "family": "Hybrid",
+        "entry": "Close > Donchian(period).Upper AND ATR(period) > k * SMA(ATR, 50)",
+        "exit": "Close < Donchian(period).Middle"
+      }
+    },
+    "cost_config": {
+      "NVDA": {
+        "commission_bps": 0.0,
+        "spread_bps": 2.0,
+        "slippage_bps": 3.0
+      },
+      "SPY": {
+        "commission_bps": 0.0,
+        "spread_bps": 1.0,
+        "slippage_bps": 2.0
+      },
+      "QQQ": {
+        "commission_bps": 0.0,
+        "spread_bps": 1.0,
+        "slippage_bps": 2.0
+      },
+      "000688.SH": {
+        "commission_bps": 3.0,
+        "spread_bps": 2.0,
+        "slippage_bps": 3.0
+      },
+      "HSTECH": {
+        "commission_bps": 2.0,
+        "spread_bps": 3.0,
+        "slippage_bps": 4.0
+      },
+      "EURUSD": {
+        "commission_bps": 0.0,
+        "spread_bps": 1.0,
+        "slippage_bps": 0.5
+      },
+      "XAUUSD": {
+        "commission_bps": 0.5,
+        "spread_bps": 3.0,
+        "slippage_bps": 2.5
+      },
+      "AU": {
+        "commission_bps": 1.0,
+        "spread_bps": 2.0,
+        "slippage_bps": 3.0
+      },
+      "AG": {
+        "commission_bps": 1.0,
+        "spread_bps": 3.0,
+        "slippage_bps": 4.0
+      }
+    },
+    "gate_thresholds": {
+      "min_trades": 20,
+      "min_sharpe": 0.8,
+      "min_oos_return": 0.0,
+      "max_drawdown": -0.3,
+      "min_profit_factor": 1.15,
+      "wf_min_positive_windows": 0.66,
+      "stability_min_positive_frac": 0.5,
+      "stability_max_cv": 1.5,
+      "min_assets_passed": 3,
+      "complexity_base": 4
+    },
+    "score_weights": {
+      "oos_sharpe": 0.25,
+      "oos_return": 0.2,
+      "drawdown": 0.15,
+      "profit_factor": 0.15,
+      "stability": 0.1,
+      "trade_count": 0.1,
+      "complexity": -0.05
+    }
+  },
+  "generated_at": "2026-08-19T09:16:20.490029+00:00",
+  "candidates": [
+    {
+      "candidate_id": "C0001",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 100
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    },
+    {
+      "candidate_id": "C0002",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 30
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    },
+    {
+      "candidate_id": "C0003",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 40
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    },
+    {
+      "candidate_id": "C0004",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 50
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    },
+    {
+      "candidate_id": "C0005",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 60
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    },
+    {
+      "candidate_id": "C0006",
+      "family": "Trend",
+      "structure_id": "trend_ema_cross",
+      "parameters": {
+        "fast": 10,
+        "slow": 80
+      },
+      "asset": "ALL",
+      "timeframe": "1H",
+      "dataset_version": "research-universe-v1.1",
+      "spec_version": "v1",
+      "entry_rule": "EMA(fast) > EMA(slow)",
+      "exit_rule": "EMA(fast) < EMA(slow)",
+      "description": "Long when EMA(fast) > EMA(slow); exit when EMA(fast) < EMA(slow).",
+      "status": "GENERATED",
+      "reject_reason": null
+    }
+  ]
+}

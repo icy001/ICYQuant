@@ -1,0 +1,1530 @@
+{
+  "experiment_id": "factor-smoke",
+  "track": "factor",
+  "spec": {
+    "version": "factor-discovery-v1",
+    "universe": [
+      "NVDA",
+      "SPY"
+    ],
+    "timeframe": "1H",
+    "alphas_total": 101,
+    "thresholds": {
+      "min_coverage": 0.8,
+      "min_abs_ic": 0.02,
+      "min_abs_rank_ic": 0.02,
+      "min_abs_icir": 0.3,
+      "min_train_sharpe": 0.5,
+      "min_val_abs_ic": 0.01,
+      "min_val_return": 0.0,
+      "min_oos_abs_ic": 0.01,
+      "min_oos_sharpe": 0.5,
+      "max_drawdown": -0.5,
+      "max_turnover_per_bar": 0.5,
+      "wf_min_positive_frac": 0.66,
+      "min_assets_passed": 3,
+      "min_block_count": 2
+    },
+    "score_weights": {
+      "oos_icir": 0.3,
+      "oos_sharpe": 0.25,
+      "oos_ic": 0.15,
+      "validation_consistency": 0.1,
+      "stability": 0.1,
+      "walk_forward_frac": 0.1,
+      "turnover_penalty": -0.1
+    },
+    "alpha_score_weights": {
+      "oos_icir": 0.35,
+      "oos_sharpe": 0.25,
+      "oos_ic": 0.15,
+      "breadth": 0.25
+    },
+    "adaptations": {
+      "rank": "rolling percentile over 250 bars",
+      "scale": "rolling magnitude normalisation over 250 bars",
+      "indneutralize": "identity (single-asset mode)",
+      "vwap": "(high + low + close) / 3 proxy",
+      "cap": "20-bar average dollar volume proxy",
+      "delay": "all alphas evaluated delay-1",
+      "z_window": 250,
+      "z_clip": 3.0,
+      "entry_z": 1.0,
+      "exit_z": 0.25,
+      "ic_block_bars": 120
+    },
+    "alphas_run": 6
+  },
+  "split": {
+    "name": "v1-3y-60-20-20",
+    "train": [
+      "2023-01-01",
+      "2024-06-30"
+    ],
+    "validation": [
+      "2024-07-01",
+      "2024-12-31"
+    ],
+    "oos": [
+      "2025-01-01",
+      "2025-12-31"
+    ],
+    "note": "Adapted from the ideal 2021-2023/2024/2025-2026 split to the current 3-year dataset (no data extension in v1)."
+  },
+  "funnel": {
+    "alphas_total": 6,
+    "pairs_backtested": 12,
+    "validation_passed": 0,
+    "oos_passed": 0,
+    "robustness_passed": 0,
+    "final_alphas": 0
+  },
+  "ranked_pairs": [],
+  "alpha_summary": [
+    {
+      "alpha_id": "Alpha001",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.0384,
+      "mean_oos_ic": -0.0444,
+      "mean_oos_icir": -0.3636,
+      "reject_reasons": {
+        "train_icir": 1,
+        "train_performance": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha002",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.1452,
+      "mean_oos_ic": 0.01595,
+      "mean_oos_icir": 0.2117,
+      "reject_reasons": {
+        "train_ic": 1,
+        "train_icir": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha003",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.1243,
+      "mean_oos_ic": 0.01225,
+      "mean_oos_icir": 0.1375,
+      "reject_reasons": {
+        "train_icir": 1,
+        "train_ic": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha004",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.0866,
+      "mean_oos_ic": -0.064,
+      "mean_oos_icir": -0.4646,
+      "reject_reasons": {
+        "train_performance": 2
+      }
+    },
+    {
+      "alpha_id": "Alpha005",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.0269,
+      "mean_oos_ic": -0.0372,
+      "mean_oos_icir": -0.1453,
+      "reject_reasons": {
+        "train_icir": 1,
+        "train_performance": 1
+      }
+    },
+    {
+      "alpha_id": "Alpha006",
+      "assets_passed": [],
+      "assets_passed_count": 0,
+      "status": "REJECTED",
+      "mean_oos_sharpe": 0.134,
+      "mean_oos_ic": 0.0052,
+      "mean_oos_icir": -0.0019,
+      "reject_reasons": {
+        "train_ic": 2
+      }
+    }
+  ],
+  "cross_asset_matrix": {
+    "icir": {
+      "Alpha001": {
+        "NVDA": -0.2433,
+        "SPY": -0.4839
+      },
+      "Alpha002": {
+        "NVDA": 0.3901,
+        "SPY": 0.0332
+      },
+      "Alpha003": {
+        "NVDA": 0.2639,
+        "SPY": 0.011
+      },
+      "Alpha004": {
+        "NVDA": -0.2748,
+        "SPY": -0.6544
+      },
+      "Alpha005": {
+        "NVDA": 0.1903,
+        "SPY": -0.4809
+      },
+      "Alpha006": {
+        "NVDA": 0.1449,
+        "SPY": -0.1486
+      }
+    },
+    "passed": {
+      "Alpha001": {
+        "NVDA": false,
+        "SPY": false
+      },
+      "Alpha002": {
+        "NVDA": false,
+        "SPY": false
+      },
+      "Alpha003": {
+        "NVDA": false,
+        "SPY": false
+      },
+      "Alpha004": {
+        "NVDA": false,
+        "SPY": false
+      },
+      "Alpha005": {
+        "NVDA": false,
+        "SPY": false
+      },
+      "Alpha006": {
+        "NVDA": false,
+        "SPY": false
+      }
+    },
+    "assets": [
+      "NVDA",
+      "SPY"
+    ]
+  },
+  "reject_reasons": {
+    "train_icir": 4,
+    "train_performance": 4,
+    "train_ic": 4
+  },
+  "outcomes": {
+    "Alpha001": {
+      "NVDA": {
+        "alpha_id": "Alpha001",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_icir",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0317"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0262"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.269"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.11 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0332, val LS return=-31.26%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0368, oos LS sharpe=0.07 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-5.35% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.428 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=0.75"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0368,
+          "rank_ic": -0.0291,
+          "icir": -0.2433,
+          "sharpe": 0.0668,
+          "total_return": -0.528721,
+          "max_drawdown": -0.053506,
+          "turnover_per_bar": 0.428024,
+          "trade_count": 391,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha001",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0497"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0484"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-0.627"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.02 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0083, val LS return=-15.60%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.052, oos LS sharpe=0.01 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-3.98% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.437 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.052,
+          "rank_ic": -0.0482,
+          "icir": -0.4839,
+          "sharpe": 0.0099,
+          "total_return": -0.344464,
+          "max_drawdown": -0.039829,
+          "turnover_per_bar": 0.437329,
+          "trade_count": 400,
+          "blocks": 15
+        }
+      }
+    },
+    "Alpha002": {
+      "NVDA": {
+        "alpha_id": "Alpha002",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=-0.0055"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=-0.0018"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.024"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.12 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.053, val LS return=17.25%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0322, oos LS sharpe=0.19 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-7.91% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.195 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=3/6 (frac=0.50)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.5"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0322,
+          "rank_ic": 0.0314,
+          "icir": 0.3901,
+          "sharpe": 0.1884,
+          "total_return": 0.094509,
+          "max_drawdown": -0.079101,
+          "turnover_per_bar": 0.194855,
+          "trade_count": 178,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha002",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_icir",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0209"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0206"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.212"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.08 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=0.0092, val LS return=-4.43%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0003, oos LS sharpe=0.10 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-4.84% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.192 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=0/6 (frac=0.00)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0003,
+          "rank_ic": 0.0023,
+          "icir": 0.0332,
+          "sharpe": 0.1021,
+          "total_return": -0.152262,
+          "max_drawdown": -0.048414,
+          "turnover_per_bar": 0.192118,
+          "trade_count": 176,
+          "blocks": 15
+        }
+      }
+    },
+    "Alpha003": {
+      "NVDA": {
+        "alpha_id": "Alpha003",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_icir",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0292"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0223"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.112"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.11 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0724, val LS return=-27.77%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.022, oos LS sharpe=0.09 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-5.93% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.186 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=0/6 (frac=0.00)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=0.75"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.022,
+          "rank_ic": 0.0199,
+          "icir": 0.2639,
+          "sharpe": 0.0899,
+          "total_return": -0.081948,
+          "max_drawdown": -0.059254,
+          "turnover_per_bar": 0.18555,
+          "trade_count": 170,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha003",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=0.006"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=0.0034"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=0.019"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.07 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0238, val LS return=-10.46%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0025, oos LS sharpe=0.16 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-3.99% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.187 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.25"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0025,
+          "rank_ic": 0.0078,
+          "icir": 0.011,
+          "sharpe": 0.1587,
+          "total_return": -0.075128,
+          "max_drawdown": -0.03992,
+          "turnover_per_bar": 0.187192,
+          "trade_count": 171,
+          "blocks": 15
+        }
+      }
+    },
+    "Alpha004": {
+      "NVDA": {
+        "alpha_id": "Alpha004",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0533"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0496"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-0.336"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.15 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.045, val LS return=-33.03%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0397, oos LS sharpe=0.05 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-6.49% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.249 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=0.75"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0397,
+          "rank_ic": -0.0405,
+          "icir": -0.2748,
+          "sharpe": 0.0527,
+          "total_return": -0.504352,
+          "max_drawdown": -0.064883,
+          "turnover_per_bar": 0.249042,
+          "trade_count": 228,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha004",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0817"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0825"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-0.641"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.06 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0559, val LS return=-17.73%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0883, oos LS sharpe=0.12 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-4.15% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.234 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=2/6 (frac=0.33)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0883,
+          "rank_ic": -0.0878,
+          "icir": -0.6544,
+          "sharpe": 0.1205,
+          "total_return": -0.434515,
+          "max_drawdown": -0.041492,
+          "turnover_per_bar": 0.233716,
+          "trade_count": 214,
+          "blocks": 15
+        }
+      }
+    },
+    "Alpha005": {
+      "NVDA": {
+        "alpha_id": "Alpha005",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_icir",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0613"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0602"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.295"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.14 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0342, val LS return=-11.20%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.005, oos LS sharpe=0.06 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-5.31% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.205 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=0/6 (frac=0.00)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=0.75"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.005,
+          "rank_ic": -0.0066,
+          "icir": 0.1903,
+          "sharpe": 0.0605,
+          "total_return": -0.276639,
+          "max_drawdown": -0.053142,
+          "turnover_per_bar": 0.204707,
+          "trade_count": 187,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha005",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_performance",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=0.95 >= 0.8, train blocks=21 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": true,
+            "detail": "train IC=-0.0882"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": true,
+            "detail": "train RankIC=-0.0921"
+          },
+          {
+            "name": "train_icir",
+            "passed": true,
+            "detail": "train ICIR=-0.929"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.05 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.091, val LS return=-20.66%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0694, oos LS sharpe=-0.01 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-4.38% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.215 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=1.0"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0694,
+          "rank_ic": -0.0777,
+          "icir": -0.4809,
+          "sharpe": -0.0067,
+          "total_return": -0.294723,
+          "max_drawdown": -0.043819,
+          "turnover_per_bar": 0.215107,
+          "trade_count": 196,
+          "blocks": 15
+        }
+      }
+    },
+    "Alpha006": {
+      "NVDA": {
+        "alpha_id": "Alpha006",
+        "asset": "NVDA",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=1.00 >= 0.8, train blocks=23 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=-0.0127"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=-0.0086"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=-0.023"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.13 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0947, val LS return=-35.70%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=0.0202, oos LS sharpe=0.13 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-5.97% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.182 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": false,
+            "detail": "quarter sign consistency=0.5"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=5.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=3.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": 0.0202,
+          "rank_ic": 0.0168,
+          "icir": 0.1449,
+          "sharpe": 0.13,
+          "total_return": -0.014616,
+          "max_drawdown": -0.059662,
+          "turnover_per_bar": 0.182266,
+          "trade_count": 166,
+          "blocks": 15
+        }
+      },
+      "SPY": {
+        "alpha_id": "Alpha006",
+        "asset": "SPY",
+        "passed": false,
+        "fail_reason": "train_ic",
+        "checks": [
+          {
+            "name": "dataset_gate",
+            "passed": true,
+            "detail": "bars loaded and segments non-empty"
+          },
+          {
+            "name": "factor_computable",
+            "passed": true,
+            "detail": "coverage=1.00 >= 0.8, train blocks=23 >= 2"
+          },
+          {
+            "name": "train_ic",
+            "passed": false,
+            "detail": "train IC=0.0104"
+          },
+          {
+            "name": "train_rank_ic",
+            "passed": false,
+            "detail": "train RankIC=0.0084"
+          },
+          {
+            "name": "train_icir",
+            "passed": false,
+            "detail": "train ICIR=0.065"
+          },
+          {
+            "name": "train_performance",
+            "passed": false,
+            "detail": "train LS sharpe=0.07 >= 0.5"
+          },
+          {
+            "name": "validation_performance",
+            "passed": false,
+            "detail": "val IC=-0.0258, val LS return=-9.15%"
+          },
+          {
+            "name": "oos_performance",
+            "passed": false,
+            "detail": "oos IC=-0.0098, oos LS sharpe=0.14 >= 0.5"
+          },
+          {
+            "name": "max_drawdown",
+            "passed": true,
+            "detail": "oos max_dd=-3.75% >= -50%"
+          },
+          {
+            "name": "turnover_cap",
+            "passed": true,
+            "detail": "oos turnover/bar=0.195 <= 0.5"
+          },
+          {
+            "name": "walk_forward",
+            "passed": false,
+            "detail": "wf windows positive=1/6 (frac=0.17)"
+          },
+          {
+            "name": "stability",
+            "passed": true,
+            "detail": "quarter sign consistency=0.75"
+          },
+          {
+            "name": "no_lookahead",
+            "passed": true,
+            "detail": "delay-1 alignment: factor[t] predicts return t->t+1 only"
+          },
+          {
+            "name": "oos_isolated",
+            "passed": true,
+            "detail": "OOS used only for the final measurement; walk-forward inside train+validation"
+          },
+          {
+            "name": "transaction_cost",
+            "passed": true,
+            "detail": "one-way cost=3.0 bps"
+          },
+          {
+            "name": "slippage",
+            "passed": true,
+            "detail": "slippage=2.0 bps"
+          }
+        ],
+        "oos_metrics": {
+          "ic": -0.0098,
+          "rank_ic": -0.0009,
+          "icir": -0.1486,
+          "sharpe": 0.1379,
+          "total_return": -0.11996,
+          "max_drawdown": -0.037509,
+          "turnover_per_bar": 0.194855,
+          "trade_count": 178,
+          "blocks": 15
+        }
+      }
+    }
+  },
+  "runtime_seconds": 0.24,
+  "report_generated_at": "2026-08-19T09:58:30.145121+00:00",
+  "alpha_ranking": [
+    {
+      "alpha_id": "Alpha004",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.064,
+      "mean_oos_rank_ic": -0.06415,
+      "mean_oos_icir": -0.4646,
+      "mean_oos_sharpe": 0.0866,
+      "mean_turnover": 0.241379,
+      "status": "REJECTED",
+      "score": 0.7511,
+      "rank": 1
+    },
+    {
+      "alpha_id": "Alpha002",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": 0.01595,
+      "mean_oos_rank_ic": 0.01685,
+      "mean_oos_icir": 0.21165,
+      "mean_oos_sharpe": 0.14525,
+      "mean_turnover": 0.193487,
+      "status": "REJECTED",
+      "score": 0.5611,
+      "rank": 2
+    },
+    {
+      "alpha_id": "Alpha001",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.0444,
+      "mean_oos_rank_ic": -0.03865,
+      "mean_oos_icir": -0.3636,
+      "mean_oos_sharpe": 0.03835,
+      "mean_turnover": 0.432677,
+      "status": "REJECTED",
+      "score": 0.5228,
+      "rank": 3
+    },
+    {
+      "alpha_id": "Alpha003",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": 0.01225,
+      "mean_oos_rank_ic": 0.01385,
+      "mean_oos_icir": 0.13745,
+      "mean_oos_sharpe": 0.1243,
+      "mean_turnover": 0.186371,
+      "status": "REJECTED",
+      "score": 0.4513,
+      "rank": 4
+    },
+    {
+      "alpha_id": "Alpha006",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": 0.0052,
+      "mean_oos_rank_ic": 0.00795,
+      "mean_oos_icir": -0.00185,
+      "mean_oos_sharpe": 0.13395,
+      "mean_turnover": 0.188561,
+      "status": "REJECTED",
+      "score": 0.3511,
+      "rank": 5
+    },
+    {
+      "alpha_id": "Alpha005",
+      "assets_passed_count": 0,
+      "assets_passed": [],
+      "breadth": 0.0,
+      "mean_oos_ic": -0.0372,
+      "mean_oos_rank_ic": -0.04215,
+      "mean_oos_icir": -0.1453,
+      "mean_oos_sharpe": 0.0269,
+      "mean_turnover": 0.209907,
+      "status": "REJECTED",
+      "score": 0.3151,
+      "rank": 6
+    }
+  ],
+  "pair_ranking": [],
+  "strategy_experiment_id": "lab-v1",
+  "convergence": {
+    "strategy_report_found": true,
+    "strategy_experiment_id": "lab-v1",
+    "strategy_final_candidates": 38,
+    "factor_candidates": [],
+    "factor_watch_list": [
+      "Alpha004",
+      "Alpha001",
+      "Alpha002",
+      "Alpha005",
+      "Alpha003"
+    ],
+    "combinations": []
+  }
+}
