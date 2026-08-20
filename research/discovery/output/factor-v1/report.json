@@ -47,6 +47,8 @@
       "oos_ic": 0.15,
       "breadth": 0.25
     },
+    "note": "",
+    "split": null,
     "adaptations": {
       "rank": "rolling percentile over 250 bars among available values (min 50% coverage, None-tolerant)",
       "scale": "rolling magnitude normalisation over 250 bars (None-tolerant, min 50% coverage)",
@@ -85,7 +87,8 @@
     "validation_passed": 28,
     "oos_passed": 26,
     "robustness_passed": 22,
-    "final_alphas": 22
+    "final_alphas": 22,
+    "decorrelated_alphas": 15
   },
   "ranked_pairs": [
     {
@@ -96518,8 +96521,197 @@
       }
     }
   },
-  "runtime_seconds": 10.0,
-  "report_generated_at": "2026-08-19T10:26:21.004529+00:00",
+  "decorrelation": {
+    "threshold": 0.65,
+    "n_families": 15,
+    "families": [
+      {
+        "family": "D1",
+        "members": [
+          "Alpha005",
+          "Alpha038",
+          "Alpha054",
+          "Alpha060",
+          "Alpha101"
+        ],
+        "representative": "Alpha060",
+        "dropped": [
+          "Alpha005",
+          "Alpha038",
+          "Alpha054",
+          "Alpha101"
+        ],
+        "intra_mean_abs_corr": 0.8282,
+        "representative_score": 0.60314
+      },
+      {
+        "family": "D2",
+        "members": [
+          "Alpha004",
+          "Alpha019",
+          "Alpha039",
+          "Alpha047"
+        ],
+        "representative": "Alpha019",
+        "dropped": [
+          "Alpha004",
+          "Alpha039",
+          "Alpha047"
+        ],
+        "intra_mean_abs_corr": 0.7621,
+        "representative_score": 0.6996666666666668
+      },
+      {
+        "family": "D3",
+        "members": [
+          "Alpha008"
+        ],
+        "representative": "Alpha008",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.7317400000000001
+      },
+      {
+        "family": "D4",
+        "members": [
+          "Alpha020"
+        ],
+        "representative": "Alpha020",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.530875
+      },
+      {
+        "family": "D5",
+        "members": [
+          "Alpha021"
+        ],
+        "representative": "Alpha021",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.58525
+      },
+      {
+        "family": "D6",
+        "members": [
+          "Alpha029"
+        ],
+        "representative": "Alpha029",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.4867
+      },
+      {
+        "family": "D7",
+        "members": [
+          "Alpha030"
+        ],
+        "representative": "Alpha030",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.7158333333333333
+      },
+      {
+        "family": "D8",
+        "members": [
+          "Alpha032"
+        ],
+        "representative": "Alpha032",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.55824
+      },
+      {
+        "family": "D9",
+        "members": [
+          "Alpha046"
+        ],
+        "representative": "Alpha046",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.638275
+      },
+      {
+        "family": "D10",
+        "members": [
+          "Alpha063"
+        ],
+        "representative": "Alpha063",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.6698500000000001
+      },
+      {
+        "family": "D11",
+        "members": [
+          "Alpha064"
+        ],
+        "representative": "Alpha064",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.5936333333333333
+      },
+      {
+        "family": "D12",
+        "members": [
+          "Alpha069"
+        ],
+        "representative": "Alpha069",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.4831
+      },
+      {
+        "family": "D13",
+        "members": [
+          "Alpha089"
+        ],
+        "representative": "Alpha089",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.7055333333333333
+      },
+      {
+        "family": "D14",
+        "members": [
+          "Alpha090"
+        ],
+        "representative": "Alpha090",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.6778666666666666
+      },
+      {
+        "family": "D15",
+        "members": [
+          "Alpha094"
+        ],
+        "representative": "Alpha094",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.587075
+      }
+    ],
+    "representatives": [
+      "Alpha060",
+      "Alpha019",
+      "Alpha008",
+      "Alpha020",
+      "Alpha021",
+      "Alpha029",
+      "Alpha030",
+      "Alpha032",
+      "Alpha046",
+      "Alpha063",
+      "Alpha064",
+      "Alpha069",
+      "Alpha089",
+      "Alpha090",
+      "Alpha094"
+    ]
+  },
+  "runtime_seconds": 22.92,
+  "report_generated_at": "2026-08-20T07:11:54.044816+00:00",
   "alpha_ranking": [
     {
       "alpha_id": "Alpha008",

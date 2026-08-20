@@ -42,6 +42,7 @@ from .factor_backtest import (
 )
 from .factor_gate import FactorGate, FactorGateOutcome, PairEvidence
 from .factor_spec import (
+    DECORRELATION_ABS_CORR,
     FACTOR_SPEC_V1,
     FactorSpec,
     IC_BLOCK_BARS,
@@ -68,11 +69,13 @@ class FactorExperimentResult:
     oos_passed: int = 0
     robustness_passed: int = 0
     final_alphas: int = 0
+    decorrelated_alphas: int = 0
     ranked_pairs: list[dict[str, Any]] = field(default_factory=list)
     alpha_summary: list[dict[str, Any]] = field(default_factory=list)
     cross_asset_matrix: dict[str, dict[str, Any]] = field(default_factory=dict)
     reject_reasons: dict[str, int] = field(default_factory=dict)
     outcomes: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    decorrelation: dict[str, Any] = field(default_factory=dict)
     runtime_seconds: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -88,12 +91,14 @@ class FactorExperimentResult:
                 "oos_passed": self.oos_passed,
                 "robustness_passed": self.robustness_passed,
                 "final_alphas": self.final_alphas,
+                "decorrelated_alphas": self.decorrelated_alphas,
             },
             "ranked_pairs": self.ranked_pairs,
             "alpha_summary": self.alpha_summary,
             "cross_asset_matrix": self.cross_asset_matrix,
             "reject_reasons": self.reject_reasons,
             "outcomes": self.outcomes,
+            "decorrelation": self.decorrelation,
             "runtime_seconds": round(self.runtime_seconds, 2),
         }
 
@@ -356,6 +361,15 @@ class FactorDiscoveryEngine:
         result.alpha_summary = self._alpha_summary(result.outcomes, universe)
         result.cross_asset_matrix = self._cross_asset_matrix(
             result.outcomes, alpha_ids, universe)
+
+        # ---- de-correlation gate (17th step, after the 16-item gate) --- #
+        final_ids = [s["alpha_id"] for s in result.alpha_summary
+                     if s["status"] == "CANDIDATE"]
+        result.decorrelation = self._decorrelation(final_ids, universe,
+                                                   result.ranked_pairs)
+        result.decorrelated_alphas = len(
+            result.decorrelation.get("representatives", []))
+
         result.runtime_seconds = time.time() - t0
         return result
 
@@ -421,6 +435,49 @@ class FactorDiscoveryEngine:
             if ok:
                 n += 1
         return n
+
+    # ------------------------------------------------------------------ #
+    def _decorrelation(self, final_ids: list[str], universe: tuple[str, ...],
+                       ranked_pairs: list[dict[str, Any]]) -> dict[str, Any]:
+        """De-correlation Gate — one representative per correlation family.
+
+        Factor values of the gate-passing alphas are recomputed on the
+        train + validation bars only (the OOS segment is never touched) and
+        clustered by their mean-across-assets Spearman |corr|; per family
+        the member with the highest mean (alpha, asset) pair score is kept.
+        Fail-soft: on any internal error the gate is reported as errored
+        and every final alpha stays a representative (no silent pruning).
+        """
+        from .cluster import compute_factor_views, decorrelate, load_asset_contexts
+
+        scores: dict[str, Optional[float]] = {}
+        agg: dict[str, list[float]] = {}
+        for r in ranked_pairs:
+            agg.setdefault(r["alpha_id"], []).append(r["score"])
+        scores = {a: sum(v) / len(v) for a, v in agg.items()}
+
+        try:
+            ctxs = load_asset_contexts(
+                self.data_root, list(universe), self.timeframe, self.split)
+            factors, _ = compute_factor_views(
+                ctxs, final_ids,
+                z_window=self.z_window,
+                rank_window=self.rank_window or 250,
+                ic_block_bars=self.ic_block_bars)
+            return decorrelate(final_ids, factors, scores,
+                               threshold=DECORRELATION_ABS_CORR)
+        except Exception as exc:  # noqa: BLE001 — fail-soft, reported
+            return {
+                "threshold": DECORRELATION_ABS_CORR,
+                "error": f"{type(exc).__name__}: {exc}",
+                "n_families": len(final_ids),
+                "families": [{"family": f"D{i+1}", "members": [a],
+                              "representative": a, "dropped": [],
+                              "intra_mean_abs_corr": 0.0,
+                              "representative_score": scores.get(a)}
+                             for i, a in enumerate(sorted(final_ids))],
+                "representatives": sorted(final_ids),
+            }
 
     # ------------------------------------------------------------------ #
     def _rank_pairs(self, outcomes: dict[str, dict[str, dict[str, Any]]]

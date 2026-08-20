@@ -2,8 +2,8 @@
 
 - **Experiment**: `factor-v1`
 - **Spec version**: `factor-discovery-v1`
-- **Generated at**: `2026-08-19T10:26:21.004529+00:00`
-- **Runtime**: 10.0s
+- **Generated at**: `2026-08-20T07:11:54.044816+00:00`
+- **Runtime**: 22.9s
 - **Split**: `v1-3y-60-20-20` — Train ['2023-01-01', '2024-06-30'] | Validation ['2024-07-01', '2024-12-31'] | OOS ['2025-01-01', '2025-12-31']
 
 ## Factor Gate v1 Funnel
@@ -16,6 +16,27 @@
 | oos_passed | 26 |
 | robustness_passed | 22 |
 | final_alphas | 22 |
+| decorrelated_alphas | 15 |
+
+## De-correlation Gate (\|corr\| >= 0.65)
+
+| Family | Representative | Dropped (redundant) | Intra \|corr\| | Rep. pair score |
+|---|---|---|---:|---:|
+| D1 | Alpha060 | Alpha005, Alpha038, Alpha054, Alpha101 | 0.83 | 0.6031 |
+| D2 | Alpha019 | Alpha004, Alpha039, Alpha047 | 0.76 | 0.6997 |
+| D3 | Alpha008 | — | 0.00 | 0.7317 |
+| D4 | Alpha020 | — | 0.00 | 0.5309 |
+| D5 | Alpha021 | — | 0.00 | 0.5853 |
+| D6 | Alpha029 | — | 0.00 | 0.4867 |
+| D7 | Alpha030 | — | 0.00 | 0.7158 |
+| D8 | Alpha032 | — | 0.00 | 0.5582 |
+| D9 | Alpha046 | — | 0.00 | 0.6383 |
+| D10 | Alpha063 | — | 0.00 | 0.6699 |
+| D11 | Alpha064 | — | 0.00 | 0.5936 |
+| D12 | Alpha069 | — | 0.00 | 0.4831 |
+| D13 | Alpha089 | — | 0.00 | 0.7055 |
+| D14 | Alpha090 | — | 0.00 | 0.6779 |
+| D15 | Alpha094 | — | 0.00 | 0.5871 |
 
 ## ② Alpha Ranking (top 25)
 

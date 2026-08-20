@@ -1,0 +1,5 @@
+symbol,signals,filled,rejected,errored,realized_pnl,final_position,avg_cost,last_close,unrealized_pnl
+NVDA,70,57,10,3,11587.72,500,196.7779,217.56,10391.06
+QQQ,75,63,9,3,53860.76,200,703.2496,716.08,2566.09
+SPY,75,69,6,0,2800.0,100,769.2907,769.06,-23.07
+TOTAL,220,189,25,6,68248.48,,,,12934.08

@@ -36,6 +36,16 @@ IC_BLOCK_MIN_PAIRS = 30   # minimum valid pairs per IC block
 STABILITY_QUARTERS = 4    # train segment split into this many sign blocks
 STABILITY_MIN_FRAC = 0.75  # >= 3/4 quarters must share the train IC sign
 
+# De-correlation Gate (17th gate step, applied AFTER the 16-item Factor Gate)
+# ---------------------------------------------------------------------------
+# Gate-passing alphas whose factor values correlate with |Spearman corr| >=
+# this threshold (mean across assets, train + validation bars only) belong
+# to the same latent factor family; only one representative per family is
+# promoted.  0.65 resolves the evident families seen on the real daily data
+# (range-position reversal A/B, momentum-conditioned pair) while 0.80 would
+# keep near-duplicates together — see output/factor-real-cluster.
+DECORRELATION_ABS_CORR = 0.65
+
 # Gate thresholds (fail-closed; never tuned to let a factor through) --------
 FACTOR_GATE_THRESHOLDS: dict[str, Any] = {
     "min_coverage": 0.80,        # fraction of bars with a computable factor
