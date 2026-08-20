@@ -276,6 +276,46 @@ def alerts(principal: Principal = Depends(require_roles())) -> dict:
     return {"alerts": runtime.alerts()}
 
 
+# ---------------------------------------------------------------------------
+# Factor paper trading (Alpha021) - deterministic research-layer replay
+# ---------------------------------------------------------------------------
+_factor_paper_cache: Optional[dict] = None
+
+
+@router.get("/dashboard/factor")
+def factor_paper(principal: Principal = Depends(require_roles())) -> dict:
+    """Alpha021 factor -> paper trading replay (static historical data).
+
+    The replay is deterministic and independent of the live pipeline, so
+    the result is cached after the first request.  Returns
+    ``{"error": ...}`` with a friendly hint when the real daily data files
+    have not been synced into the container yet.
+    """
+    global _factor_paper_cache
+    if _factor_paper_cache is not None:
+        return _factor_paper_cache
+    try:
+        from apps.runtime.factor_gate import build_paper_data, data_dir
+
+        missing = [s for s in ("NVDA", "QQQ", "SPY")
+                   if not (data_dir() / f"{s}_1d.csv").exists()]
+        if missing:
+            payload = {
+                "error": "real daily data files not found under "
+                         f"{data_dir()} (missing: {', '.join(missing)}); "
+                         "sync with: docker cp data/real/d1 "
+                         "icyquant-api:/app/data/real/",
+            }
+        else:
+            payload = build_paper_data()
+    except Exception as exc:  # noqa: BLE001 - surfaced on the page
+        logger.warning("factor paper replay failed: %s", exc)
+        payload = {"error": f"{type(exc).__name__}: {exc}"}
+    if "error" not in payload:
+        _factor_paper_cache = payload
+    return payload
+
+
 @router.get("/dashboard/session")
 def session_status(principal: Principal = Depends(require_roles())) -> dict:
     return {

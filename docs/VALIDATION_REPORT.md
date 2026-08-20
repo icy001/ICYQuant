@@ -129,12 +129,12 @@ icyquant-strategy-runtime   Up 3 hours (healthy)
 
 ## 7. 门禁验收测试（pytest）
 
-### Dashboard Gate（15/15 PASS）
+### Dashboard Gate（16/16 PASS）
 
-D-01~D-15，覆盖 9 个页面（accounts/portfolio/positions/orders/executions/reconciliation/system/strategies/risk）+ API 数据一致性 + Docker 可部署性（static 资源齐全 + docker-compose 定义 api 服务）。
+D-01~D-16，覆盖 10 个页面（accounts/portfolio/positions/orders/executions/reconciliation/system/strategies/risk/factor）+ API 数据一致性 + Docker 可部署性（static 资源齐全 + docker-compose 定义 api 服务）。D-16 校验 Factor 因子纸面页（菜单链接、API payload 结构、headline 数字与逐笔日志一致性；`data/real/d1` 未同步时自动 skip）。
 
 ```text
-15 passed, 140 warnings in 0.70s
+16 passed, 140 warnings in 0.70s
 ```
 
 ### Adapter Gate（12/12 PASS）
@@ -209,15 +209,92 @@ Strategy S001 (Strategy 001 - NVDA 15m Moving Average Cross) on NVDA 15m: PASS
 
 ---
 
+## 8a. Research Layer：Factor Alpha021 Paper Trading（2026-08-20 接入）
+
+因子线首个候选（Alpha021，唯一在合成 1H 与真实日频数据双向通过 16 项 Factor Gate、
+且通过 De-correlation Gate 独立成族的 alpha）已端到端接入纸面交易链路：
+
+```text
+data/real/d1/{NVDA,QQQ,SPY}_1d.csv（真实日频，akshare）
+  -> Alpha021（research/discovery/factor/formulas.py，REAL_D1 密封窗口）
+  -> rolling z-score（120 bars）-> Schmitt 触发仓位
+  -> 方向由 TRAIN 段 IC 符号决定（train-only，不碰 OOS）
+  -> 仓位变化 -> 纸面交易信号（多头映射：+1 持 100 股，其余空仓）
+  -> PaperTradingSession（fill / reject / error / latency / slippage）
+  -> Factor Gate（apps/runtime/factor_gate.py，独立 runtime 命令）
+```
+
+### Factor Gate（8/8 PASS，2026-08-20）
+
+```text
+Factor Alpha021 on NVDA/QQQ/SPY daily: PASS
+  [PASS] data files present: 3/3 files in data/real/d1
+  [PASS] data volume: NVDA=660, QQQ=660, SPY=660
+  [PASS] factor computable: NVDA=98%, QQQ=98%, SPY=98%
+  [PASS] orientation learned: NVDA +0.0744 / QQQ +0.0990 / SPY +0.1087（train IC）
+  [PASS] positions non-flat: NVDA=14%, QQQ=14%, SPY=14%
+  [PASS] signals generated: 220 position changes
+  [PASS] paper execution healthy: fill=85.91% reject=11.36% error=2.73%
+  [PASS] account solvency: equity $1,270,677.96, ledger events 189
+```
+
+已知限制（记录于 gate 报告）：纸面账户不可做空，+1 映射为持 100 股、其余空仓；
+容器内运行需先同步 `data/real/d1`（`docker cp data/real/d1 icyquant-api:/app/data/real/`）。
+
+### De-correlation Gate（第 17 项 Gate，2026-08-20 固化进引擎）
+
+16 项 Factor Gate 之后新增去相关步骤：过闸 alpha 的因子值在 train+validation
+（OOS 永不触碰）上按跨资产平均 Spearman |corr| 聚类（average linkage，
+密封阈值 0.65），每族只保留 pair score 最高者。合成 factor-v1：22 个过闸 alpha
+去相关后为 15 族（D1 区间反转超族 5 成员保 Alpha060，D2 动量条件族 4 成员保
+Alpha019）；真实 factor-real-d1：1 个过闸（Alpha021）→ 1 族。
+
+---
+
+## 8b. 阶段标志：Factor Discovery v2 闭环完成（2026-08-20）
+
+```text
+Alpha101 (101) → Pair Discovery (909) → Validation v2 (16 项 Gate)
+    → Robustness/OOS → De-correlation (22 → 15 独立族)
+    → Candidate (Alpha021，双向验证 + 独立族)
+    → Paper Trading (220 signals / fill 85.91% / ledger 189 events)
+```
+
+| 环节 | 结果 |
+|---|---|
+| Alpha101 / Pair Discovery | 101 alphas × 9 资产 = 909 pairs |
+| Validation v2（16 项 Gate，OOS 不参与选择） | 22 候选（合成）/ 1 候选（真实） |
+| De-correlation Gate（\|corr\|≥0.65） | 22 → 15 独立族 |
+| Alpha021（唯一双向验证 + 独立族） | 晋升 **Paper Candidate** |
+| Paper Trading（NVDA/QQQ/SPY 真实日频） | 220 信号 / 189 成交 / 25 拒单 / 6 错误 |
+| 测试 | discovery 86/86 + dashboard 16/16 |
+
+**Paper 结果口径（重要）**：经济意义上有效的 headline 是按真实收盘定价
+（±3 bps）的回放——equity $1,000,000 → $1,081,183（**+8.12%**，maxDD -5.0%，
+88 笔平仓胜率 68%，已实现 +$68,248 / 浮盈 +$12,934）。Factor Gate 输出里的
+$1,270,678（+27%）是 session 内部随机游走 feed 的管线级数字，仅用于验证
+fill/reject/ledger 链路，不代表收益。已知限制：纸面多头映射 + 拒单仓位漂移
+（期末被动持仓 NVDA500/QQQ200/SPY100），+8.12% 中含部分 2024-26 美股 beta。
+
+**下一阶段（Validation，不是扩展）**：
+1. Alpha021 连续 Paper Trading 积累样本（每次刷新数据后重跑回放，快照存档）；
+2. 观察真实信号稳定性，记录实际 Fill / Reject / Slippage；
+3. Paper 结果与回测 Attribution 对账（分解 alpha / beta / cost）；
+4. 达标后评估 Shadow Trading，最后才是 Live Candidate。
+在 1-3 完成前，不新增 Alpha、不扩展系统。
+
+---
+
 ## 9. 验证命令速查
 
-### runtime CLI（Golden / Paper / Shadow / Strategy / Readiness）
+### runtime CLI（Golden / Paper / Shadow / Strategy / Factor / Readiness）
 
 ```bash
 docker compose exec api python -m apps.runtime scenarios   # Golden Scenarios 8 项
 docker compose exec api python -m apps.runtime paper       # 模拟盘
 docker compose exec api python -m apps.runtime shadow      # 影子交易
 docker compose exec api python -m apps.runtime strategy    # Strategy 001 回测（Research Layer）
+docker compose exec api python -m apps.runtime factor      # Alpha021 因子纸面交易（Research Layer）
 docker compose exec api python -m apps.runtime gate        # Readiness Gate 22 项
 ```
 
@@ -242,6 +319,9 @@ docker compose exec api rm -rf /app/tests
 4. 登录响应字段为 `token`（非 `access_token`）
 5. `python -m apps.runtime strategy` 依赖 `/app/data/lakehouse/NVDA_15m.csv`（宿主
    `data/lakehouse/` 需先 `docker cp` 同步），可用 `infra/scripts/generate_nvda_15m.py` 重新生成
+6. `python -m apps.runtime factor` 依赖 `/app/data/real/d1/{NVDA,QQQ,SPY}_1d.csv`
+   （宿主 `data/real/d1/` 需先 `docker cp data/real/d1 icyquant-api:/app/data/real/`
+   同步），可用 `python -m research.data.fetch_real` 重新抓取
 
 ---
 
@@ -253,5 +333,7 @@ docker compose exec api rm -rf /app/tests
 | 2026-08-18 | v0.4.0-alpha2 | Paper Trading 模拟盘（100 信号）：fill 85.0% / reject 13.0% / error 2.0%，全链路延迟 82.6μs，滑点 3.81 bps，equity 2,088,651.33，ledger events 85 | PASS |
 | 2026-08-18 | v0.4.0-alpha2 | Shadow Trading 影子交易（50 信号）：50/50 consistent，主/影子持仓逐笔一致（AAPL 1090/MSFT 1100/TSLA 1040），ledger events 50/50 | PASS |
 | 2026-08-19 | v0.4.0-alpha2 | Research Layer 接入：Strategy 001（NVDA 15m 双均线）回测 5 笔交易，Readiness Gate 21→22，Strategy Gate 6/6 + 单测 8/8 + research 包回归 122/122 | 全部 PASS（280 项累计） |
+| 2026-08-20 | v0.4.0-alpha2 | Factor Layer 接入：Alpha021（NVDA/QQQ/SPY 真实日频）因子→纸面交易 220 信号，fill 85.91%，Factor Gate 8/8；De-correlation Gate 固化进 Factor 引擎（合成 22→15 族，真实 1→1）；discovery 测试 86/86 | 全部 PASS |
+| 2026-08-20 | v0.4.0-alpha2 | Dashboard 集成 Factor 因子纸面页（#/factor 菜单 + /api/dashboard/factor + 容器内静态历史回放），Dashboard Gate 15→16（host 与容器均 16/16） | 全部 PASS |
 
 后续每次验证后请在下方追加记录。

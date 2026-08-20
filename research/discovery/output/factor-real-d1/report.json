@@ -102,7 +102,8 @@
     "validation_passed": 3,
     "oos_passed": 2,
     "robustness_passed": 1,
-    "final_alphas": 1
+    "final_alphas": 1,
+    "decorrelated_alphas": 1
   },
   "ranked_pairs": [
     {
@@ -94139,8 +94140,27 @@
       }
     }
   },
-  "runtime_seconds": 0.72,
-  "report_generated_at": "2026-08-20T03:16:02.481289+00:00",
+  "decorrelation": {
+    "threshold": 0.65,
+    "n_families": 1,
+    "families": [
+      {
+        "family": "D1",
+        "members": [
+          "Alpha021"
+        ],
+        "representative": "Alpha021",
+        "dropped": [],
+        "intra_mean_abs_corr": 0.0,
+        "representative_score": 0.5652666666666667
+      }
+    ],
+    "representatives": [
+      "Alpha021"
+    ]
+  },
+  "runtime_seconds": 0.75,
+  "report_generated_at": "2026-08-20T07:11:31.019873+00:00",
   "alpha_ranking": [
     {
       "alpha_id": "Alpha035",

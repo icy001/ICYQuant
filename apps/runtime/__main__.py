@@ -6,6 +6,7 @@ Usage:
     python -m apps.runtime paper [--signals N]       # Phase 4: paper trading metrics
     python -m apps.runtime shadow [--signals N]      # Phase 5: shadow trading consistency
     python -m apps.runtime strategy [--json]         # Phase 7: Strategy 001 backtest (research layer)
+    python -m apps.runtime factor [--json]           # Phase 8: Alpha021 factor -> paper trading (research layer)
 """
 from __future__ import annotations
 
@@ -39,6 +40,12 @@ def main(argv: list[str] | None = None) -> int:
     p_strategy = sub.add_parser("strategy", help="Phase 7: Strategy 001 backtest (research layer)")
     p_strategy.add_argument("--json", action="store_true", help="output raw JSON")
 
+    p_factor = sub.add_parser("factor", help="Phase 8: Alpha021 factor -> paper trading (research layer)")
+    p_factor.add_argument("--json", action="store_true", help="output raw JSON")
+    p_factor.add_argument("--export", nargs="?", const="__default__", metavar="DIR",
+                          help="export the full trade/equity log as CSV "
+                               "(default dir: research/discovery/output/factor-paper-d1)")
+
     args = parser.parse_args(argv)
 
     if args.command == "health":
@@ -53,6 +60,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_gate(args)
     if args.command == "strategy":
         return _run_strategy(args)
+    if args.command == "factor":
+        return _run_factor(args)
     parser.print_help()
     return 2
 
@@ -161,6 +170,19 @@ def _run_strategy(args) -> int:
     from apps.runtime.strategy_gate import main as strategy_main
 
     return strategy_main(["--json"] if args.json else [])
+
+
+def _run_factor(args) -> int:
+    from apps.runtime.factor_gate import main as factor_main
+
+    fwd: list[str] = []
+    if getattr(args, "json", False):
+        fwd.append("--json")
+    export = getattr(args, "export", None)
+    if export is not None:
+        # "__default__" lets factor_gate resolve its own default dir
+        fwd += ["--export"] + ([] if export == "__default__" else [export])
+    return factor_main(fwd)
 
 
 def _run_scenarios(args) -> int:

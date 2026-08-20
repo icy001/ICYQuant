@@ -791,6 +791,146 @@
   }
 
   /* ==================================================================
+   * Factor paper trading page (Alpha021, static research replay)
+   * ================================================================== */
+
+  function factorStaticLine(points, opts) {
+    opts = opts || {};
+    const color = opts.color || "#00e5a0";
+    const height = opts.height || 170;
+    if (!points || points.length < 2) {
+      return '<div class="empty">No data yet / 暂无数据</div>';
+    }
+    const w = 920, padL = 58, padR = 14, padT = 12, padB = 22;
+    const vals = points.map(function (p) { return p.y; });
+    let lo = Math.min.apply(null, vals.concat([opts.baseline || Infinity]));
+    let hi = Math.max.apply(null, vals.concat([opts.baseline || -Infinity]));
+    const range0 = hi - lo || 1;
+    lo -= range0 * 0.06; hi += range0 * 0.06;
+    const X = function (i) { return padL + (i / (points.length - 1)) * (w - padL - padR); };
+    const Y = function (v) { return padT + (1 - (v - lo) / (hi - lo)) * (height - padT - padB); };
+    let s =
+      '<svg viewBox="0 0 ' + w + " " + height + '" style="width:100%;height:' + height + 'px">';
+    for (let g = 0; g <= 4; g++) {
+      const v = lo + (g * (hi - lo)) / 4;
+      s +=
+        '<line x1="' + padL + '" y1="' + Y(v).toFixed(1) + '" x2="' + (w - padR) + '" y2="' + Y(v).toFixed(1) + '" class="chart-grid-line"/>' +
+        '<text x="' + (padL - 6) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" fill="#64748b" font-size="10" text-anchor="end" font-family="monospace">' + (opts.fmt ? opts.fmt(v) : v.toFixed(0)) + "</text>";
+    }
+    if (opts.baseline !== undefined && opts.baseline > lo && opts.baseline < hi) {
+      s += '<line x1="' + padL + '" y1="' + Y(opts.baseline).toFixed(1) + '" x2="' + (w - padR) + '" y2="' + Y(opts.baseline).toFixed(1) + '" stroke="#33415a" stroke-dasharray="4 4"/>';
+    }
+    const pts = points.map(function (p, i) { return X(i).toFixed(1) + "," + Y(p.y).toFixed(1); });
+    s += '<polyline points="' + pts.join(" ") + '" fill="none" stroke="' + color + '" stroke-width="1.6"/>';
+    [0, Math.floor(points.length / 2), points.length - 1].forEach(function (i) {
+      s += '<text x="' + X(i).toFixed(1) + '" y="' + (height - 6) + '" fill="#64748b" font-size="10" text-anchor="middle">' + esc(points[i].x) + "</text>";
+    });
+    return s + "</svg>";
+  }
+
+  async function pageFactor() {
+    const data = await api.get("/dashboard/factor");
+    if (data.error) {
+      return (
+        '<div class="card"><div class="card-title">Factor Paper / 因子纸面交易</div>' +
+        '<div class="alert alert-warning" style="margin:0">' +
+        "Real daily data unavailable / 真实日频数据不可用<br>" +
+        '<span class="metric-sub">' + esc(data.error) + "</span></div></div>"
+      );
+    }
+    const m = data.meta || {};
+    const trades = data.trades || [];
+    const eq = data.equity || [];
+    const summary = data.summary || [];
+    const metric = function (label, value, cls) {
+      return (
+        '<div class="card metric-card"><span class="metric-label">' + esc(label) + "</span>" +
+        '<span class="metric-value sm ' + (cls || "") + '">' + value + "</span></div>"
+      );
+    };
+    const outcomeBadge = function (o) {
+      if (o === "FILLED") return badge("Filled / 成交", "badge-green");
+      if (o === "REJECTED") return badge("Rejected / 拒单", "badge-amber");
+      return badge("Error / 错误", "badge-red");
+    };
+    const cumPnl = trades
+      .filter(function (r) { return r.outcome === "FILLED"; })
+      .map(function (r) { return { x: r.date.slice(5), y: r.cum_realized_pnl }; });
+
+    return (
+      '<div class="card mb"><div class="card-title">' + esc(m.alpha_id || "Alpha") +
+      " · Factor Paper Trading / 因子纸面交易</div>" +
+      '<div class="metric-sub">' + esc((m.symbols || []).join(" / ")) + " · 真实日频 · " +
+      esc(m.period || "") + " · 定价：真实收盘 ± 3 bps · 初始资金 $1,000,000 · 多头映射（+1 → 100 股）</div></div>" +
+      '<div class="grid grid-4 mb">' +
+      metric("Final Equity / 期末净值", fmtMoney(m.equity_final)) +
+      metric("Return / 收益率", (m.return_pct || 0).toFixed(2) + "%", (m.return_pct >= 0 ? "pos" : "neg")) +
+      metric("Realized P&L / 已实现", fmtMoney(m.realized), pnlClass(m.realized)) +
+      metric("Unrealized P&L / 浮动", fmtMoney(m.unrealized), pnlClass(m.unrealized)) +
+      metric("Max Drawdown / 最大回撤", (m.maxdd_pct || 0).toFixed(1) + "%", "neg") +
+      metric("Closed / Win Rate / 平仓胜率", fmtNum(m.closed_trips) + " 笔 · " + (m.win_rate || 0).toFixed(0) + "%") +
+      metric("Signals / Filled / 信号成交", fmtNum(m.signals) + " / " + fmtNum(m.filled)) +
+      metric("Rejected / Error / 拒单错误", fmtNum(m.rejected) + " / " + fmtNum(m.errored)) +
+      "</div>" +
+      '<div class="grid grid-2 mb">' +
+      '<div class="card"><div class="card-title">Equity Curve / 净值曲线（真实收盘 mark-to-market）</div>' +
+      factorStaticLine(eq.map(function (r) { return { x: r.date.slice(0, 7), y: r.equity }; }),
+        { color: "#4da3ff", baseline: 1000000, fmt: function (v) { return "$" + Math.round(v / 1000) + "k"; } }) +
+      "</div>" +
+      '<div class="card"><div class="card-title">Cumulative Realized P&L / 累计已实现盈亏</div>' +
+      factorStaticLine(cumPnl, { color: "#00e5a0", baseline: 0, fmt: function (v) { return "$" + Math.round(v / 1000) + "k"; } }) +
+      "</div>" +
+      "</div>" +
+      '<div class="card mb"><div class="card-title">Per-Symbol Summary / 分资产汇总</div>' +
+      '<div class="table-wrap"><table><thead><tr>' +
+      "<th>Symbol / 资产</th><th>Signals / 信号</th><th>Filled / 成交</th><th>Rejected / 拒单</th><th>Error / 错误</th>" +
+      "<th>Realized / 已实现</th><th>Final Pos / 期末仓位</th><th>Avg Cost / 成本</th><th>Last / 最新收盘</th><th>Unrealized / 浮动</th>" +
+      "</tr></thead><tbody>" +
+      summary.map(function (r) {
+        return (
+          "<tr>" +
+          '<td class="mono">' + esc(r.symbol) + "</td>" +
+          '<td class="num">' + fmtNum(r.signals) + "</td>" +
+          '<td class="num">' + fmtNum(r.filled) + "</td>" +
+          '<td class="num">' + fmtNum(r.rejected) + "</td>" +
+          '<td class="num">' + fmtNum(r.errored) + "</td>" +
+          '<td class="num ' + pnlClass(r.realized_pnl) + '">' + fmtMoney(r.realized_pnl) + "</td>" +
+          '<td class="num">' + esc(String(r.final_position)) + "</td>" +
+          '<td class="num mono">' + esc(String(r.avg_cost)) + "</td>" +
+          '<td class="num mono">' + esc(String(r.last_close)) + "</td>" +
+          '<td class="num ' + pnlClass(r.unrealized_pnl) + '">' + fmtMoney(r.unrealized_pnl) + "</td>" +
+          "</tr>"
+        );
+      }).join("") +
+      "</tbody></table></div></div>" +
+      '<div class="card"><div class="card-title">Trade Log / 交易明细（' + trades.length + "，最新在前）</div>" +
+      '<div class="table-wrap" style="max-height:480px;overflow:auto"><table><thead><tr>' +
+      "<th>#</th><th>Date / 日期</th><th>Symbol / 资产</th><th>Side / 方向</th><th>Close / 收盘</th><th>Outcome / 结果</th>" +
+      "<th>Exec / 成交价</th><th>Pos / 仓位</th><th>P&L / 平仓盈亏</th><th>Cum / 累计</th>" +
+      "</tr></thead><tbody>" +
+      trades.slice().reverse().map(function (r) {
+        return (
+          "<tr>" +
+          '<td class="num">' + fmtNum(r.seq) + "</td>" +
+          '<td class="mono">' + esc(r.date) + "</td>" +
+          '<td class="mono">' + esc(r.symbol) + "</td>" +
+          "<td>" + sideHtml(r.side) + "</td>" +
+          '<td class="num mono">' + esc(String(r.ref_price_real_close)) + "</td>" +
+          "<td>" + outcomeBadge(r.outcome) + "</td>" +
+          '<td class="num mono">' + esc(String(r.exec_price)) + "</td>" +
+          '<td class="num">' + fmtNum(r.position_after) + "</td>" +
+          '<td class="num ' + pnlClass(r.realized_pnl) + '">' + (r.realized_pnl ? fmtMoney(r.realized_pnl) : "—") + "</td>" +
+          '<td class="num ' + pnlClass(r.cum_realized_pnl) + '">' + fmtMoney(r.cum_realized_pnl) + "</td>" +
+          "</tr>"
+        );
+      }).join("") +
+      "</tbody></table></div>" +
+      '<div class="metric-sub" style="margin-top:8px">拒单会造成仓位漂移（SELL 被拒后仓位保留）——期末未平仓位见汇总表；该页为静态历史回放，不随 5s 自动刷新。</div>' +
+      "</div>"
+    );
+  }
+
+  /* ==================================================================
    * Reconciliation page
    * ================================================================== */
 
@@ -1186,6 +1326,7 @@
     { re: /^#\/orders$/, title: "Orders / 订单", render: pageOrders },
     { re: /^#\/executions$/, title: "Executions / 成交", render: pageExecutions },
     { re: /^#\/strategies$/, title: "Strategies / 策略", render: pageStrategies },
+    { re: /^#\/factor$/, title: "Factor / 因子纸面交易", render: pageFactor },
     { re: /^#\/risk$/, title: "Risk / 风控", render: pageRisk },
     { re: /^#\/reconciliation$/, title: "Reconciliation / 对账", render: pageReconciliation },
     { re: /^#\/system$/, title: "System / 系统", render: pageSystem },
@@ -1217,6 +1358,7 @@
       "#/orders": "orders",
       "#/executions": "executions",
       "#/strategies": "strategies",
+      "#/factor": "factor",
       "#/risk": "risk",
       "#/reconciliation": "reconciliation",
       "#/system": "system",
@@ -1366,6 +1508,8 @@
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(function () {
       if (api.isAuthenticated() && location.hash && location.hash !== "#/login") {
+        // factor page is a static historical replay - skip the 5s re-render
+        if (location.hash.indexOf("#/factor") === 0) return;
         render();
       }
     }, state.refreshMs);

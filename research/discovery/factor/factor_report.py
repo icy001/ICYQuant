@@ -257,9 +257,35 @@ class FactorReport:
         w("| Stage | Count |")
         w("|---|---:|")
         for key in ("alphas_total", "pairs_backtested", "validation_passed",
-                    "oos_passed", "robustness_passed", "final_alphas"):
+                    "oos_passed", "robustness_passed", "final_alphas",
+                    "decorrelated_alphas"):
             w(f"| {key} | {funnel.get(key, 0)} |")
         w("")
+
+        # ---- de-correlation gate -------------------------------------- #
+        dec = data.get("decorrelation", {})
+        if dec:
+            w(f"## De-correlation Gate (\\|corr\\| >= {dec.get('threshold', 0.65)})")
+            w("")
+            if dec.get("error"):
+                w(f"_Gate errored (fail-soft, no pruning): {dec['error']}_")
+                w("")
+            fams = dec.get("families", [])
+            if fams:
+                w("| Family | Representative | Dropped (redundant) | "
+                  "Intra \\|corr\\| | Rep. pair score |")
+                w("|---|---|---|---:|---:|")
+                for f in fams:
+                    sc = f.get("representative_score")
+                    sc_s = "·" if sc is None else f"{sc:.4f}"
+                    intra = f.get("intra_mean_abs_corr", 0.0)
+                    w(f"| {f['family']} | {f['representative']} "
+                      f"| {', '.join(f.get('dropped', [])) or '—'} "
+                      f"| {intra:.2f} | {sc_s} |")
+            else:
+                w("_No final alphas — the de-correlation gate had nothing "
+                  "to prune._")
+            w("")
 
         # ---- table 2: alpha ranking ---------------------------------- #
         w("## ② Alpha Ranking (top {})".format(TOP_ALPHAS_IN_MD))

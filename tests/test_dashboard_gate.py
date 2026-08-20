@@ -441,3 +441,51 @@ def test_d15_docker_deployable():
         .read_text()
     )
     assert "api" in compose["services"]
+
+
+def test_d16_factor_paper_page():
+    """Factor / 因子纸面 page: menu link, API payload schema, data sanity.
+
+    Skipped when the real daily data files are not present (they must be
+    synced separately, see VALIDATION_REPORT.md 执行注意 #6).
+    """
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced - factor replay unavailable")
+
+    # nav link present in the SPA
+    index = (Path(apps_api_main.__file__).resolve().parent.parent
+             / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/factor"' in index
+    assert 'data-nav="factor"' in index
+
+    res = client.get(
+        "/api/dashboard/factor",
+        headers=_headers(_login("admin", "admin123")),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert "error" not in body, body.get("error")
+
+    meta = body["meta"]
+    assert meta["alpha_id"] == "Alpha021"
+    assert meta["symbols"] == ["NVDA", "QQQ", "SPY"]
+    assert meta["signals"] == len(body["trades"]) >= 100
+    assert meta["filled"] + meta["rejected"] + meta["errored"] == meta["signals"]
+    # equity curve is daily, marked to real closes, starts at 1M cash
+    assert len(body["equity"]) >= 300
+    first_fill_day = min(r["date"] for r in body["trades"])
+    assert body["equity"][0]["date"] == first_fill_day
+    # summary carries per-symbol rows + a TOTAL row
+    assert [r["symbol"] for r in body["summary"]] == ["NVDA", "QQQ", "SPY", "TOTAL"]
+    total = body["summary"][-1]
+    assert total["realized_pnl"] == pytest.approx(meta["realized"], abs=0.01)
+    # headline numbers consistent with the trade log
+    assert sum(r["realized_pnl"] for r in body["trades"]) == pytest.approx(
+        meta["realized"], abs=0.05)

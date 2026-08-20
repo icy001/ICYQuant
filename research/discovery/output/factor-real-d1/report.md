@@ -2,8 +2,8 @@
 
 - **Experiment**: `factor-real-d1`
 - **Spec version**: `factor-discovery-real-d1`
-- **Generated at**: `2026-08-20T03:16:02.481289+00:00`
-- **Runtime**: 0.7s
+- **Generated at**: `2026-08-20T07:11:31.019873+00:00`
+- **Runtime**: 0.8s
 - **Split**: `real-2y-60-20-20` — Train ['2024-01-01', '2025-06-30'] | Validation ['2025-07-01', '2025-12-31'] | OOS ['2026-01-01', '2026-08-19']
 
 ## Factor Gate v1 Funnel
@@ -16,6 +16,13 @@
 | oos_passed | 2 |
 | robustness_passed | 1 |
 | final_alphas | 1 |
+| decorrelated_alphas | 1 |
+
+## De-correlation Gate (\|corr\| >= 0.65)
+
+| Family | Representative | Dropped (redundant) | Intra \|corr\| | Rep. pair score |
+|---|---|---|---:|---:|
+| D1 | Alpha021 | — | 0.00 | 0.5653 |
 
 ## ② Alpha Ranking (top 25)
 
