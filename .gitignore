@@ -28,3 +28,9 @@ test_*.txt
 # `python infra/scripts/generate_research_dataset.py`); manifests stay tracked
 data/processed/*.csv
 data/raw/
+
+# Validation-phase paper snapshots: runtime data assets, NOT code.
+# Git keeps code/spec/gates/templates + the manifest convention; the
+# per-day replay artifacts under factor-paper-snapshots/YYYY-MM-DD/ are
+# diffed against the baseline outside version control.
+research/discovery/output/factor-paper-snapshots/
