@@ -1341,3 +1341,128 @@
   padding-top: var(--ds-space-2);
   border-top: 1px solid var(--ds-border-soft);
 }
+
+/* ==========================================================================
+   ICYQuant Positions — Commit 009
+   ========================================================================== */
+
+/* ── Exposure Bars ───────────────────────────────────────────── */
+.pos-exp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-2) 0;
+}
+.pos-exp-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 110px 110px;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+.pos-exp-sym {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  letter-spacing: var(--ds-tracking-tight);
+}
+.pos-exp-track {
+  height: 14px;
+  background: var(--ds-bg-surface-sunken);
+  border-radius: var(--ds-radius-full);
+  overflow: hidden;
+}
+.pos-exp-fill {
+  height: 100%;
+  border-radius: var(--ds-radius-full);
+  transition: width var(--ds-transition-normal);
+}
+.pos-exp-fill.pos-bar { background: var(--ds-profit); }
+.pos-exp-fill.neg-bar { background: var(--ds-loss); }
+.pos-exp-qty {
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-secondary);
+  text-align: right;
+}
+.pos-exp-val {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-semibold);
+  color: var(--ds-text-primary);
+  text-align: right;
+}
+@media (max-width: 700px) {
+  .pos-exp-row {
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .pos-exp-qty, .pos-exp-val { grid-column: 2; text-align: left; }
+}
+
+/* ── Two-column layout (table + detail) ──────────────────────── */
+.pos-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: var(--ds-space-4);
+  align-items: start;
+}
+.pos-layout-main, .pos-layout-side { min-width: 0; }
+@media (max-width: 1100px) {
+  .pos-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Positions Table (clickable rows) ────────────────────────── */
+.pos-table { width: 100%; }
+.pos-table tbody tr.pos-row { cursor: pointer; }
+.pos-table tbody tr.pos-row:hover td {
+  background: var(--ds-bg-surface-sunken);
+}
+.pos-table tbody tr.pos-row-selected td {
+  background: var(--ds-info-dim);
+  border-left: 3px solid var(--ds-info);
+  padding-left: calc(var(--ds-space-3) - 3px);
+}
+.pos-table tbody tr.pos-row-selected:hover td {
+  background: rgba(77, 163, 255, 0.22);
+}
+.pos-col-symbol {
+  font-weight: var(--ds-font-bold);
+  letter-spacing: var(--ds-tracking-tight);
+}
+
+/* ── Position Detail Grid ────────────────────────────────────── */
+.pos-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--ds-border-soft);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: var(--ds-radius-md);
+  overflow: hidden;
+  margin-bottom: var(--ds-space-4);
+}
+.pos-detail-cell {
+  background: var(--ds-bg-surface);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+.pos-detail-pnl {
+  background: var(--ds-bg-surface-sunken);
+}
+.pos-detail-label {
+  font-size: var(--ds-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--ds-tracking-wider);
+  color: var(--ds-text-muted);
+  font-weight: var(--ds-font-semibold);
+}
+.pos-detail-value {
+  font-size: var(--ds-text-lg);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+}
+.pos-detail-value.pos { color: var(--ds-profit); }
+.pos-detail-value.neg { color: var(--ds-loss); }
+@media (max-width: 600px) {
+  .pos-detail-grid { grid-template-columns: repeat(2, 1fr); }
+}

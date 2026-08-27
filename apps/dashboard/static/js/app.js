@@ -3306,36 +3306,259 @@
     );
   };
 
-  PAGE_FRAMEWORK["trading/positions"] = function () {
-    var kpis = UI.metricCard("Open Positions", "3", "", "") +
-      UI.metricCard("Total P&L", "+$13,620", "", "pos") +
-      UI.metricCard("Gross Exposure", "$266,564", "26.6%", "info") +
-      UI.metricCard("Net Exposure", "$229,936", "18.6%", "info");
+  /* ==================================================================
+   * Positions module — Commit 009
+   * Mock position state designed for future real-API swap. Maps to the
+   * Execution → Position → Ledger fact chain (ORDER_FILLED dispatches
+   * to both Position and Ledger, sharing Execution Facts).
+   * ================================================================== */
+  var POSITIONS_DATA = [
+    {
+      symbol: "NVDA", account: "Main Paper", side: "LONG", quantity: 600,
+      avgPrice: 170.33, markPrice: 178.42, marketValue: 107052,
+      realizedPnl: 2340, unrealizedPnl: 4854, totalPnl: 7194,
+      returnPct: 0.0475, weight: 0.482, updatedAt: "10:32:06",
+      timeline: [
+        { time: "Aug 20 09:30", type: "SIGNAL", title: "Alpha021 triggered LONG signal @ 165.20", variant: "info" },
+        { time: "Aug 20 09:31", type: "ORDER", title: "ORD-097 — BUY 200 Market", variant: "info" },
+        { time: "Aug 20 09:31", type: "FILL", title: "Filled 200 @ 165.20", variant: "profit" },
+        { time: "Aug 20 09:31", type: "POSITION", title: "Position opened +200 (LONG 200)", variant: "info" },
+        { time: "Aug 22 14:15", type: "SIGNAL", title: "Alpha021 add-on signal", variant: "info" },
+        { time: "Aug 22 14:16", type: "ORDER", title: "ORD-110 — BUY 200 Limit @ 172.00", variant: "info" },
+        { time: "Aug 22 14:22", type: "FILL", title: "Filled 200 @ 172.00", variant: "profit" },
+        { time: "Aug 22 14:22", type: "POSITION", title: "Position added +200 (LONG 400)", variant: "info" },
+        { time: "Aug 25 10:14", type: "ORDER", title: "ORD-117 — BUY 200 Market", variant: "info" },
+        { time: "Aug 25 10:14", type: "FILL", title: "Filled 200 @ 174.50", variant: "profit" },
+        { time: "Aug 25 10:14", type: "POSITION", title: "Position added +200 (LONG 600)", variant: "info" },
+        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 178.42", variant: "neutral" },
+      ],
+    },
+    {
+      symbol: "QQQ", account: "Main Paper", side: "LONG", quantity: 200,
+      avgPrice: 525.15, markPrice: 540.20, marketValue: 108040,
+      realizedPnl: 0, unrealizedPnl: 3010, totalPnl: 3010,
+      returnPct: 0.0287, weight: 0.314, updatedAt: "10:32:06",
+      timeline: [
+        { time: "Aug 23 09:35", type: "SIGNAL", title: "Momentum strategy triggered LONG", variant: "info" },
+        { time: "Aug 23 09:36", type: "ORDER", title: "ORD-119 — BUY 50 Limit @ 522.00", variant: "info" },
+        { time: "Aug 23 09:42", type: "FILL", title: "Filled 50 @ 522.00", variant: "profit" },
+        { time: "Aug 23 09:42", type: "POSITION", title: "Position opened +50 (LONG 50)", variant: "info" },
+        { time: "Aug 24 10:05", type: "ORDER", title: "ORD-121 — BUY 150 Limit @ 528.00", variant: "info" },
+        { time: "Aug 24 10:12", type: "FILL", title: "Filled 150 @ 528.00", variant: "profit" },
+        { time: "Aug 24 10:12", type: "POSITION", title: "Position added +150 (LONG 200)", variant: "info" },
+        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 540.20", variant: "neutral" },
+      ],
+    },
+    {
+      symbol: "SPY", account: "Main Paper", side: "SHORT", quantity: 100,
+      avgPrice: 652.00, markPrice: 650.10, marketValue: 65010,
+      realizedPnl: 0, unrealizedPnl: 190, totalPnl: 190,
+      returnPct: 0.0029, weight: 0.098, updatedAt: "10:32:06",
+      timeline: [
+        { time: "Aug 24 15:00", type: "SIGNAL", title: "Mean Reversion triggered SHORT @ 652.00", variant: "info" },
+        { time: "Aug 24 15:01", type: "ORDER", title: "ORD-118 — SELL 100 Market", variant: "info" },
+        { time: "Aug 24 15:01", type: "FILL", title: "Filled 100 @ 652.00", variant: "profit" },
+        { time: "Aug 24 15:01", type: "POSITION", title: "Position opened -100 (SHORT 100)", variant: "info" },
+        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 650.10", variant: "neutral" },
+      ],
+    },
+    {
+      symbol: "AAPL", account: "Main Paper", side: "FLAT", quantity: 0,
+      avgPrice: 0, markPrice: 226.50, marketValue: 0,
+      realizedPnl: 1280, unrealizedPnl: 0, totalPnl: 1280,
+      returnPct: 0, weight: 0, updatedAt: "Yesterday 15:30",
+      timeline: [
+        { time: "Aug 21 10:00", type: "SIGNAL", title: "Momentum triggered LONG @ 224.00", variant: "info" },
+        { time: "Aug 21 10:01", type: "ORDER", title: "ORD-124 — BUY 200 Limit @ 224.00", variant: "info" },
+        { time: "Aug 21 10:12", type: "FILL", title: "Filled 200 @ 224.00", variant: "profit" },
+        { time: "Aug 21 10:12", type: "POSITION", title: "Position opened +200 (LONG 200)", variant: "info" },
+        { time: "Aug 23 09:50", type: "ORDER", title: "ORD-119 — SELL 200 Limit @ 228.50", variant: "info" },
+        { time: "Aug 23 10:12", type: "FILL", title: "Filled 200 @ 228.50", variant: "profit" },
+        { time: "Aug 23 10:12", type: "POSITION", title: "Position reduced -200 (FLAT)", variant: "neutral" },
+      ],
+    },
+    {
+      symbol: "MSFT", account: "Main Paper", side: "LONG", quantity: 150,
+      avgPrice: 448.50, markPrice: 442.10, marketValue: 66315,
+      realizedPnl: 0, unrealizedPnl: -960, totalPnl: -960,
+      returnPct: -0.0143, weight: 0.106, updatedAt: "10:32:06",
+      timeline: [
+        { time: "Aug 22 09:30", type: "SIGNAL", title: "Alpha021 triggered LONG @ 450.00", variant: "info" },
+        { time: "Aug 22 09:31", type: "ORDER", title: "ORD-120 — BUY 150 Limit @ 450.00", variant: "info" },
+        { time: "Aug 22 09:35", type: "FILL", title: "Filled 150 @ 450.00", variant: "profit" },
+        { time: "Aug 22 09:35", type: "POSITION", title: "Position opened +150 (LONG 150)", variant: "info" },
+        { time: "Aug 22 09:50", type: "ORDER", title: "ORD-123 — SELL 150 Limit @ 448.50 (reduce)", variant: "info" },
+        { time: "Aug 22 09:55", type: "FILL", title: "Filled 150 @ 448.50", variant: "profit" },
+        { time: "Aug 22 09:55", type: "POSITION", title: "Position reduced -150 (FLAT)", variant: "neutral" },
+        { time: "Aug 25 09:30", type: "SIGNAL", title: "Alpha021 re-entry LONG @ 448.50", variant: "info" },
+        { time: "Aug 25 09:31", type: "ORDER", title: "ORD-125 — BUY 150 Market", variant: "info" },
+        { time: "Aug 25 09:31", type: "FILL", title: "Filled 150 @ 448.50", variant: "profit" },
+        { time: "Aug 25 09:31", type: "POSITION", title: "Position re-opened +150 (LONG 150)", variant: "info" },
+        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 442.10", variant: "neutral" },
+      ],
+    },
+  ];
+
+  var POSITIONS_SELECTED_SYMBOL = "NVDA";
+
+  function positionSidePill(side) {
+    var m = { LONG: "profit", SHORT: "loss", FLAT: "neutral" };
+    return '<span class="ds-status-pill ds-status-' + (m[side] || "neutral") + '"><span class="ds-status-dot"></span>' + side + '</span>';
+  }
+
+  function positionsOpen() {
+    return POSITIONS_DATA.filter(function (p) { return p.side !== "FLAT"; });
+  }
+
+  function renderExposureBars() {
+    var open = positionsOpen();
+    if (open.length === 0) {
+      return UI.empty("No open positions", "All positions are flat.");
+    }
+    var maxVal = Math.max.apply(null, open.map(function (p) { return p.marketValue; })) || 1;
+    return open.map(function (p) {
+      var pct = Math.round((p.marketValue / maxVal) * 100);
+      var barClass = p.side === "LONG" ? "pos-bar" : "neg-bar";
+      return (
+        '<div class="pos-exp-row">' +
+        '<span class="pos-exp-sym">' + p.symbol + '</span>' +
+        '<div class="pos-exp-track">' +
+        '<div class="pos-exp-fill ' + barClass + '" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<span class="pos-exp-qty ds-text-mono">' + p.quantity + ' shares</span>' +
+        '<span class="pos-exp-val ds-text-mono">$' + p.marketValue.toLocaleString("en-US") + '</span>' +
+        '</div>'
+      );
+    }).join("");
+  }
+
+  function renderPositionsRows() {
+    return POSITIONS_DATA.map(function (p) {
+      var sel = p.symbol === POSITIONS_SELECTED_SYMBOL ? " pos-row-selected" : "";
+      var sideCls = p.side === "LONG" ? "pos" : (p.side === "SHORT" ? "neg" : "");
+      var pnlCls = p.unrealizedPnl >= 0 ? "pos" : "neg";
+      var qtyText = p.side === "FLAT" ? "0" : String(p.quantity);
+      var avgText = p.side === "FLAT" ? "—" : "$" + p.avgPrice.toFixed(2);
+      var mvText = p.side === "FLAT" ? "—" : "$" + p.marketValue.toLocaleString("en-US");
+      var uPnlText = p.side === "FLAT" ? "—" : UI.signedMoney(p.unrealizedPnl);
+      var retText = p.side === "FLAT" ? "—" : (p.returnPct >= 0 ? "+" : "") + (p.returnPct * 100).toFixed(2) + "%";
+      return '<tr class="pos-row' + sel + '" data-pos-symbol="' + p.symbol + '">' +
+        '<td class="pos-col-symbol">' + p.symbol + '</td>' +
+        '<td>' + positionSidePill(p.side) + '</td>' +
+        '<td class="num ds-text-mono ' + sideCls + '">' + qtyText + '</td>' +
+        '<td class="num ds-text-mono">' + avgText + '</td>' +
+        '<td class="num ds-text-mono">$' + p.markPrice.toFixed(2) + '</td>' +
+        '<td class="num ds-text-mono">' + mvText + '</td>' +
+        '<td class="num ds-text-mono ' + pnlCls + '">' + uPnlText + '</td>' +
+        '<td class="num ds-text-mono ' + pnlCls + '">' + retText + '</td>' +
+        '</tr>';
+    }).join("");
+  }
+
+  function renderPositionsTable() {
     return (
-      UI.pageHeader("Positions", "Position management and P&L tracking") +
-      UI.kpiGrid(kpis) +
-      UI.sectionHeading("Open Positions") +
-      UI.panel("Positions", UI.table({
-        columns: [
-          { key: "symbol", label: "Symbol" },
-          { key: "qty", label: "Qty", numeric: true },
-          { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-          { key: "mktPrice", label: "Last", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-          { key: "pnl", label: "P&L", numeric: true,
-            format: function (v) { return UI.signedMoney(v); },
-            color: function (v) { return v >= 0 ? "pos" : "neg"; } },
-          { key: "pnlPct", label: "P&L %", numeric: true,
-            format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; },
-            color: function (v) { return v >= 0 ? "pos" : "neg"; } },
-          { key: "weight", label: "Weight", numeric: true,
-            format: function (v) { return (v * 100).toFixed(1) + "%"; } },
-        ],
-        rows: [
-          { symbol: "NVDA", qty: 500, avgPrice: 165.20, mktPrice: 178.42, pnl: 6610, pnlPct: 0.0800, weight: 0.107 },
-          { symbol: "QQQ", qty: 200, avgPrice: 520.10, mktPrice: 540.20, pnl: 4020, pnlPct: 0.0387, weight: 0.108 },
-          { symbol: "SPY", qty: 100, avgPrice: 620.20, mktPrice: 650.10, pnl: 2990, pnlPct: 0.0482, weight: 0.072 },
-        ],
-      }))
+      '<table class="ds-table pos-table">' +
+      '<thead><tr>' +
+      '<th>Symbol</th>' +
+      '<th>Side</th>' +
+      '<th class="num">Qty</th>' +
+      '<th class="num">Avg Price</th>' +
+      '<th class="num">Mark</th>' +
+      '<th class="num">Market Value</th>' +
+      '<th class="num">Unreal P&L</th>' +
+      '<th class="num">Return</th>' +
+      '</tr></thead>' +
+      '<tbody id="pos-tbody">' + renderPositionsRows() + '</tbody>' +
+      '</table>'
+    );
+  }
+
+  function renderPositionDetail() {
+    var p = null;
+    for (var i = 0; i < POSITIONS_DATA.length; i++) {
+      if (POSITIONS_DATA[i].symbol === POSITIONS_SELECTED_SYMBOL) { p = POSITIONS_DATA[i]; break; }
+    }
+    if (!p) {
+      return UI.empty("No position selected", "Click a position row to view details and timeline.");
+    }
+    var pnlVariant = p.totalPnl >= 0 ? "profit" : "loss";
+    var grid =
+      '<div class="pos-detail-grid">' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Side</div><div class="pos-detail-value">' + positionSidePill(p.side) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Quantity</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "0" : String(p.quantity)) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Avg Price</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "—" : "$" + p.avgPrice.toFixed(2)) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Mark Price</div><div class="pos-detail-value ds-text-mono">$' + p.markPrice.toFixed(2) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Market Value</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "—" : "$" + p.marketValue.toLocaleString("en-US")) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Weight</div><div class="pos-detail-value ds-text-mono">' + (p.weight * 100).toFixed(1) + '%</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Unrealized P&L</div><div class="pos-detail-value ds-text-mono ' + (p.unrealizedPnl >= 0 ? "pos" : "neg") + '">' + (p.side === "FLAT" ? "—" : UI.signedMoney(p.unrealizedPnl)) + '</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Realized P&L</div><div class="pos-detail-value ds-text-mono ' + (p.realizedPnl >= 0 ? "pos" : "neg") + '">' + UI.signedMoney(p.realizedPnl) + '</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Total P&L</div><div class="pos-detail-value ds-text-mono ' + (p.totalPnl >= 0 ? "pos" : "neg") + '">' + UI.signedMoney(p.totalPnl) + '</div></div>' +
+      '</div>';
+    return grid + UI.sectionHeading("Position Timeline") + UI.timeline(p.timeline);
+  }
+
+  function bindPositionsPage() {
+    // Row selection via event delegation
+    var tbody = document.getElementById("pos-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-pos-symbol]");
+        if (!row) return;
+        POSITIONS_SELECTED_SYMBOL = row.getAttribute("data-pos-symbol");
+        tbody.innerHTML = renderPositionsRows();
+        var detail = document.getElementById("pos-detail");
+        if (detail) detail.innerHTML = renderPositionDetail();
+      });
+    }
+    // Refresh button (mock visual feedback)
+    var refreshBtn = document.querySelector('[data-action="pos:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        setTimeout(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+          showToast("Positions refreshed (mock) / 持仓已刷新", "ok");
+        }, 700);
+      });
+    }
+  }
+
+  PAGE_FRAMEWORK["trading/positions"] = function () {
+    // ── Mock KPIs ──────────────────────────────────────────────────
+    var open = positionsOpen();
+    var longExp = open.filter(function (p) { return p.side === "LONG"; })
+      .reduce(function (s, p) { return s + p.marketValue; }, 0);
+    var shortExp = open.filter(function (p) { return p.side === "SHORT"; })
+      .reduce(function (s, p) { return s + p.marketValue; }, 0);
+    var unrealPnl = POSITIONS_DATA
+      .reduce(function (s, p) { return s + p.unrealizedPnl; }, 0);
+    var kpis = UI.metricCard("Total Positions", String(POSITIONS_DATA.length), String(open.length) + " open", "") +
+      UI.metricCard("Long Exposure", "$" + longExp.toLocaleString("en-US"), "", "pos") +
+      UI.metricCard("Short Exposure", "$" + shortExp.toLocaleString("en-US"), "", "neg") +
+      UI.metricCard("Unrealized P&L", UI.signedMoney(unrealPnl), "", unrealPnl >= 0 ? "pos" : "neg");
+
+    // ── Two-column layout ──────────────────────────────────────────
+    var layout =
+      '<div class="pos-layout">' +
+      '<div class="pos-layout-main">' +
+      UI.panel("Open Positions", renderPositionsTable(), {
+        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
+      }) +
+      '</div>' +
+      '<div class="pos-layout-side">' +
+      UI.panel(POSITIONS_SELECTED_SYMBOL, '<div id="pos-detail">' + renderPositionDetail() + '</div>') +
+      '</div>' +
+      '</div>';
+
+    return (
+      UI.pageHeader("Positions", "Position management, exposure and P&L · 持仓管理",
+        UI.button("Refresh", "ghost", { sm: true, action: "pos:refresh" })) +
+      UI.kpiGrid(kpis, 4) +
+      UI.sectionHeading("Position Exposure") +
+      UI.panel("Exposure by Symbol", '<div class="pos-exp">' + renderExposureBars() + '</div>') +
+      layout
     );
   };
 
@@ -3982,6 +4205,11 @@
     // Orders (Commit 008): row selection, filters, search, New Order modal
     if (document.getElementById("ord-tbody")) {
       bindOrdersPage();
+    }
+
+    // Positions (Commit 009): row selection, refresh
+    if (document.getElementById("pos-tbody")) {
+      bindPositionsPage();
     }
 
     // Design System: bind tabs
