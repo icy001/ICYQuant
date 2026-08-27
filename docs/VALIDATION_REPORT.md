@@ -129,12 +129,12 @@ icyquant-strategy-runtime   Up 3 hours (healthy)
 
 ## 7. 门禁验收测试（pytest）
 
-### Dashboard Gate（16/16 PASS）
+### Dashboard Gate（18/18 PASS）
 
-D-01~D-16，覆盖 10 个页面（accounts/portfolio/positions/orders/executions/reconciliation/system/strategies/risk/factor）+ API 数据一致性 + Docker 可部署性（static 资源齐全 + docker-compose 定义 api 服务）。D-16 校验 Factor 因子纸面页（菜单链接、API payload 结构、headline 数字与逐笔日志一致性；`data/real/d1` 未同步时自动 skip）。
+D-01~D-18，覆盖 12 个页面（accounts/portfolio/positions/orders/executions/reconciliation/system/strategies/risk/factor/backtest/settings）+ API 数据一致性 + Docker 可部署性（static 资源齐全 + docker-compose 定义 api 服务）。D-16 校验 Factor 因子纸面页；D-17 校验 Backtest 回测页（默认参数与密封回放等价、窗口化回放、参数校验、RBAC）；D-18 校验 Settings 配置页（默认值、保存持久化、校验与 RBAC、无虚假连接——券商一律 Not Connected、live_trading_enabled 恒为 False）。（`data/real/d1` 未同步时 D-16/D-17 自动 skip）
 
 ```text
-16 passed, 140 warnings in 0.70s
+18 passed, 140 warnings in 0.70s
 ```
 
 ### Adapter Gate（12/12 PASS）
@@ -335,5 +335,6 @@ docker compose exec api rm -rf /app/tests
 | 2026-08-19 | v0.4.0-alpha2 | Research Layer 接入：Strategy 001（NVDA 15m 双均线）回测 5 笔交易，Readiness Gate 21→22，Strategy Gate 6/6 + 单测 8/8 + research 包回归 122/122 | 全部 PASS（280 项累计） |
 | 2026-08-20 | v0.4.0-alpha2 | Factor Layer 接入：Alpha021（NVDA/QQQ/SPY 真实日频）因子→纸面交易 220 信号，fill 85.91%，Factor Gate 8/8；De-correlation Gate 固化进 Factor 引擎（合成 22→15 族，真实 1→1）；discovery 测试 86/86 | 全部 PASS |
 | 2026-08-20 | v0.4.0-alpha2 | Dashboard 集成 Factor 因子纸面页（#/factor 菜单 + /api/dashboard/factor + 容器内静态历史回放），Dashboard Gate 15→16（host 与容器均 16/16） | 全部 PASS |
+| 2026-08-27 | v0.4.0-alpha2 | Product UI Completion（冻结量化核心，仅产品界面）：Backtest 回测页（#/backtest，参数化回放 API，默认参数与密封回放逐位等价）+ Settings 配置页（#/settings，账户/风控 JSON 持久化 + 审计 + 无虚假连接）+ Strategy 页因子候选卡片 + Risk 页规则卡片；Dashboard Gate 16→18（host 与容器均 18/18） | 全部 PASS |
 
 后续每次验证后请在下方追加记录。

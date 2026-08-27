@@ -28,6 +28,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 from research.data.csv_provider import CsvMarketDataProvider
 from research.data.types import TimeFrame
@@ -60,8 +61,8 @@ def data_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "real" / "d1"
 
 
-def build_signals() -> tuple[list, dict]:
-    """Compute Alpha021 paper signals across the gate-passed assets.
+def build_signals(symbols: tuple[str, ...] = SYMBOLS) -> tuple[list, dict]:
+    """Compute Alpha021 paper signals across the given assets.
 
     Returns ``(signals, context)`` where signals are paper-ready
     ``(symbol, side, quantity, ref_price, date)`` tuples and context holds
@@ -74,7 +75,7 @@ def build_signals() -> tuple[list, dict]:
 
     signals: list[tuple] = []
     context: dict = {"assets": {}}
-    for symbol in SYMBOLS:
+    for symbol in symbols:
         bars = provider.load_bars(symbol, TimeFrame.D1)
         md = MarketData(
             open_=[b.open for b in bars],
@@ -134,13 +135,19 @@ def build_signals() -> tuple[list, dict]:
 # --------------------------------------------------------------------------- #
 # Paper-trading log export                                                     #
 # --------------------------------------------------------------------------- #
-def build_paper_data() -> dict:
-    """Deterministic Alpha021 paper run -> full data payload (no IO).
+def _replay(signals: list, context: dict, symbols: tuple[str, ...],
+            start: Optional[str], end: Optional[str],
+            initial_capital: float) -> dict:
+    """Deterministic replay core shared by the gate, snapshots and the
+    product Backtest page.
 
-    Shared by the CSV/HTML export and the Dashboard API.  Returns
-    ``{meta, trades, equity, summary}`` where equity/summary/meta match the
-    exported CSV schemas.  Raises on missing data files (callers decide how
-    to surface that).
+    Reuses the FROZEN factor components (compute_alpha -> z-score ->
+    Schmitt trigger -> train-IC orientation from the sealed REAL_D1
+    split); only the replay window, universe and initial capital are
+    parameterised.  Price accounting is marked to the REAL world:
+    exec = real close * (1 +/- 3 bps).
+
+    Returns ``{meta, trades, equity, summary}``.
     """
     from apps.runtime.paper_trading import (
         PaperAccount,
@@ -149,21 +156,24 @@ def build_paper_data() -> dict:
         SimulatedMarketFeed,
     )
 
-    signals, context = build_signals()
     assets = context["assets"]
     base_prices = {s: a["last_close"] or 100.0
                    for s, a in assets.items() if a.get("last_close")}
     session = PaperTradingSession(
         feed=SimulatedMarketFeed(base_prices=base_prices, seed=42),
-        account=PaperAccount(initial_cash=1_000_000.0))
+        account=PaperAccount(initial_cash=initial_capital))
     bps = session.slippage_bps / 1e4
+
+    # window filter (None = unbounded, identical to the sealed replay)
+    flt = [s for s in signals
+           if (start is None or s[4] >= start) and (end is None or s[4] <= end)]
 
     book: dict[str, dict] = {}
     cum_realized = 0.0
     rows: list[dict] = []
     fills: list[tuple] = []   # (date, symbol, side, eff_qty, exec_price)
 
-    for seq, (symbol, side, qty, ref, date) in enumerate(signals, 1):
+    for seq, (symbol, side, qty, ref, date) in enumerate(flt, 1):
         rec = session.process(
             SignalSpec(symbol=symbol, side=side, quantity=qty, ref_price=ref))
         latency = rec.get("latency_total_us")
@@ -217,22 +227,22 @@ def build_paper_data() -> dict:
     # ---- daily equity curve marked to the real closes ------------------ #
     closes: dict[str, dict[str, float]] = {}
     provider = CsvMarketDataProvider(data_dir())
-    for s in SYMBOLS:
+    for s in symbols:
         bars = provider.load_bars(s, TimeFrame.D1)
         closes[s] = {b.timestamp.date().isoformat(): b.close for b in bars}
     fill_days = sorted({f[0] for f in fills})
-    all_days = sorted({d for s in SYMBOLS for d in closes[s]})
+    all_days = sorted({d for s in symbols for d in closes[s]})
     days = [d for d in all_days if fill_days[0] <= d <= fill_days[-1]]
     fills_by_day: dict[str, list[tuple]] = {}
     for f in fills:
         fills_by_day.setdefault(f[0], []).append(f)
 
     eq_rows: list[dict] = []
-    pos_qty = {s: 0 for s in SYMBOLS}
-    cash_eq = 1_000_000.0
+    pos_qty = {s: 0 for s in symbols}
+    cash_eq = float(initial_capital)
     last_close: dict[str, float] = {}
     for d in days:
-        for s in SYMBOLS:
+        for s in symbols:
             if d in closes[s]:
                 last_close[s] = closes[s][d]
         for (_d, s, side, q, px) in fills_by_day.get(d, []):
@@ -243,19 +253,19 @@ def build_paper_data() -> dict:
                 cash_eq += q * px
                 pos_qty[s] -= q
         value = sum(pos_qty[s] * last_close.get(s, 0.0)
-                    for s in SYMBOLS if pos_qty[s])
+                    for s in symbols if pos_qty[s])
         eq_rows.append({
             "date": d,
             "cash": round(cash_eq, 2),
             "positions_value": round(value, 2),
             "equity": round(cash_eq + value, 2),
-            "held": " ".join(f"{s}:{pos_qty[s]}" for s in SYMBOLS
+            "held": " ".join(f"{s}:{pos_qty[s]}" for s in symbols
                              if pos_qty[s]) or "flat",
         })
 
     # ---- per-symbol summary -------------------------------------------- #
     sum_rows: list[dict] = []
-    for s in SYMBOLS:
+    for s in symbols:
         rs = [r for r in rows if r["symbol"] == s]
         filled = [r for r in rs if r["outcome"] == "FILLED"]
         p = book.get(s, {"qty": 0, "avg_cost": 0.0})
@@ -296,16 +306,32 @@ def build_paper_data() -> dict:
         for v in eq_vals:
             peak = max(peak, v)
             maxdd = min(maxdd, v / peak - 1.0)
+    # annualised Sharpe on daily equity returns
+    sharpe = None
+    if len(eq_vals) >= 3:
+        rets = [(eq_vals[i] / eq_vals[i - 1] - 1.0)
+                for i in range(1, len(eq_vals)) if eq_vals[i - 1] > 0]
+        if len(rets) >= 3:
+            mean = sum(rets) / len(rets)
+            var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+            std = var ** 0.5
+            if std > 0:
+                sharpe = round(mean / std * (252 ** 0.5), 2)
+    turnover = (round(sum(f[3] for f in fills) / len(eq_rows), 2)
+                if eq_rows else 0.0)
     meta = {
         "alpha_id": ALPHA_ID,
-        "symbols": list(SYMBOLS),
+        "symbols": list(symbols),
         "period": f"{rows[0]['date']} → {rows[-1]['date']}" if rows else "",
+        "initial_capital": float(initial_capital),
         "realized": total_realized,
         "unrealized": sum_rows[-1]["unrealized_pnl"],
         "equity_final": eq_rows[-1]["equity"] if eq_rows else None,
-        "return_pct": ((eq_vals[-1] / 1_000_000.0 - 1.0) * 100
+        "return_pct": ((eq_vals[-1] / initial_capital - 1.0) * 100
                        if eq_vals else 0.0),
         "maxdd_pct": maxdd * 100,
+        "sharpe": sharpe,
+        "turnover_shares_per_day": turnover,
         "signals": len(rows),
         "filled": sum(1 for r in rows if r["outcome"] == "FILLED"),
         "rejected": sum(1 for r in rows if r["outcome"] == "REJECTED"),
@@ -315,6 +341,47 @@ def build_paper_data() -> dict:
     }
     return {"meta": meta, "trades": rows, "equity": eq_rows,
             "summary": sum_rows}
+
+
+# assets with real daily data available for the Backtest page (the full
+# research universe; Alpha021 gate-passed only NVDA/QQQ/SPY)
+BACKTEST_UNIVERSE = ("NVDA", "QQQ", "SPY", "000688.SH", "HSTECH",
+                     "EURUSD", "XAUUSD", "AU", "AG")
+
+
+def run_backtest(symbols: Optional[list[str]] = None,
+                 start: Optional[str] = None, end: Optional[str] = None,
+                 initial_capital: float = 1_000_000.0) -> dict:
+    """Parameterised Alpha021 backtest for the product Backtest page.
+
+    Product-layer wrapper around the frozen factor components: the replay
+    window, universe and capital are caller-supplied; the quant logic
+    (formula, windows, orientation) stays exactly as sealed in
+    FACTOR_SPEC_REAL_D1 (Factor Discovery v2 — CLOSED).
+    """
+    root = data_dir()
+    syms = tuple(symbols) if symbols else SYMBOLS
+    invalid = [s for s in syms if s not in BACKTEST_UNIVERSE]
+    if invalid:
+        raise ValueError(f"unknown symbols: {', '.join(invalid)}")
+    missing = [s for s in syms if not (root / f"{s}_1d.csv").exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"no real daily data for: {', '.join(missing)}")
+    signals, context = build_signals(syms)
+    return _replay(signals, context, syms, start, end, initial_capital)
+
+
+def build_paper_data() -> dict:
+    """Deterministic Alpha021 paper run -> full data payload (no IO).
+
+    Shared by the CSV/HTML export and the Dashboard API.  Returns
+    ``{meta, trades, equity, summary}`` where equity/summary/meta match the
+    exported CSV schemas.  Raises on missing data files (callers decide how
+    to surface that).
+    """
+    signals, context = build_signals()
+    return _replay(signals, context, SYMBOLS, None, None, 1_000_000.0)
 
 
 def export_paper_log(out_dir: Path) -> dict:

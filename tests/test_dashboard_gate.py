@@ -489,3 +489,153 @@ def test_d16_factor_paper_page():
     # headline numbers consistent with the trade log
     assert sum(r["realized_pnl"] for r in body["trades"]) == pytest.approx(
         meta["realized"], abs=0.05)
+
+
+# --- D-17 回测页面（Product UI） -------------------------------------------------------------
+
+
+def test_d17_backtest_page():
+    """Backtest / 回测 page: menu link, frozen-core replay API, equivalence
+    with the sealed paper replay, windowed runs, validation errors."""
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced - backtest replay unavailable")
+
+    index = (Path(apps_api_main.__file__).resolve().parent.parent
+             / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/backtest"' in index
+    assert 'data-nav="backtest"' in index
+
+    token = _login("admin", "admin123")
+
+    # default run == sealed paper replay (same data, same seed, same windows)
+    res = client.post(
+        "/api/dashboard/backtest/run", json={},
+        headers=_headers(token),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    m = body["meta"]
+    assert m["alpha_id"] == "Alpha021"
+    assert m["symbols"] == ["NVDA", "QQQ", "SPY"]
+    sealed = client.get(
+        "/api/dashboard/factor", headers=_headers(token)).json()["meta"]
+    assert m["equity_final"] == sealed["equity_final"]
+    assert m["signals"] == sealed["signals"]
+    assert m["return_pct"] == pytest.approx(sealed["return_pct"], abs=1e-6)
+    assert m["sharpe"] is not None and m["turnover_shares_per_day"] > 0
+    # latency noise stripped from the product payload
+    assert all("latency_total_us" not in r for r in body["trades"])
+
+    # windowed run on a subset with a different capital
+    res = client.post(
+        "/api/dashboard/backtest/run",
+        json={"symbols": ["NVDA"], "start": "2025-01-01",
+              "end": "2025-12-31", "initial_capital": 500_000.0},
+        headers=_headers(token),
+    )
+    assert res.status_code == 200
+    m2 = res.json()["meta"]
+    assert m2["symbols"] == ["NVDA"]
+    assert m2["initial_capital"] == 500_000.0
+    assert all(t["symbol"] == "NVDA" for t in res.json()["trades"])
+    assert res.json()["trades"][0]["date"] >= "2025-01-01"
+
+    # validation: unknown symbol / empty symbols / bad capital
+    for payload, code in (
+        ({"symbols": ["FAKE"]}, 400),
+        ({"symbols": []}, 400),
+        ({"symbols": ["NVDA"], "initial_capital": 0}, 400),
+    ):
+        res = client.post(
+            "/api/dashboard/backtest/run", json=payload, headers=_headers(token))
+        assert res.status_code == code, payload
+
+    # RBAC: readonly may run backtests (read-only replay)
+    ro_token = _login("readonly", "readonly123")
+    res = client.post(
+        "/api/dashboard/backtest/run", json={}, headers=_headers(ro_token))
+    assert res.status_code == 200
+
+
+# --- D-18 账户 / 风控配置页面 ------------------------------------------------------------------
+
+
+def test_d18_settings_page():
+    """Settings / 设置 page: menu link, config GET defaults + POST save
+    + persistence, RBAC, and honest no-fake-connection surface."""
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    index = (Path(apps_api_main.__file__).resolve().parent.parent
+             / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/settings"' in index
+    assert 'data-nav="settings"' in index
+
+    token = _login("admin", "admin123")
+
+    # defaults (or previously saved values) with connection honesty
+    res = client.get("/api/dashboard/config", headers=_headers(token))
+    assert res.status_code == 200
+    cfg = res.json()
+    assert cfg["account"]["account_name"]
+    assert cfg["risk"]["max_daily_loss_pct"] > 0
+    assert cfg["live_trading_enabled"] is False
+    assert all(b["connected"] is False for b in cfg["connections"]["brokers"])
+
+    # save and read back (persists to data/config/trading_ui.json)
+    payload = {
+        "account_name": "UI Test Account",
+        "broker": "Simulated",
+        "account_type": "Paper",
+        "initial_capital": 2_000_000.0,
+        "currency": "USD",
+        "max_daily_loss_pct": 2.5,
+        "max_drawdown_pct": 5.0,
+        "risk_per_trade_pct": 0.4,
+    }
+    res = client.post(
+        "/api/dashboard/config", json=payload, headers=_headers(token))
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+    # live trading stays hard-off even if a client tried to imply otherwise
+    assert res.json()["config"]["live_trading_enabled"] is False
+
+    res = client.get("/api/dashboard/config", headers=_headers(token))
+    assert res.json()["account"]["account_name"] == "UI Test Account"
+    assert res.json()["risk"]["max_daily_loss_pct"] == 2.5
+
+    # validation errors
+    for bad in ({"initial_capital": -1}, {"max_daily_loss_pct": 99.0}):
+        res = client.post(
+            "/api/dashboard/config",
+            json={**payload, **bad},
+            headers=_headers(token))
+        assert res.status_code == 400, bad
+
+    # RBAC: readonly cannot save
+    ro_token = _login("readonly", "readonly123")
+    res = client.post(
+        "/api/dashboard/config", json=payload, headers=_headers(ro_token))
+    assert res.status_code == 403
+    res = client.get("/api/dashboard/config", headers=_headers(ro_token))
+    assert res.status_code == 200
+
+    # restore defaults so the test stays idempotent
+    client.post("/api/dashboard/config", json={
+        "account_name": "Main Paper Account",
+        "broker": "Simulated",
+        "account_type": "Paper",
+        "initial_capital": 1_000_000.0,
+        "currency": "USD",
+        "max_daily_loss_pct": 3.0,
+        "max_drawdown_pct": 6.0,
+        "risk_per_trade_pct": 0.5,
+    }, headers=_headers(token))
