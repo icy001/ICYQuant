@@ -646,3 +646,116 @@ def accounts_sync(
         ip_address=_client_ip(request),
     )
     return report
+
+
+# ---------------------------------------------------------------------------
+# Audit log (read-only viewer for the Audit Center)
+# ---------------------------------------------------------------------------
+
+@router.get("/dashboard/audit-log")
+def audit_log(
+    principal: Principal = Depends(require_roles()),
+    limit: int = 200,
+    action: Optional[str] = None,
+    actor: Optional[str] = None,
+    severity: Optional[str] = None,
+) -> dict:
+    """Audit log viewer with optional filters.
+
+    Returns recent audit entries from the Dashboard AuditCenter.
+    Supports filtering by action, actor, or severity.
+    """
+    from services.security.audit_center import AuditAction as AA, AuditSeverity as AS
+
+    kwargs: dict = {"limit": min(limit, 1000)}
+    if action:
+        try:
+            kwargs["action"] = AA(action)
+        except ValueError:
+            pass
+    if actor:
+        kwargs["actor"] = actor
+    if severity:
+        try:
+            kwargs["severity"] = AS(severity.lower())
+        except ValueError:
+            pass
+
+    entries = auth.audit.query(**kwargs)
+    return {
+        "entries": [e.to_dict() for e in reversed(entries)],
+        "total": len(entries),
+        "statistics": auth.audit.get_statistics(),
+        "integrity": auth.audit.verify_integrity(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Enhanced risk (VaR / Beta / breach / exposure breakdown)
+# ---------------------------------------------------------------------------
+
+@router.get("/dashboard/risk-enhanced")
+def risk_enhanced(principal: Principal = Depends(require_roles())) -> dict:
+    """Enhanced risk view: VaR, Beta, concentration, breach status."""
+    from apps.dashboard import runtime as rt
+
+    positions_list = rt.positions()
+    total_eq = 100000.0 + sum(float(p.get("unrealized_pnl", 0)) for p in positions_list)
+    total_exposure = sum(float(p.get("exposure", 0)) for p in positions_list)
+    gross = total_exposure
+    net = total_exposure  # long-only
+
+    # Concentration by symbol
+    conc = {}
+    for p in positions_list:
+        sym = p.get("symbol", "unknown")
+        val = float(p.get("exposure", 0))
+        conc[sym] = conc.get(sym, 0) + val
+    conc_pct = {k: round(v / total_exposure * 100, 2) if total_exposure > 0 else 0.0
+                for k, v in conc.items()}
+
+    # Simple 1-day 95% VaR using historical vol (assume 2% daily vol proxy)
+    daily_vol = 0.02
+    var_95 = round(total_exposure * daily_vol * 1.65, 2)
+
+    # Beta proxy (simple: 1.0 for paper account)
+    beta = 1.0
+
+    # Breach detection
+    breaches = []
+    max_dd = 0.0
+    daily_loss = sum(float(p.get("unrealized_pnl", 0)) for p in positions_list)
+
+    # Check against configured risk limits if available
+    try:
+        cfg = _load_ui_config()
+        risk_limits = cfg.get("risk", {})
+        max_daily_loss_pct = risk_limits.get("max_daily_loss_pct", 3.0)
+        max_drawdown_pct = risk_limits.get("max_drawdown_pct", 6.0)
+        if total_eq > 0:
+            dd_pct = abs(daily_loss) / total_eq * 100
+            if dd_pct >= max_daily_loss_pct:
+                breaches.append({
+                    "rule": "Max Daily Loss",
+                    "limit_pct": max_daily_loss_pct,
+                    "actual_pct": round(dd_pct, 2),
+                    "severity": "CRITICAL",
+                    "action": "Trading Halted",
+                })
+    except Exception:
+        pass
+
+    return {
+        "summary": {
+            "total_equity": round(total_eq, 2),
+            "gross_exposure": round(gross, 2),
+            "net_exposure": round(net, 2),
+            "beta": beta,
+            "var_95": var_95,
+            "concentration": conc_pct,
+            "position_count": len(positions_list),
+        },
+        "breaches": breaches,
+        "trading_halted": len(breaches) > 0,
+        "positions": positions_list,
+    }

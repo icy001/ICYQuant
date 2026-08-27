@@ -639,3 +639,212 @@ def test_d18_settings_page():
         "max_drawdown_pct": 6.0,
         "risk_per_trade_pct": 0.5,
     }, headers=_headers(token))
+
+
+# --- D-19 Audit Log endpoint ------------------------------------------------
+
+def test_d19_audit_log_endpoint():
+    """GET /api/dashboard/audit-log returns entries, statistics, integrity.
+    RBAC enforced; filters accepted. """
+    token = _login("admin", "admin123")
+    res = client.get(
+        "/api/dashboard/audit-log", headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "entries" in body
+    assert "total" in body
+    assert "statistics" in body
+    assert "integrity" in body
+    assert isinstance(body["entries"], list)
+    assert isinstance(body["statistics"], dict)
+    # Each entry must have the expected fields
+    if body["entries"]:
+        e = body["entries"][0]
+        assert "action" in e
+        assert "actor" in e
+        assert "target" in e
+        assert "severity" in e
+        assert "timestamp" in e
+    # Integrity must report ok
+    integ = body["integrity"]
+    assert "integrityOk" in integ
+    assert "total" in integ
+
+    # filter by action
+    res2 = client.get(
+        "/api/dashboard/audit-log?action=LOGIN",
+        headers=_headers(token))
+    assert res2.status_code == 200
+    # RBAC: readonly can read audit
+    ro_token = _login("readonly", "readonly123")
+    res3 = client.get(
+        "/api/dashboard/audit-log", headers=_headers(ro_token))
+    assert res3.status_code == 200
+
+
+# --- D-20 Enhanced Risk endpoint --------------------------------------------
+
+def test_d20_risk_enhanced_endpoint():
+    """GET /api/dashboard/risk-enhanced returns summary, breaches, positions.
+    RBAC enforced. """
+    token = _login("admin", "admin123")
+    res = client.get(
+        "/api/dashboard/risk-enhanced", headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "summary" in body
+    assert "breaches" in body
+    assert "trading_halted" in body
+    assert "positions" in body
+    s = body["summary"]
+    assert "total_equity" in s
+    assert "gross_exposure" in s
+    assert "net_exposure" in s
+    assert "var_95" in s
+    assert "concentration" in s
+    assert "position_count" in s
+    assert isinstance(s["concentration"], dict)
+    assert isinstance(body["breaches"], list)
+    assert isinstance(body["trading_halted"], bool)
+
+    # RBAC: risk role can access
+    risk_token = _login("risk", "risk123")
+    res2 = client.get(
+        "/api/dashboard/risk-enhanced", headers=_headers(risk_token))
+    assert res2.status_code == 200
+
+
+# --- D-21 Backtest chart_panels ---------------------------------------------
+
+def test_d21_backtest_chart_panels():
+    """Backtest response includes chart_panels for multi-panel chart rendering.
+    Each panel has price, z_score, position, signal arrays. """
+    from pathlib import Path
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced")
+
+    token = _login("admin", "admin123")
+    res = client.post(
+        "/api/dashboard/backtest/run", json={},
+        headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "chart_panels" in body
+    panels = body["chart_panels"]
+    assert isinstance(panels, list)
+    assert len(panels) > 0
+    # Each panel must have the required arrays
+    for p in panels:
+        assert "symbol" in p
+        assert "dates" in p
+        assert "closes" in p
+        assert "z_scores" in p
+        assert "positions" in p
+        assert "signals" in p
+        assert "equity_line" in p
+        n = len(p["dates"])
+        assert n > 0
+        assert len(p["closes"]) == n
+        assert len(p["z_scores"]) == n
+        assert len(p["positions"]) == n
+        assert len(p["equity_line"]) == n
+    # Default run has NVDA panel
+    symbols = [p["symbol"] for p in panels]
+    assert "NVDA" in symbols
+
+
+# --- D-22 Backtest extended metrics -----------------------------------------
+
+def test_d22_backtest_extended_metrics():
+    """Backtest meta includes CAGR, Sortino, Calmar and trade analysis. """
+    from pathlib import Path
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced")
+
+    token = _login("admin", "admin123")
+    res = client.post(
+        "/api/dashboard/backtest/run", json={},
+        headers=_headers(token))
+    assert res.status_code == 200
+    m = res.json()["meta"]
+    # New extended fields must be present
+    assert "cagr" in m
+    assert "sortino" in m
+    assert "calmar" in m
+    assert "avg_win" in m
+    assert "avg_loss" in m
+    assert "profit_factor" in m
+    assert "expectancy" in m
+    assert "avg_holding_days" in m
+    assert "best_trade" in m
+    assert "worst_trade" in m
+    # Profit factor and expectancy should be reasonable numbers
+    assert m["profit_factor"] is None or m["profit_factor"] >= 0
+    # Original fields still present (additive change)
+    assert "equity_final" in m
+    assert "return_pct" in m
+
+
+# --- D-23 Drawdown series in backtest ---------------------------------------
+
+def test_d23_drawdown_series():
+    """Backtest response includes drawdown_series (daily DD %). """
+    from pathlib import Path
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced")
+
+    token = _login("admin", "admin123")
+    res = client.post(
+        "/api/dashboard/backtest/run", json={},
+        headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "drawdown_series" in body
+    dd = body["drawdown_series"]
+    assert isinstance(dd, list)
+    assert len(dd) > 0
+    # Drawdown values should be <= 0 (no positive drawdown)
+    for v in dd:
+        assert v <= 0, f"drawdown value {v} should be <= 0"
+
+
+# --- D-24 Monthly returns in backtest ---------------------------------------
+
+def test_d24_monthly_returns():
+    """Backtest response includes monthly_returns for heatmap. """
+    from pathlib import Path
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced")
+
+    token = _login("admin", "admin123")
+    res = client.post(
+        "/api/dashboard/backtest/run", json={},
+        headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "monthly_returns" in body
+    mr = body["monthly_returns"]
+    assert isinstance(mr, list)
+    assert len(mr) > 0
+    # Each entry has month (YYYY-MM) and return_pct
+    for m in mr:
+        assert "month" in m
+        assert "return_pct" in m
+        assert len(m["month"]) == 7  # YYYY-MM format
+    # Returns should sum approximately to total return
+    total_ret = body["meta"]["return_pct"]
+    monthly_sum = sum(m["return_pct"] for m in mr)
+    assert abs(monthly_sum - total_ret) < 5.0, (
+        f"monthly sum {monthly_sum} ~= total {total_ret}")

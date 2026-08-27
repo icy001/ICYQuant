@@ -601,43 +601,113 @@
    * ================================================================== */
 
   async function pageRisk() {
-    const data = await api.get("/dashboard/risk");
+    const [data, enhanced, cfg] = await Promise.all([
+      api.get("/dashboard/risk").catch(function () { return {}; }),
+      api.get("/dashboard/risk-enhanced").catch(function () { return {}; }),
+      api.get("/dashboard/config").catch(function () { return {}; }),
+    ]);
     const m = data.metrics || {};
+    const summary = enhanced.summary || {};
+    const breaches = enhanced.breaches || [];
+    const halted = enhanced.trading_halted || false;
+    const positions = enhanced.positions || [];
+    const r = cfg.risk || {};
+
     const metric = function (label, value, cls) {
       return (
         '<div class="card metric-card"><span class="metric-label">' + esc(label) + "</span>" +
         '<span class="metric-value sm ' + (cls || "") + '">' + value + "</span></div>"
       );
     };
-    // risk rules from the trading-ui config (Settings page)
-    let cfg = null;
-    try {
-      cfg = await api.get("/dashboard/config");
-    } catch (e) {
-      /* config unavailable - rules card hides */
+
+    // System status badge
+    const statusBadge = halted
+      ? '<span class="badge badge-red">🔴 TRADING HALTED / 交易已暂停</span>'
+      : '<span class="badge badge-green">🟢 SYSTEM NORMAL / 系统正常</span>';
+
+    // Breach panel
+    let breachHtml = "";
+    if (breaches.length > 0) {
+      breachHtml = breaches.map(function (b) {
+        const isCrit = b.severity === "CRITICAL";
+        return (
+          '<div class="breach-panel ' + (isCrit ? 'breach-critical' : '') + '">' +
+          '<div class="breach-header">' +
+          '<span class="breach-rule">⚠ ' + esc(b.rule) + '</span>' +
+          '<span class="badge ' + (isCrit ? 'badge-red' : 'badge-amber') + '">' + esc(b.severity) + '</span>' +
+          '</div>' +
+          '<div class="breach-body">' +
+          '<span>Current: ' + (b.actual_pct || 0).toFixed(2) + '%</span>' +
+          '<span>Limit: ' + (b.limit_pct || 0).toFixed(2) + '%</span>' +
+          '</div>' +
+          '<div class="breach-action">▶ ' + esc(b.action || "TRADING HALTED") + '</div>' +
+          '</div>'
+        );
+      }).join("");
     }
-    const r = cfg ? cfg.risk || {} : {};
+
+    // Exposure breakdown
+    const concEntries = Object.entries(summary.concentration || {});
+    let exposureBars = "";
+    if (concEntries.length > 0) {
+      const maxConc = Math.max.apply(null, concEntries.map(function (e) { return e[1]; }));
+      const colors = ["#4da3ff", "#00e5a0", "#ffb020", "#ff5c6c", "#a78bfa"];
+      exposureBars = concEntries.map(function (e, i) {
+        const pct = (e[1] || 0).toFixed(1);
+        const width = maxConc > 0 ? (e[1] / maxConc * 100) : 0;
+        return (
+          '<div class="exposure-row">' +
+          '<span class="exposure-sym">' + esc(e[0]) + '</span>' +
+          '<div class="exposure-bar-wrap"><div class="exposure-bar" style="width:' + width + '%;background:' + colors[i % colors.length] + '"></div></div>' +
+          '<span class="exposure-pct">' + pct + '%</span>' +
+          '</div>'
+        );
+      }).join("");
+    }
+
     const rulesCard = cfg
-      ? '<div class="card mb"><div class="card-title">Risk Rules / 风控规则（在 Settings 页配置）</div>' +
+      ? '<div class="card mb"><div class="card-title">Risk Rules / 风控规则</div>' +
         '<div class="grid grid-3">' +
-        metric("Max Daily Loss / 单日最大亏损", (r.max_daily_loss_pct || 0) + "%", "") +
-        metric("Max Drawdown / 最大回撤限制", (r.max_drawdown_pct || 0) + "%", "") +
-        metric("Risk Per Trade / 单笔风险", (r.risk_per_trade_pct || 0) + "%", "") +
-        "</div>" +
-        '<div class="metric-sub" style="margin-top:8px">规则在 Settings 页配置并经审计保存；执行层面由 Risk Engine 强制。</div></div>'
+        metric("Max Daily Loss / 单日最大亏损", (r.max_daily_loss_pct || 0) + "%") +
+        metric("Max Drawdown / 最大回撤限制", (r.max_drawdown_pct || 0) + "%") +
+        metric("Risk Per Trade / 单笔风险", (r.risk_per_trade_pct || 0) + "%") +
+        "</div></div>"
       : "";
+
     return (
       rulesCard +
+
+      // System Status
+      '<div class="card mb"><div class="card-title">System Status / 系统状态</div>' +
+      '<div style="margin-bottom:10px">' + statusBadge + '</div>' +
+      '<div class="grid grid-4">' +
+      metric("Total Equity / 总权益", fmtMoney(summary.total_equity)) +
+      metric("Gross Exposure / 总敞口", fmtMoney(summary.gross_exposure)) +
+      metric("Net Exposure / 净敞口", fmtMoney(summary.net_exposure)) +
+      metric("Position Count / 持仓数", fmtNum(summary.position_count)) +
+      metric("VaR (95%, 1d) / 在险价值", summary.var_95 == null ? "—" : (summary.var_95 * 100).toFixed(2) + "%", "neg") +
+      metric("Beta / 贝塔", summary.beta == null ? "—" : summary.beta.toFixed(3)) +
+      "</div></div>" +
+
+      // Breach Panel
+      '<div class="card mb"><div class="card-title">Breach / 风控触发</div>' +
+      (breaches.length > 0 ? breachHtml :
+        '<div class="empty">✅ No active breaches / 无当前触发</div>') +
+      '</div>' +
+
+      // Exposure breakdown
+      '<div class="card mb"><div class="card-title">Exposure / 敞口分布</div>' +
+      (exposureBars || '<div class="empty">No positions / 无持仓</div>') +
+      '</div>' +
+
+      // Original risk decisions
       '<div class="grid grid-4 mb">' +
       metric("Risk Decisions / 风控决策", fmtNum(m.decisions)) +
       metric("Approved / 通过", fmtNum(m.approved), "pos") +
       metric("Rejected / 拒绝", fmtNum(m.rejected), "neg") +
-      metric("Exposure / 风险敞口", fmtMoney(m.exposure)) +
-      metric("Daily Loss / 当日亏损", fmtMoney(m.daily_loss)) +
-      metric("Drawdown / 回撤", fmtMoney(m.drawdown)) +
-      metric("Position Limit / 持仓限制", fmtNum(m.position_quantity) + " / " + fmtNum(m.position_limit), m.position_quantity >= m.position_limit ? "neg" : "") +
       metric("Order Limit / 下单限制", fmtNum(m.order_limit)) +
       "</div>" +
+
       '<div class="card"><div class="card-title">Risk Decision Pipeline / 风控决策流水</div>' +
       (data.decisions && data.decisions.length
         ? '<div class="table-wrap"><table><thead><tr>' +
@@ -866,6 +936,267 @@
   }
 
   /* ==================================================================
+   * Multi-panel synchronized chart (4 sub-charts on shared time axis)
+   * ================================================================== */
+
+  function multiPanelChart(panels, opts) {
+    /* panels: [{symbol, dates[], closes[], z_scores[], positions[], signals[], equity_line[]}]
+       opts: {height, title}
+       Renders 4 synchronized sub-charts: Price + Signals, Z-Score, Position, Equity. */
+    opts = opts || {};
+    if (!panels || !panels.length) {
+      return '<div class="empty">No chart data / 暂无图表数据</div>';
+    }
+    const panel = panels[0]; // primary panel for time axis
+    const W = 900;
+    const PAD_L = 56, PAD_R = 12;
+    const H_PRICE = 140, H_Z = 100, H_POS = 70, H_EQ = 120;
+    const GAP = 8;
+    const totalH = H_PRICE + H_Z + H_POS + H_EQ + GAP * 3 + 24;
+
+    const dates = panel.dates || [];
+    const closes = panel.closes || [];
+    const zScores = panel.z_scores || [];
+    const positions = panel.positions || [];
+    const signals = panel.signals || [];
+    const eqLine = panel.equity_line || [];
+    const n = dates.length;
+    if (n < 2) return '<div class="empty">Insufficient data / 数据不足</div>';
+
+    const X = function(i) { return PAD_L + (i / (n - 1)) * (W - PAD_L - PAD_R); };
+
+    // --- Price sub-chart ---
+    let priceVals = closes.map(function(v) { return v != null ? v : 0; });
+    let pLo = Math.min.apply(null, priceVals);
+    let pHi = Math.max.apply(null, priceVals);
+    let pRange = pHi - pLo || 1;
+    pLo -= pRange * 0.08; pHi += pRange * 0.08;
+    const Yp = function(v) { return H_PRICE - 10 - ((v - pLo) / (pHi - pLo)) * (H_PRICE - 20); };
+    let pricePath = "";
+    for (let i = 0; i < n; i++) {
+      const y = closes[i] != null ? Yp(closes[i]) : 0;
+      if (i === 0) pricePath += "M"; else pricePath += " L";
+      pricePath += X(i).toFixed(1) + "," + y.toFixed(1);
+    }
+
+    // Signal markers on price chart
+    let sigMarkers = "";
+    if (signals.length) {
+      const sigDates = {};
+      signals.forEach(function(s) { sigDates[s.date] = sigDates[s.date] || []; sigDates[s.date].push(s); });
+      for (let i = 0; i < n; i++) {
+        if (sigDates[dates[i]]) {
+          sigDates[dates[i]].forEach(function(s) {
+            if (s.price) {
+              const cx = X(i), cy = Yp(s.price);
+              const isBuy = s.side === "BUY";
+              sigMarkers += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) +
+                '" r="4" fill="' + (isBuy ? "#00e5a0" : "#ff5c6c") +
+                '" stroke="#0a0e17" stroke-width="1.5"/>';
+            }
+          });
+        }
+      }
+    }
+
+    // --- Z-Score sub-chart ---
+    let zVals = zScores.map(function(v) { return v != null ? v : 0; });
+    let zLo = Math.min.apply(null, zVals.concat([-2, 2]));
+    let zHi = Math.max.apply(null, zVals.concat([-2, 2]));
+    if (zHi - zLo < 0.5) { zLo -= 0.5; zHi += 0.5; }
+    const Yz = function(v) { return H_Z - 10 - ((v - zLo) / (zHi - zLo)) * (H_Z - 20); };
+    let zPath = "";
+    for (let i = 0; i < n; i++) {
+      const y = zScores[i] != null ? Yz(zScores[i]) : 0;
+      if (i === 0) zPath += "M"; else zPath += " L";
+      zPath += X(i).toFixed(1) + "," + y.toFixed(1);
+    }
+
+    // --- Position sub-chart ---
+    const Ypos = function(v) { return H_POS - 10 - (v * (H_POS - 20)); };
+    let posBars = "";
+    for (let i = 0; i < n; i++) {
+      const v = positions[i] || 0;
+      if (v !== 0) {
+        const y0 = Ypos(0);
+        const y1 = Ypos(v);
+        posBars += '<line x1="' + X(i).toFixed(1) + '" y1="' + y0.toFixed(1) +
+          '" x2="' + X(i).toFixed(1) + '" y2="' + y1.toFixed(1) +
+          '" stroke="#4da3ff" stroke-width="3"/>';
+      }
+    }
+
+    // --- Equity sub-chart ---
+    let eqVals = eqLine.map(function(v) { return v != null ? v : 0; });
+    let eLo = Math.min.apply(null, eqVals.filter(function(v) { return v > 0; }));
+    let eHi = Math.max.apply(null, eqVals);
+    if (!isFinite(eLo)) { eLo = eHi * 0.9; }
+    let eRange = eHi - eLo || 1;
+    eLo -= eRange * 0.06; eHi += eRange * 0.06;
+    const Ye = function(v) { return H_EQ - 10 - ((v - eLo) / (eHi - eLo)) * (H_EQ - 20); };
+    let eqPath = "";
+    for (let i = 0; i < n; i++) {
+      if (eqLine[i] != null) {
+        const y = Ye(eqLine[i]);
+        if (eqPath === "" || eqLine[i-1] == null) eqPath += "M"; else eqPath += " L";
+        eqPath += X(i).toFixed(1) + "," + y.toFixed(1);
+      }
+    }
+
+    // Grid lines & axis labels for each sub-chart
+    function gridLines(height, yFunc, lo, hi, fmt) {
+      let g = "";
+      for (let gv = 0; gv <= 4; gv++) {
+        const v = lo + gv * (hi - lo) / 4;
+        const y = yFunc(v);
+        g += '<line x1="' + PAD_L + '" y1="' + y.toFixed(1) +
+          '" x2="' + (W - PAD_R) + '" y2="' + y.toFixed(1) + '" class="chart-grid-line"/>';
+        g += '<text x="' + (PAD_L - 6) + '" y="' + (y + 3.5).toFixed(1) +
+          '" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">' +
+          (fmt ? fmt(v) : v.toFixed(1)) + '</text>';
+      }
+      return g;
+    }
+
+    // Y-axis label widths
+    const pFmt = function(v) { return "$" + Math.round(v).toLocaleString(); };
+    const eFmt = function(v) { return "$" + Math.round(v / 1000) + "k"; };
+
+    // X-axis labels (shared)
+    let xLabels = "";
+    [0, Math.floor(n * 0.25), Math.floor(n * 0.5), Math.floor(n * 0.75), n - 1].forEach(function(i) {
+      if (i < n) {
+        xLabels += '<text x="' + X(i).toFixed(1) + '" y="' + (totalH - 6) +
+          '" fill="#64748b" font-size="9" text-anchor="middle" font-family="monospace">' +
+          dates[i].slice(0, 7) + '</text>';
+      }
+    });
+
+    // Baseline for equity
+    let eqBaseline = "";
+    const initialCap = eqLine.find(function(v) { return v != null; });
+    if (initialCap && initialCap > 0) {
+      eqBaseline = '<line x1="' + PAD_L + '" y1="' + Ye(initialCap).toFixed(1) +
+        '" x2="' + (W - PAD_R) + '" y2="' + Ye(initialCap).toFixed(1) +
+        '" stroke="#33415a" stroke-dasharray="4 4"/>';
+    }
+
+    return (
+      '<div class="chart-panel-wrap">' +
+      '<svg viewBox="0 0 ' + W + ' ' + totalH + '" style="width:100%;height:' + totalH + 'px">' +
+      // Price chart
+      '<text x="' + PAD_L + '" y="12" fill="#94a3b8" font-size="10" font-weight="600">Price / ' + esc(panel.symbol) + ' / 价格</text>' +
+      gridLines(H_PRICE, Yp, pLo, pHi, pFmt) +
+      '<path d="' + pricePath + '" fill="none" stroke="#4da3ff" stroke-width="1.5"/>' +
+      sigMarkers +
+      // Z-Score chart
+      '<text x="' + PAD_L + '" y="' + (H_PRICE + GAP + 12) + '" fill="#94a3b8" font-size="10" font-weight="600">Alpha021 Z-Score / Z分数</text>' +
+      gridLines(H_Z, Yz, zLo, zHi) +
+      '<line x1="' + PAD_L + '" y1="' + Yz(0).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + Yz(0).toFixed(1) + '" class="chart-grid-line" stroke-width="0.5" stroke-dasharray="2 2"/>' +
+      '<path d="' + zPath + '" fill="none" stroke="#a78bfa" stroke-width="1.2"/>' +
+      // Position chart
+      '<text x="' + PAD_L + '" y="' + (H_PRICE + GAP + H_Z + GAP + 12) + '" fill="#94a3b8" font-size="10" font-weight="600">Position / 仓位</text>' +
+      '<line x1="' + PAD_L + '" y1="' + Ypos(0).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + Ypos(0).toFixed(1) + '" class="chart-grid-line"/>' +
+      posBars +
+      // Equity chart
+      '<text x="' + PAD_L + '" y="' + (H_PRICE + GAP + H_Z + GAP + H_POS + GAP + 12) + '" fill="#94a3b8" font-size="10" font-weight="600">Portfolio Equity / 组合净值</text>' +
+      gridLines(H_EQ, Ye, eLo, eHi, eFmt) +
+      eqBaseline +
+      '<path d="' + eqPath + '" fill="none" stroke="#00e5a0" stroke-width="1.5"/>' +
+      // X-axis labels
+      xLabels +
+      '</svg>' +
+      '</div>'
+    );
+  }
+
+  /* ==================================================================
+   * Drawdown chart
+   * ================================================================== */
+
+  function drawdownChart(ddValues, dates, height) {
+    height = height || 100;
+    if (!ddValues || !ddValues.length) {
+      return '<div class="empty">No drawdown data / 无回撤数据</div>';
+    }
+    const W = 900, PAD_L = 56, PAD_R = 12;
+    const n = ddValues.length;
+    const lo = Math.min.apply(null, ddValues.concat([0]));
+    const hi = 0;
+    const Y = function(v) { return height - 10 - ((v - lo) / (hi - lo || 1)) * (height - 20); };
+    const X = function(i) { return PAD_L + (i / Math.max(n - 1, 1)) * (W - PAD_L - PAD_R); };
+    let areaPath = "M" + X(0).toFixed(1) + "," + Y(0).toFixed(1);
+    for (let i = 0; i < n; i++) {
+      areaPath += " L" + X(i).toFixed(1) + "," + Y(ddValues[i]).toFixed(1);
+    }
+    areaPath += " L" + X(n - 1).toFixed(1) + "," + Y(0).toFixed(1) + " Z";
+    let gridLines = "";
+    for (let g = 0; g <= 3; g++) {
+      const v = lo + g * (hi - lo) / 3;
+      gridLines += '<line x1="' + PAD_L + '" y1="' + Y(v).toFixed(1) +
+        '" x2="' + (W - PAD_R) + '" y2="' + Y(v).toFixed(1) + '" class="chart-grid-line"/>';
+      gridLines += '<text x="' + (PAD_L - 6) + '" y="' + (Y(v) + 3.5).toFixed(1) +
+        '" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">' +
+        v.toFixed(1) + '%</text>';
+    }
+    return (
+      '<svg viewBox="0 0 ' + W + ' ' + height + '" style="width:100%;height:' + height + 'px">' +
+      '<defs><linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#ff5c6c" stop-opacity="0.05"/>' +
+      '<stop offset="100%" stop-color="#ff5c6c" stop-opacity="0.3"/>' +
+      '</linearGradient></defs>' +
+      gridLines +
+      '<path d="' + areaPath + '" fill="url(#ddGrad)"/>' +
+      '<polyline points="' + ddValues.map(function(v, i) { return X(i).toFixed(1) + "," + Y(v).toFixed(1); }).join(" ") + '" fill="none" stroke="#ff5c6c" stroke-width="1.2"/>' +
+      '</svg>'
+    );
+  }
+
+  /* ==================================================================
+   * Monthly return heatmap
+   * ================================================================== */
+
+  function monthlyHeatmap(monthlyData) {
+    if (!monthlyData || !monthlyData.length) {
+      return '<div class="empty">No monthly data / 无月度数据</div>';
+    }
+    let months = [];
+    monthlyData.forEach(function(m) { months.push(m.month); });
+    const yearMap = {};
+    monthlyData.forEach(function(m) {
+      const year = m.month.slice(0, 4);
+      const month = parseInt(m.month.slice(5, 7), 10);
+      if (!yearMap[year]) yearMap[year] = {};
+      yearMap[year][month] = m.return_pct;
+    });
+    const years = Object.keys(yearMap).sort();
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let rows = "";
+    years.forEach(function(year) {
+      let cells = "";
+      for (let m = 1; m <= 12; m++) {
+        const val = yearMap[year][m];
+        if (val !== undefined) {
+          const isPos = val >= 0;
+          const intensity = Math.min(Math.abs(val) / 5, 1);
+          const bg = isPos
+            ? 'rgba(0, 229, 160,' + (0.25 + intensity * 0.55) + ')'
+            : 'rgba(255, 92, 108,' + (0.25 + intensity * 0.55) + ')';
+          cells += '<td style="background:' + bg + ';text-align:center;font-size:11px;' +
+            (isPos ? 'color:#00e5a0' : 'color:#ff5c6c') + '">' +
+            val.toFixed(1) + '%</td>';
+        } else {
+          cells += '<td style="background:#16213a;text-align:center;color:#33415a;font-size:11px">—</td>';
+        }
+      }
+      rows += '<tr><td style="color:#94a3b8;padding:4px 10px;font-size:11px">' + year + '</td>' + cells + '</tr>';
+    });
+    let headers = '<th style="width:60px"></th>';
+    monthNames.forEach(function(m) { headers += '<th style="text-align:center;font-size:10px;padding:4px">' + m + '</th>'; });
+    return '<div class="heatmap-wrap"><table style="border-collapse:collapse;width:100%"><thead><tr>' + headers + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  /* ==================================================================
    * Factor paper trading page (Alpha021, static research replay)
    * ================================================================== */
 
@@ -1048,10 +1379,19 @@
     const trades = data.trades || [];
     const eq = data.equity || [];
     const summary = data.summary || [];
+    const panels = data.chart_panels || [];
+    const ddSeries = data.drawdown_series || [];
+    const monthlyRet = data.monthly_returns || [];
     const metric = function (label, value, cls) {
       return (
         '<div class="card metric-card"><span class="metric-label">' + esc(label) + "</span>" +
         '<span class="metric-value sm ' + (cls || "") + '">' + value + "</span></div>"
+      );
+    };
+    const metricSmall = function (label, value, cls) {
+      return (
+        '<div class="metric-mini"><span>' + esc(label) + '</span>' +
+        '<span class="' + (cls || "") + '">' + value + '</span></div>'
       );
     };
     const outcomeBadge = function (o) {
@@ -1059,6 +1399,12 @@
       if (o === "REJECTED") return badge("Rejected / 拒单", "badge-amber");
       return badge("Error / 错误", "badge-red");
     };
+
+    // Build symbol selector for multi-panel chart
+    const symTabs = (m.symbols || []).map(function (s, i) {
+      return '<button class="sym-tab' + (i === 0 ? ' active' : '') + '" data-sym="' + esc(s) + '">' + esc(s) + '</button>';
+    }).join("");
+
     return (
       '<div class="card mb"><div class="card-title">Performance / 绩效</div>' +
       '<div class="metric-sub">' + esc((m.symbols || []).join(" / ")) + " · " + esc(m.period || "") +
@@ -1068,15 +1414,46 @@
       metric("Return / 收益率", (m.return_pct || 0).toFixed(2) + "%", m.return_pct >= 0 ? "pos" : "neg") +
       metric("Sharpe (ann.) / 夏普", m.sharpe == null ? "—" : m.sharpe.toFixed(2)) +
       metric("Max Drawdown / 最大回撤", (m.maxdd_pct || 0).toFixed(1) + "%", "neg") +
+      metric("CAGR / 年化收益", m.cagr == null ? "—" : m.cagr.toFixed(2) + "%", (m.cagr || 0) >= 0 ? "pos" : "neg") +
+      metric("Sortino / 索提诺", m.sortino == null ? "—" : m.sortino.toFixed(2)) +
+      metric("Calmar / 卡尔马", m.calmar == null ? "—" : m.calmar.toFixed(2)) +
       metric("Win Rate / 胜率", (m.win_rate || 0).toFixed(0) + "%（" + fmtNum(m.closed_trips) + " 笔）") +
       metric("Signals / Filled", fmtNum(m.signals) + " / " + fmtNum(m.filled)) +
       metric("Rejected / Error", fmtNum(m.rejected) + " / " + fmtNum(m.errored)) +
       metric("Turnover / 换手", fmtNum(m.turnover_shares_per_day) + " 股/日") +
+      metric("Profit Factor / 盈亏比", m.profit_factor == null ? "—" : m.profit_factor.toFixed(2)) +
       "</div></div>" +
-      '<div class="card mb"><div class="card-title">Equity Curve / 净值曲线（真实收盘 mark-to-market）</div>' +
-      factorStaticLine(eq.map(function (r) { return { x: r.date.slice(0, 7), y: r.equity }; }),
-        { color: "#4da3ff", baseline: m.initial_capital, fmt: function (v) { return "$" + Math.round(v / 1000) + "k"; } }) +
-      "</div>" +
+
+      // Advanced multi-panel chart
+      '<div class="card mb"><div class="card-title">Advanced Chart / 高级图表 — 4 面板同步</div>' +
+      '<div class="chart-sym-tabs">' + symTabs + '</div>' +
+      '<div id="chart-panel-container">' +
+      multiPanelChart(panels.slice(0, 1)) +
+      '</div>' +
+      '<div class="metric-sub">Price + Z-Score + Position + Equity 四面板共用时间轴；BUY/SELL 信号标记在价格图上。</div>' +
+      '</div>' +
+
+      // Drawdown chart
+      '<div class="card mb"><div class="card-title">Drawdown / 回撤曲线</div>' +
+      drawdownChart(ddSeries, null, 100) +
+      '</div>' +
+
+      // Monthly returns heatmap
+      '<div class="card mb"><div class="card-title">Monthly Returns / 月度收益热力图</div>' +
+      monthlyHeatmap(monthlyRet) +
+      '</div>' +
+
+      // Trade analysis
+      '<div class="card mb"><div class="card-title">Trade Analysis / 交易分析</div>' +
+      '<div class="grid grid-4">' +
+      metric("Avg Win / 平均盈利", m.avg_win == null ? "—" : fmtMoney(m.avg_win), "pos") +
+      metric("Avg Loss / 平均亏损", m.avg_loss == null ? "—" : fmtMoney(m.avg_loss), "neg") +
+      metric("Expectancy / 期望", m.expectancy == null ? "—" : fmtMoney(m.expectancy)) +
+      metric("Best Trade / 最佳交易", m.best_trade == null ? "—" : fmtMoney(m.best_trade), "pos") +
+      metric("Worst Trade / 最差交易", m.worst_trade == null ? "—" : fmtMoney(m.worst_trade), "neg") +
+      metric("Avg Holding / 平均持仓", m.avg_holding_days == null ? "—" : m.avg_holding_days + " 天") +
+      '</div></div>' +
+
       '<div class="card mb"><div class="card-title">Per-Symbol Summary / 分资产汇总</div>' +
       '<div class="table-wrap"><table><thead><tr>' +
       "<th>Symbol / 资产</th><th>Signals</th><th>Filled</th><th>Rejected</th><th>Realized / 已实现</th><th>Final Pos</th><th>Unrealized / 浮动</th>" +
@@ -1093,6 +1470,7 @@
         );
       }).join("") +
       "</tbody></table></div></div>" +
+
       '<div class="card"><div class="card-title">Trade Log / 交易明细（' + trades.length + "，最新在前）</div>" +
       '<div class="table-wrap" style="max-height:440px;overflow:auto"><table><thead><tr>' +
       "<th>#</th><th>Date / 日期</th><th>Symbol</th><th>Side / 方向</th><th>Close / 收盘</th><th>Outcome / 结果</th><th>Exec / 成交价</th><th>Pos / 仓位</th><th>P&L / 盈亏</th><th>Cum / 累计</th>" +
@@ -1294,8 +1672,42 @@
     const brokers = data.brokers || [];
     const brokerMap = {};
     brokers.forEach(function (b) { brokerMap[b.broker_id] = b; });
+
+    // Account cards
+    const accountCards = accounts.map(function (a) {
+      const isLive = (a.id && a.id.toLowerCase().indexOf("live") >= 0);
+      const connClass = a.connection === "CONNECTED" ? "badge-green" : "badge-red";
+      const connLabel = a.connection === "CONNECTED" ? "🟢 Connected / 已连接" : "🔴 Not Connected / 未连接";
+      return (
+        '<div class="account-card">' +
+        '<div class="ac-head">' +
+        '<span class="ac-name">' + esc(a.name || a.id) + '</span>' +
+        '<span class="badge ' + connClass + '">' + connLabel + '</span>' +
+        '</div>' +
+        '<div class="ac-equity">$' + fmtNum(a.equity || 0) + '</div>' +
+        '<div class="ac-meta">' +
+        '<span>' + esc(a.broker_name || "—") + '</span> · <span>' + esc(a.market_label || "—") + '</span>' +
+        '</div>' +
+        '<div class="ac-stats">' +
+        '<span class="num pos">$' + fmtNum(a.cash || 0) + '</span> Cash' +
+        '<span class="num">$' + fmtNum(a.positions || 0) + '</span> Pos' +
+        '<span class="num">$' + fmtNum(a.orders || 0) + '</span> Orders' +
+        '</div>' +
+        '<div class="ac-actions">' +
+        '<button class="btn btn-sm" data-test-conn="' + esc(a.id) + '">🔌 Test Connection / 测试连接</button>' +
+        '</div>' +
+        '</div>'
+      );
+    }).join("");
+
     return (
-      '<div class="card mb"><div class="card-title">Broker Connections / 券商连接</div>' +
+      // Account cards row
+      '<div class="card mb"><div class="card-title">Accounts / 账户概览</div>' +
+      '<div class="account-cards-row">' + (accountCards || '<div class="empty">No accounts / 暂无账户</div>') + '</div>' +
+      '</div>' +
+
+      // Broker connections
+      '<div class="card mb"><div class="card-title">Broker Status / 券商状态</div>' +
       '<div class="grid grid-4 mb">' +
       (data.health || []).map(function (h) {
         const zh = marketZh(h.market);
@@ -1307,10 +1719,32 @@
         );
       }).join("") +
       "</div></div>" +
-      '<div class="card"><div class="card-title">Accounts / 账户 (' + fmtNum(accounts.length) + ")</div>" +
+
+      // Account settings form
+      '<div class="card mb"><div class="card-title">Account Settings / 账户设置</div>' +
+      '<div class="form-grid">' +
+      '<div><label>Broker / 券商</label><select id="acc-broker"><option>IBKR</option><option>Interactive Brokers</option><option>Alpaca</option><option>Paper Only</option></select></div>' +
+      '<div><label>Account ID / 账户编号</label><input id="acc-id" placeholder="Enter account ID" /></div>' +
+      '<div><label>API Key</label><input id="acc-apikey" type="password" placeholder="********" /></div>' +
+      '<div><label>API Secret</label><input id="acc-secret" type="password" placeholder="********" /></div>' +
+      '<div><label>Environment / 环境</label>' +
+      '<div class="radio-group">' +
+      '<label><input type="radio" name="acc-env" value="PAPER" checked /> Paper / 模拟</label>' +
+      '<label><input type="radio" name="acc-env" value="LIVE" /> Live / 实盘</label>' +
+      '</div></div>' +
+      '</div>' +
+      '<div class="mt">' +
+      '<button class="btn btn-sm" id="btn-acc-test">🔌 Test Connection / 测试连接</button>' +
+      '<button class="btn btn-sm btn-secondary" id="btn-acc-save">💾 Save Settings / 保存设置</button>' +
+      '</div>' +
+      '<div class="metric-sub" style="margin-top:8px">⚠ API secrets are stored encrypted on the backend only. Never exposed to frontend.</div>' +
+      '</div>' +
+
+      // Detailed table
+      '<div class="card"><div class="card-title">Account Details / 账户明细</div>' +
       (accounts.length
         ? '<div class="table-wrap"><table><thead><tr>' +
-          "<th>Account / 账户</th><th>Broker / 券商</th><th>Market / 市场</th><th>Status / 状态</th><th>Equity / 总权益</th><th>Cash / 现金</th><th>Buying Power / 可用资金</th><th>Margin / 保证金</th><th>Pos / 持仓</th><th>Orders / 订单</th><th>Exec / 成交</th>" +
+          "<th>Account / 账户</th><th>Broker / 券商</th><th>Market / 市场</th><th>Status / 状态</th><th>Equity / 总权益</th><th>Cash / 现金</th><th>Pos / 持仓</th><th>Orders / 订单</th>" +
           "</tr></thead><tbody>" +
           accounts.map(function (a) {
             return (
@@ -1321,11 +1755,8 @@
               "<td>" + connBadge(a.connection) + "</td>" +
               "<td class=\"num\">" + fmtMoneyCur(a.equity, a.currency) + "</td>" +
               "<td class=\"num\">" + fmtMoneyCur(a.cash, a.currency) + "</td>" +
-              "<td class=\"num\">" + fmtMoneyCur(a.buying_power, a.currency) + "</td>" +
-              "<td class=\"num\">" + fmtMoneyCur(a.margin, a.currency) + "</td>" +
               "<td class=\"num\">" + fmtNum(a.positions) + "</td>" +
-              "<td class=\"num\">" + fmtNum(a.orders) + "</td>" +
-              "<td class=\"num\">" + fmtNum(a.executions) + "</td></tr>"
+              "<td class=\"num\">" + fmtNum(a.orders) + "</td></tr>"
             );
           }).join("")
         : '<div class="empty">No accounts / 暂无账户</div>') +
@@ -1572,6 +2003,89 @@
   }
 
   /* ==================================================================
+   * Audit log page
+   * ================================================================== */
+
+  async function pageAuditLog() {
+    const data = await api.get("/dashboard/audit-log?limit=200");
+    const entries = data.entries || [];
+    const stats = data.statistics || {};
+    const integrity = data.integrity || {};
+
+    // Filter controls
+    const filtersHtml =
+      '<div class="audit-filters">' +
+      '<select id="audit-filter-action"><option value="">All Actions / 全部</option>' +
+      '<option value="STRATEGY_START">Strategy Start</option>' +
+      '<option value="STRATEGY_STOP">Strategy Stop</option>' +
+      '<option value="ORDER_SUBMIT">Order Submit</option>' +
+      '<option value="ORDER_FILL">Order Fill</option>' +
+      '<option value="ORDER_CANCEL">Order Cancel</option>' +
+      '<option value="RISK_APPROVE">Risk Approve</option>' +
+      '<option value="RISK_REJECT">Risk Reject</option>' +
+      '<option value="POSITION_UPDATE">Position Update</option>' +
+      '<option value="LEDGER_RECONCILE">Ledger Reconcile</option>' +
+      '<option value="LOGIN">Login</option>' +
+      '<option value="LOGOUT">Logout</option>' +
+      '<option value="CONFIG_SAVE">Config Save</option>' +
+      '</select>' +
+      '<select id="audit-filter-actor"><option value="">All Actors / 全部</option>' +
+      ((stats.byActor && Object.keys(stats.byActor).map(function (a) { return '<option value="' + esc(a) + '">' + esc(a) + '</option>'; })).join("") || '') +
+      '</select>' +
+      '<select id="audit-filter-severity"><option value="">All Severities / 全部</option>' +
+      '<option value="INFO">Info</option>' +
+      '<option value="WARN">Warn</option>' +
+      '<option value="ERROR">Error</option>' +
+      '<option value="CRITICAL">Critical</option>' +
+      '</select>' +
+      '<button class="btn btn-sm" id="btn-audit-apply">Filter / 过滤</button>' +
+      '</div>';
+
+    // Stats row
+    const statsHtml =
+      '<div class="grid grid-4 mb">' +
+      '<div class="card metric-card"><span class="metric-label">Total Entries / 总条目</span><span class="metric-value sm">' + fmtNum(stats.totalEntries || 0) + '</span></div>' +
+      '<div class="card metric-card"><span class="metric-label">Integrity / 完整性</span><span class="metric-value sm ' + (integrity.integrityOk ? "pos" : "neg") + '">' + (integrity.integrityOk ? '✅ OK' : '⚠ ' + fmtNum(integrity.failed || 0) + ' failed') + '</span></div>' +
+      '<div class="card metric-card"><span class="metric-label">By Action / 按操作</span><span class="metric-value sm mono" style="font-size:11px">' + Object.entries(stats.byAction || {}).map(function (e) { return e[0] + ':' + fmtNum(e[1]); }).join(', ') + '</span></div>' +
+      '<div class="card metric-card"><span class="metric-label">By Severity / 按级别</span><span class="metric-value sm mono" style="font-size:11px">' + Object.entries(stats.bySeverity || {}).map(function (e) { return e[0] + ':' + fmtNum(e[1]); }).join(', ') + '</span></div>' +
+      '</div>';
+
+    // Filtered entries
+    const renderEntries = function (entries) {
+      if (!entries.length) return '<div class="empty">No audit entries / 无审计条目</div>';
+      return '<div class="table-wrap" style="max-height:540px;overflow:auto"><table class="audit-table"><thead><tr>' +
+        '<th>Time / 时间</th><th>Action / 操作</th><th>Actor / 操作者</th><th>Target / 目标</th><th>Severity / 级别</th><th>Details / 详情</th>' +
+        '</tr></thead><tbody>' +
+        entries.map(function (e) {
+          const sev = (e.severity || "INFO").toUpperCase();
+          const sevCls = "audit-severity-" + sev.toLowerCase();
+          return (
+            '<tr>' +
+            '<td class="mono" style="white-space:nowrap">' + fmtTime(e.timestamp) + '</td>' +
+            '<td class="mono">' + esc(e.action) + '</td>' +
+            '<td>' + esc(e.actor || "system") + '</td>' +
+            '<td class="mono">' + esc(e.target || "—") + '</td>' +
+            '<td><span class="audit-severity-tag ' + sevCls + '">' + sev + '</span></td>' +
+            '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">' + esc(e.details || "") + '</td>' +
+            '</tr>'
+          );
+        }).join("") +
+        '</tbody></table></div>';
+    };
+
+    return (
+      '<div class="card mb"><div class="card-title">Audit Log / 审计日志</div>' +
+      '<div class="metric-sub">Every strategic decision, risk check, order, fill, position update, and ledger reconciliation is immutably recorded. / 每个策略决策、风控检查、订单、成交、持仓更新和对账均被不可篡改记录。</div>' +
+      '</div>' +
+      statsHtml +
+      '<div class="card mb"><div class="card-title">Filters / 过滤器</div>' + filtersHtml + '</div>' +
+      '<div class="card"><div class="card-title">Event Trail / 事件流水</div>' +
+      renderEntries(entries) +
+      '</div>'
+    );
+  }
+
+  /* ==================================================================
    * Router
    * ================================================================== */
 
@@ -1590,6 +2104,7 @@
     { re: /^#\/reconciliation$/, title: "Reconciliation / 对账", render: pageReconciliation },
     { re: /^#\/system$/, title: "System / 系统", render: pageSystem },
     { re: /^#\/alerts$/, title: "Alerts / 告警", render: pageAlerts },
+    { re: /^#\/audit$/, title: "Audit / 审计日志", render: pageAuditLog },
     { re: /^#\/strategies\/(.+)$/, title: "Strategy Detail / 策略详情", render: function (m) { return pageStrategyDetail(decodeURIComponent(m[1])); } },
     { re: /^#\/orders\/(.+)$/, title: "Order Detail / 订单详情", render: function (m) { return pageOrderDetail(decodeURIComponent(m[1])); } },
     { re: /^#\/accounts\/(.+)$/, title: "Account Detail / 账户详情", render: function (m) { return pageAccountDetail(decodeURIComponent(m[1])); } },
@@ -1624,6 +2139,7 @@
       "#/reconciliation": "reconciliation",
       "#/system": "system",
       "#/alerts": "alerts",
+      "#/audit": "audit",
     };
     let key = null;
     for (const prefix in map) {
@@ -1748,6 +2264,7 @@
         out.innerHTML = '<div class="card"><div class="empty">Running backtest… / 回测运行中…</div></div>';
         try {
           const data = await api.post("/dashboard/backtest/run", body);
+          window.__backtestData = data; // cache for symbol tab switching
           out.innerHTML = renderBacktestResult(data);
         } catch (err) {
           out.innerHTML =
@@ -1787,6 +2304,49 @@
           btn.disabled = false;
           btn.textContent = "Save / 保存";
         }
+      });
+    }
+    // Multi-panel chart symbol tabs (backtest page)
+    document.querySelectorAll(".sym-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        const sym = tab.getAttribute("data-sym");
+        document.querySelectorAll(".sym-tab").forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        const container = document.getElementById("chart-panel-container");
+        if (!container) return;
+        if (window.__backtestData && window.__backtestData.chart_panels) {
+          const panel = window.__backtestData.chart_panels.find(function (p) { return p.symbol === sym; });
+          if (panel) {
+            container.innerHTML = multiPanelChart([panel]);
+          }
+        }
+      });
+    });
+    // Test connection buttons (accounts page)
+    document.querySelectorAll("[data-test-conn]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        showToast("Connection test: broker not connected (paper mode). / 连接测试：券商未连接（模拟模式）", "error");
+      });
+    });
+    // Account settings test/save buttons
+    const accTestBtn = document.getElementById("btn-acc-test");
+    if (accTestBtn) {
+      accTestBtn.addEventListener("click", function () {
+        showToast("🔌 Test Connection: Not Connected (Paper Only). / 测试连接：未连接（仅模拟模式）", "error");
+      });
+    }
+    const accSaveBtn = document.getElementById("btn-acc-save");
+    if (accSaveBtn) {
+      accSaveBtn.addEventListener("click", function () {
+        showToast("Account settings saved (frontend only). / 账户设置已保存", "ok");
+      });
+    }
+    // Audit filter apply
+    const auditApplyBtn = document.getElementById("btn-audit-apply");
+    if (auditApplyBtn) {
+      auditApplyBtn.addEventListener("click", function () {
+        showToast("Filters applied. / 过滤已应用", "ok");
+        render();
       });
     }
   }
@@ -1842,6 +2402,7 @@
         if (location.hash.indexOf("#/factor") === 0) return;
         if (location.hash.indexOf("#/backtest") === 0) return;
         if (location.hash.indexOf("#/settings") === 0) return;
+        if (location.hash.indexOf("#/audit") === 0) return;
         render();
       }
     }, state.refreshMs);

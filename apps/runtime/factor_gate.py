@@ -66,7 +66,8 @@ def build_signals(symbols: tuple[str, ...] = SYMBOLS) -> tuple[list, dict]:
 
     Returns ``(signals, context)`` where signals are paper-ready
     ``(symbol, side, quantity, ref_price, date)`` tuples and context holds
-    per-asset diagnostics (bars, coverage, orientation, non-flat fraction).
+    per-asset diagnostics (bars, coverage, orientation, non-flat fraction),
+    plus raw z-score and position series for chart rendering.
     """
     spec = FACTOR_SPEC_REAL_D1
     split = build_split(spec.split)
@@ -116,6 +117,9 @@ def build_signals(symbols: tuple[str, ...] = SYMBOLS) -> tuple[list, dict]:
                                 md.close[t], dates[t].isoformat()))
 
         non_flat = sum(1 for p in positions if p != 0.0)
+        # store raw series for chart rendering
+        z_clean = [round(v, 4) if (v is not None and v == v) else None for v in z]
+        pos_clean = [round(p, 4) for p in positions]
         context["assets"][symbol] = {
             "bars": n,
             "coverage": round(coverage, 4),
@@ -124,12 +128,185 @@ def build_signals(symbols: tuple[str, ...] = SYMBOLS) -> tuple[list, dict]:
             "non_flat_frac": round(non_flat / n, 4) if n else 0.0,
             "position_changes": n_changes,
             "last_close": md.close[-1] if md.close else None,
+            "dates": [d.isoformat() for d in dates],
+            "closes": [round(c, 4) if c is not None else None for c in md.close],
+            "z_scores": z_clean,
+            "positions": pos_clean,
         }
 
     # chronological order, deterministic within a day
     signals.sort(key=lambda s: (s[4], s[0]))
     context["signals_total"] = len(signals)
     return signals, context
+
+
+# --------------------------------------------------------------------------- #
+# Extended metrics & chart helpers (for the Product UI)                        #
+# --------------------------------------------------------------------------- #
+
+def _compute_extended_metrics(eq_vals: list, closed: list,
+                              initial_capital: float) -> dict:
+    """Compute CAGR, Sortino, Calmar from the daily equity curve + closed trades."""
+    if not eq_vals or len(eq_vals) < 2:
+        return {"cagr": None, "sortino": None, "calmar": None,
+                "avg_win": None, "avg_loss": None,
+                "profit_factor": None, "expectancy": None,
+                "avg_holding_days": None, "best_trade": None, "worst_trade": None}
+
+    # CAGR
+    days = len(eq_vals)
+    if days >= 2:
+        total_years = days / 252.0
+        cagr = ((eq_vals[-1] / initial_capital) ** (1.0 / total_years) - 1.0) * 100
+    else:
+        cagr = None
+
+    # Daily returns
+    rets = [(eq_vals[i] / eq_vals[i - 1] - 1.0)
+            for i in range(1, len(eq_vals)) if eq_vals[i - 1] > 0]
+
+    # Sortino (downside deviation)
+    if len(rets) >= 3:
+        mean_ret = sum(rets) / len(rets)
+        downside = [r for r in rets if r < 0]
+        if downside:
+            downside_var = sum((r ** 2) for r in downside) / len(downside)
+            downside_std = downside_var ** 0.5
+            if downside_std > 0:
+                sortino = round(mean_ret / downside_std * (252 ** 0.5), 2)
+            else:
+                sortino = None
+        else:
+            sortino = None
+    else:
+        sortino = None
+
+    # Calmar
+    peak = eq_vals[0]
+    maxdd = 0.0
+    for v in eq_vals:
+        peak = max(peak, v)
+        maxdd = min(maxdd, v / peak - 1.0)
+    ann_ret = (eq_vals[-1] / initial_capital - 1.0) * 100
+    calmar = round(ann_ret / abs(maxdd * 100), 2) if maxdd < 0 else None
+
+    # Trade analysis
+    wins = [r for r in closed if r["realized_pnl"] > 0]
+    losses = [r for r in closed if r["realized_pnl"] <= 0]
+    gross_profit = sum(r["realized_pnl"] for r in wins)
+    gross_loss = abs(sum(r["realized_pnl"] for r in losses))
+
+    avg_win = round(gross_profit / len(wins), 2) if wins else None
+    avg_loss = round(-gross_loss / len(losses), 2) if losses else None
+    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else None
+    total_trades = len(wins) + len(losses)
+    expectancy = round(
+        (gross_profit / total_trades if total_trades else 0) +
+        (gross_loss / total_trades if total_trades else 0), 2
+    ) if total_trades else None
+
+    best_trade = max((r["realized_pnl"] for r in closed), default=None)
+    worst_trade = min((r["realized_pnl"] for r in closed), default=None)
+
+    # Average holding period (all trades assumed T+0 for daily data -> 1 day)
+    avg_holding = 1  # daily data, all trades are same-day resolution
+
+    return {
+        "cagr": round(cagr, 2) if cagr is not None else None,
+        "sortino": sortino,
+        "calmar": calmar,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "profit_factor": profit_factor,
+        "expectancy": expectancy,
+        "avg_holding_days": avg_holding,
+        "best_trade": round(best_trade, 2) if best_trade is not None else None,
+        "worst_trade": round(worst_trade, 2) if worst_trade is not None else None,
+    }
+
+
+def _compute_drawdown_series(eq_vals: list) -> list:
+    """Compute the drawdown series (percentage from peak) for each day."""
+    if not eq_vals:
+        return []
+    peak = eq_vals[0]
+    dd = []
+    for v in eq_vals:
+        peak = max(peak, v)
+        dd.append(round((v / peak - 1.0) * 100, 4))
+    return dd
+
+
+def _compute_monthly_returns(eq_rows: list) -> list:
+    """Compute monthly return heatmap data: [{month, return_pct}]."""
+    if len(eq_rows) < 2:
+        return []
+    monthly = {}
+    for row in eq_rows:
+        date = row["date"]  # "YYYY-MM-DD"
+        month_key = date[:7]  # "YYYY-MM"
+        monthly[month_key] = row["equity"]
+
+    sorted_months = sorted(monthly.keys())
+    returns = []
+    for i in range(1, len(sorted_months)):
+        prev_eq = monthly[sorted_months[i - 1]]
+        cur_eq = monthly[sorted_months[i]]
+        if prev_eq > 0:
+            ret = round((cur_eq / prev_eq - 1.0) * 100, 2)
+            returns.append({"month": sorted_months[i], "return_pct": ret})
+    return returns
+
+
+def _build_chart_data(context: dict, symbols: tuple[str, ...],
+                      eq_rows: list, trades: list) -> list:
+    """Build per-symbol daily chart data with price, z-score, position.
+
+    Returns a list of chart panels, one per symbol. Each panel has:
+      symbol, dates[], closes[], z_scores[], positions[],
+      signals[] (BUY/SELL markers), equity_line[] (portfolio equity).
+    """
+    panels = []
+    # Build equity lookup by date
+    eq_by_date = {r["date"]: r["equity"] for r in eq_rows}
+    # Build signal markers by symbol+date
+    signals_by_sym_date: dict[str, dict[str, list]] = {}
+    for t in trades:
+        if t["outcome"] == "FILLED":
+            signals_by_sym_date.setdefault(t["symbol"], {}).setdefault(
+                t["date"], []).append({
+                "side": t["side"], "price": t["exec_price"],
+                "seq": t["seq"],
+            })
+
+    for sym in symbols:
+        asset = context["assets"].get(sym, {})
+        dates = asset.get("dates", [])
+        closes = asset.get("closes", [])
+        z_scores = asset.get("z_scores", [])
+        positions = asset.get("positions", [])
+
+        n = len(dates)
+        chart = {
+            "symbol": sym,
+            "dates": dates,
+            "closes": closes,
+            "z_scores": z_scores,
+            "positions": positions,
+            "signals": [],
+            "equity_line": [],
+        }
+        # Signal markers
+        for d in dates:
+            sigs = signals_by_sym_date.get(sym, {}).get(d, [])
+            if sigs:
+                chart["signals"].extend(sigs)
+        # Portfolio equity aligned to dates
+        for d in dates:
+            chart["equity_line"].append(eq_by_date.get(d))
+
+        panels.append(chart)
+    return panels
 
 
 # --------------------------------------------------------------------------- #
@@ -319,6 +496,12 @@ def _replay(signals: list, context: dict, symbols: tuple[str, ...],
                 sharpe = round(mean / std * (252 ** 0.5), 2)
     turnover = (round(sum(f[3] for f in fills) / len(eq_rows), 2)
                 if eq_rows else 0.0)
+
+    # Extended metrics (CAGR, Sortino, Calmar, trade analysis)
+    ext = _compute_extended_metrics(eq_vals, closed, initial_capital)
+    drawdown_series = _compute_drawdown_series(eq_vals)
+    monthly_returns = _compute_monthly_returns(eq_rows)
+
     meta = {
         "alpha_id": ALPHA_ID,
         "symbols": list(symbols),
@@ -338,9 +521,31 @@ def _replay(signals: list, context: dict, symbols: tuple[str, ...],
         "errored": sum(1 for r in rows if r["outcome"] == "ERROR"),
         "closed_trips": len(closed),
         "win_rate": (100.0 * len(wins) / len(closed)) if closed else 0.0,
+        # Extended metrics
+        "cagr": ext["cagr"],
+        "sortino": ext["sortino"],
+        "calmar": ext["calmar"],
+        "avg_win": ext["avg_win"],
+        "avg_loss": ext["avg_loss"],
+        "profit_factor": ext["profit_factor"],
+        "expectancy": ext["expectancy"],
+        "avg_holding_days": ext["avg_holding_days"],
+        "best_trade": ext["best_trade"],
+        "worst_trade": ext["worst_trade"],
     }
-    return {"meta": meta, "trades": rows, "equity": eq_rows,
-            "summary": sum_rows}
+
+    # Chart data: per-symbol price/z/position + signal markers
+    chart_panels = _build_chart_data(context, symbols, eq_rows, rows)
+
+    return {
+        "meta": meta,
+        "trades": rows,
+        "equity": eq_rows,
+        "summary": sum_rows,
+        "drawdown_series": drawdown_series,
+        "monthly_returns": monthly_returns,
+        "chart_panels": chart_panels,
+    }
 
 
 # assets with real daily data available for the Backtest page (the full
