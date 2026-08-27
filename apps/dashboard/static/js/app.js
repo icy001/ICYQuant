@@ -449,32 +449,89 @@
   async function pageStrategies() {
     const data = await api.get("/dashboard/strategies");
     const list = data.strategies || [];
-    if (!list.length) {
-      return '<div class="card"><div class="empty">No strategies running / 暂无运行中策略.<br><br><span class="metric-sub">Start a paper session or run a Golden Scenario to see live strategy activity. / 启动模拟会话或运行 Golden Scenario 即可看到实时策略活动。</span></div></div>';
+    // factor candidates (read-only Gate outcomes; the Gate decides stages)
+    let fc = { candidates: [], watch_list: [], families: null };
+    try {
+      fc = await api.get("/dashboard/factor-candidates");
+    } catch (e) {
+      /* research report absent - card simply hides its tables */
     }
-    return (
-      '<div class="card"><div class="card-title">Running Strategies / 运行中策略</div>' +
-      '<div class="table-wrap"><table><thead><tr>' +
-      "<th>Strategy / 策略</th><th>Status / 状态</th><th>Symbols / 标的</th><th>Signals / 信号</th><th>Approved / 通过</th><th>Rejected / 拒绝</th><th>Position / 持仓</th><th>P&amp;L / 盈亏</th>" +
-      "</tr></thead><tbody>" +
-      list
-        .map(function (s) {
-          return (
-            '<tr class="clickable" data-href="#/strategies/' + esc(s.strategy_id) + '">' +
-            "<td class=\"mono\">" + esc(s.strategy_id) + "</td>" +
-            "<td>" + badge("Running / 运行中", "badge-green") + "</td>" +
-            "<td>" + esc((s.symbols || []).join(", ")) + "</td>" +
-            "<td class=\"num\">" + fmtNum(s.signals) + "</td>" +
-            "<td class=\"num pos\">" + fmtNum(s.approved) + "</td>" +
-            "<td class=\"num neg\">" + fmtNum(s.rejected) + "</td>" +
-            "<td class=\"num\">" + fmtNum(s.position) + "</td>" +
-            '<td class="num ' + pnlClass(s.pnl) + '">' + fmtMoney(s.pnl) + "</td>" +
-            "</tr>"
-          );
-        })
-        .join("") +
-      "</tbody></table></div></div>"
-    );
+    const stageBadge = function (stage) {
+      if (stage === "PAPER") return badge("PAPER / 纸面交易", "badge-green");
+      if (stage === "CANDIDATE") return badge("CANDIDATE / 候选", "badge-blue");
+      return badge("WATCH / 观察", "badge-gray");
+    };
+    const factorCard =
+      '<div class="card mb"><div class="card-title">Factor Candidates / 因子候选（Gate 决定阶段，只读展示）</div>' +
+      '<div class="metric-sub">' +
+      "De-correlation 后 " + (fc.families == null ? "—" : fc.families) + " 个独立因子族（阈值 " +
+      esc(String(fc.decorrelation_threshold || 0.65)) + "）· Gate 结果来自 factor-real-d1 密封报告" +
+      "</div>" +
+      (fc.candidates && fc.candidates.length
+        ? '<div class="table-wrap"><table><thead><tr>' +
+          "<th>Alpha</th><th>Stage / 阶段</th><th>Gate-Passed Assets / 过闸资产</th><th>Family Rep / 族代表</th><th>Mean OOS IC</th><th>Mean OOS ICIR</th><th>Mean OOS Sharpe</th>" +
+          "</tr></thead><tbody>" +
+          fc.candidates
+            .map(function (c) {
+              return (
+                "<tr><td><b>" + esc(c.alpha_id) + "</b></td>" +
+                "<td>" + stageBadge(c.stage) + "</td>" +
+                '<td class="mono">' + esc((c.assets || []).join(", ")) + "</td>" +
+                "<td>" + (c.is_family_representative ? badge("Yes / 是", "badge-purple") : "—") + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_ic)) + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_icir)) + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_sharpe)) + "</td></tr>"
+              );
+            })
+            .join("") +
+          "</tbody></table></div>" +
+          '<div class="metric-sub" style="margin-top:8px">UI 只展示阶段；能否进入下一阶段由 Gate 决定，不由本页控制。</div>'
+        : '<div class="empty">No gate-passed factor candidates / 暂无过闸因子候选</div>') +
+      "</div>";
+    const watchCard =
+      fc.watch_list && fc.watch_list.length
+        ? '<div class="card mb"><div class="card-title">Watch List / 观察名单（未过 Gate，不进入交易）</div>' +
+          '<div class="table-wrap"><table><thead><tr>' +
+          "<th>Alpha</th><th>Stage</th><th>Family Rep / 族代表</th><th>Mean OOS IC</th><th>Mean OOS ICIR</th><th>Mean OOS Sharpe</th>" +
+          "</tr></thead><tbody>" +
+          fc.watch_list
+            .map(function (c) {
+              return (
+                "<tr><td>" + esc(c.alpha_id) + "</td>" +
+                "<td>" + stageBadge(c.stage) + "</td>" +
+                "<td>" + (c.is_family_representative ? badge("Yes / 是", "badge-purple") : "—") + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_ic)) + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_icir)) + "</td>" +
+                '<td class="num">' + esc(String(c.mean_oos_sharpe)) + "</td></tr>"
+              );
+            })
+            .join("") +
+          "</tbody></table></div></div>"
+        : "";
+    const strategyCard = list.length
+      ? '<div class="card mb"><div class="card-title">Running Strategies / 运行中策略</div>' +
+        '<div class="table-wrap"><table><thead><tr>' +
+        "<th>Strategy / 策略</th><th>Status / 状态</th><th>Symbols / 标的</th><th>Signals / 信号</th><th>Approved / 通过</th><th>Rejected / 拒绝</th><th>Position / 持仓</th><th>P&amp;L / 盈亏</th>" +
+        "</tr></thead><tbody>" +
+        list
+          .map(function (s) {
+            return (
+              '<tr class="clickable" data-href="#/strategies/' + esc(s.strategy_id) + '">' +
+              "<td class=\"mono\">" + esc(s.strategy_id) + "</td>" +
+              "<td>" + badge("Running / 运行中", "badge-green") + "</td>" +
+              "<td>" + esc((s.symbols || []).join(", ")) + "</td>" +
+              "<td class=\"num\">" + fmtNum(s.signals) + "</td>" +
+              "<td class=\"num pos\">" + fmtNum(s.approved) + "</td>" +
+              "<td class=\"num neg\">" + fmtNum(s.rejected) + "</td>" +
+              "<td class=\"num\">" + fmtNum(s.position) + "</td>" +
+              '<td class="num ' + pnlClass(s.pnl) + '">' + fmtMoney(s.pnl) + "</td>" +
+              "</tr>"
+            );
+          })
+          .join("") +
+        "</tbody></table></div></div>"
+      : '<div class="card mb"><div class="empty">No strategies running / 暂无运行中策略.<br><br><span class="metric-sub">Start a paper session or run a Golden Scenario to see live strategy activity. / 启动模拟会话或运行 Golden Scenario 即可看到实时策略活动。</span></div></div>';
+    return strategyCard + factorCard + watchCard;
   }
 
   async function pageStrategyDetail(id) {
@@ -552,7 +609,25 @@
         '<span class="metric-value sm ' + (cls || "") + '">' + value + "</span></div>"
       );
     };
+    // risk rules from the trading-ui config (Settings page)
+    let cfg = null;
+    try {
+      cfg = await api.get("/dashboard/config");
+    } catch (e) {
+      /* config unavailable - rules card hides */
+    }
+    const r = cfg ? cfg.risk || {} : {};
+    const rulesCard = cfg
+      ? '<div class="card mb"><div class="card-title">Risk Rules / 风控规则（在 Settings 页配置）</div>' +
+        '<div class="grid grid-3">' +
+        metric("Max Daily Loss / 单日最大亏损", (r.max_daily_loss_pct || 0) + "%", "") +
+        metric("Max Drawdown / 最大回撤限制", (r.max_drawdown_pct || 0) + "%", "") +
+        metric("Risk Per Trade / 单笔风险", (r.risk_per_trade_pct || 0) + "%", "") +
+        "</div>" +
+        '<div class="metric-sub" style="margin-top:8px">规则在 Settings 页配置并经审计保存；执行层面由 Risk Engine 强制。</div></div>'
+      : "";
     return (
+      rulesCard +
       '<div class="grid grid-4 mb">' +
       metric("Risk Decisions / 风控决策", fmtNum(m.decisions)) +
       metric("Approved / 通过", fmtNum(m.approved), "pos") +
@@ -926,6 +1001,188 @@
       }).join("") +
       "</tbody></table></div>" +
       '<div class="metric-sub" style="margin-top:8px">拒单会造成仓位漂移（SELL 被拒后仓位保留）——期末未平仓位见汇总表；该页为静态历史回放，不随 5s 自动刷新。</div>' +
+      "</div>"
+    );
+  }
+
+  /* ==================================================================
+   * Backtest page (product UI - parameterised replay, frozen quant core)
+   * ================================================================== */
+
+  async function pageBacktest() {
+    const univ = [
+      { sym: "NVDA", gate: true }, { sym: "QQQ", gate: true }, { sym: "SPY", gate: true },
+      { sym: "000688.SH", gate: false }, { sym: "HSTECH", gate: false },
+      { sym: "EURUSD", gate: false }, { sym: "XAUUSD", gate: false },
+      { sym: "AU", gate: false }, { sym: "AG", gate: false },
+    ];
+    const checks = univ
+      .map(function (u) {
+        return (
+          '<label class="form-check"><input type="checkbox" name="bt-sym" value="' + esc(u.sym) + '"' +
+          (u.gate ? " checked" : "") + ">" + esc(u.sym) +
+          (u.gate ? '<span class="chk-note">gate ✓</span>' : "") + "</label>"
+        );
+      })
+      .join("");
+    return (
+      '<div class="card mb"><div class="card-title">Backtest / 回测 — Alpha021</div>' +
+      '<div class="metric-sub">因子逻辑（公式 / 窗口 / 定向）密封于 Factor Discovery v2，本页仅参数化回放窗口与资金。' +
+      "定价：真实收盘 ± 3 bps。带 gate ✓ 标记的资产已通过 16 项 Factor Gate。</div>" +
+      '<form id="bt-form">' +
+      '<div class="form-grid">' +
+      '<div class="form-field" style="grid-column:1/-1"><label>Markets / 市场（多选）</label><div class="form-checks">' + checks + "</div></div>" +
+      '<div class="form-field"><label>Start / 开始日期</label><input type="date" id="bt-start" value="2024-07-01"></div>' +
+      '<div class="form-field"><label>End / 结束日期</label><input type="date" id="bt-end"></div>' +
+      '<div class="form-field"><label>Initial Capital / 初始资金 (USD)</label><input type="number" id="bt-capital" value="1000000" min="1000" step="1000"></div>' +
+      "</div>" +
+      '<div class="form-actions"><button type="submit" id="btn-backtest-run" class="btn btn-primary">Run Backtest / 运行回测</button>' +
+      '<span class="metric-sub">回放确定性：同参数同结果（延迟字段除外）</span></div>' +
+      "</form></div>" +
+      '<div id="backtest-result"></div>'
+    );
+  }
+
+  function renderBacktestResult(data) {
+    const m = data.meta || {};
+    const trades = data.trades || [];
+    const eq = data.equity || [];
+    const summary = data.summary || [];
+    const metric = function (label, value, cls) {
+      return (
+        '<div class="card metric-card"><span class="metric-label">' + esc(label) + "</span>" +
+        '<span class="metric-value sm ' + (cls || "") + '">' + value + "</span></div>"
+      );
+    };
+    const outcomeBadge = function (o) {
+      if (o === "FILLED") return badge("Filled / 成交", "badge-green");
+      if (o === "REJECTED") return badge("Rejected / 拒单", "badge-amber");
+      return badge("Error / 错误", "badge-red");
+    };
+    return (
+      '<div class="card mb"><div class="card-title">Performance / 绩效</div>' +
+      '<div class="metric-sub">' + esc((m.symbols || []).join(" / ")) + " · " + esc(m.period || "") +
+      " · 初始资金 $" + fmtNum(m.initial_capital) + "</div>" +
+      '<div class="grid grid-4">' +
+      metric("Final Equity / 期末净值", fmtMoney(m.equity_final)) +
+      metric("Return / 收益率", (m.return_pct || 0).toFixed(2) + "%", m.return_pct >= 0 ? "pos" : "neg") +
+      metric("Sharpe (ann.) / 夏普", m.sharpe == null ? "—" : m.sharpe.toFixed(2)) +
+      metric("Max Drawdown / 最大回撤", (m.maxdd_pct || 0).toFixed(1) + "%", "neg") +
+      metric("Win Rate / 胜率", (m.win_rate || 0).toFixed(0) + "%（" + fmtNum(m.closed_trips) + " 笔）") +
+      metric("Signals / Filled", fmtNum(m.signals) + " / " + fmtNum(m.filled)) +
+      metric("Rejected / Error", fmtNum(m.rejected) + " / " + fmtNum(m.errored)) +
+      metric("Turnover / 换手", fmtNum(m.turnover_shares_per_day) + " 股/日") +
+      "</div></div>" +
+      '<div class="card mb"><div class="card-title">Equity Curve / 净值曲线（真实收盘 mark-to-market）</div>' +
+      factorStaticLine(eq.map(function (r) { return { x: r.date.slice(0, 7), y: r.equity }; }),
+        { color: "#4da3ff", baseline: m.initial_capital, fmt: function (v) { return "$" + Math.round(v / 1000) + "k"; } }) +
+      "</div>" +
+      '<div class="card mb"><div class="card-title">Per-Symbol Summary / 分资产汇总</div>' +
+      '<div class="table-wrap"><table><thead><tr>' +
+      "<th>Symbol / 资产</th><th>Signals</th><th>Filled</th><th>Rejected</th><th>Realized / 已实现</th><th>Final Pos</th><th>Unrealized / 浮动</th>" +
+      "</tr></thead><tbody>" +
+      summary.map(function (r) {
+        return (
+          "<tr><td><b>" + esc(r.symbol) + "</b></td>" +
+          '<td class="num">' + fmtNum(r.signals) + "</td>" +
+          '<td class="num">' + fmtNum(r.filled) + "</td>" +
+          '<td class="num">' + fmtNum(r.rejected) + "</td>" +
+          '<td class="num ' + pnlClass(r.realized_pnl) + '">' + fmtMoney(r.realized_pnl) + "</td>" +
+          '<td class="num">' + esc(String(r.final_position)) + "</td>" +
+          '<td class="num ' + pnlClass(r.unrealized_pnl) + '">' + fmtMoney(r.unrealized_pnl) + "</td></tr>"
+        );
+      }).join("") +
+      "</tbody></table></div></div>" +
+      '<div class="card"><div class="card-title">Trade Log / 交易明细（' + trades.length + "，最新在前）</div>" +
+      '<div class="table-wrap" style="max-height:440px;overflow:auto"><table><thead><tr>' +
+      "<th>#</th><th>Date / 日期</th><th>Symbol</th><th>Side / 方向</th><th>Close / 收盘</th><th>Outcome / 结果</th><th>Exec / 成交价</th><th>Pos / 仓位</th><th>P&L / 盈亏</th><th>Cum / 累计</th>" +
+      "</tr></thead><tbody>" +
+      trades.slice().reverse().map(function (r) {
+        return (
+          "<tr><td>" + fmtNum(r.seq) + "</td>" +
+          '<td class="mono">' + esc(r.date) + "</td>" +
+          '<td class="mono">' + esc(r.symbol) + "</td>" +
+          "<td>" + sideHtml(r.side) + "</td>" +
+          '<td class="num mono">' + esc(String(r.ref_price_real_close)) + "</td>" +
+          "<td>" + outcomeBadge(r.outcome) + "</td>" +
+          '<td class="num mono">' + esc(String(r.exec_price)) + "</td>" +
+          '<td class="num">' + fmtNum(r.position_after) + "</td>" +
+          '<td class="num ' + pnlClass(r.realized_pnl) + '">' + (r.realized_pnl ? fmtMoney(r.realized_pnl) : "—") + "</td>" +
+          '<td class="num ' + pnlClass(r.cum_realized_pnl) + '">' + fmtMoney(r.cum_realized_pnl) + "</td></tr>"
+        );
+      }).join("") +
+      "</tbody></table></div>" +
+      '<div class="metric-sub" style="margin-top:8px">已知限制：多头映射（+1 → 100 股）；拒单会导致仓位漂移。</div>' +
+      "</div>"
+    );
+  }
+
+  /* ==================================================================
+   * Settings page (paper account + risk rules; no live connections)
+   * ================================================================== */
+
+  async function pageSettings() {
+    const data = await api.get("/dashboard/config");
+    const a = data.account || {};
+    const r = data.risk || {};
+    const conn = data.connections || {};
+    const brokers = (conn.brokers || [])
+      .map(function (b) {
+        return (
+          "<tr><td>" + esc(b.name) + "</td><td>" +
+          badge("Not Connected / 未连接", "badge-red") + "</td></tr>"
+        );
+      })
+      .join("");
+    const field = function (id, label, value, type, attrs) {
+      return (
+        '<div class="form-field"><label>' + esc(label) + "</label>" +
+        '<input type="' + (type || "text") + '" id="' + id + '" value="' + esc(String(value)) + '" ' + (attrs || "") + "></div>"
+      );
+    };
+    return (
+      '<div class="card mb"><div class="card-title">Account &amp; Risk / 账户与风控配置</div>' +
+      '<div class="metric-sub">纸面账户配置（Product UI）。实盘交易未启用，未连接任何券商——此处仅配置参数，不建立真实连接。</div>' +
+      '<form id="cfg-form">' +
+      '<div class="form-grid">' +
+      field("cfg-name", "Account Name / 账户名称", a.account_name) +
+      '<div class="form-field"><label>Broker / 券商</label><select id="cfg-broker">' +
+      ["Simulated", "Interactive Brokers", "盈透证券", "CTP", "Alpaca"]
+        .map(function (b) {
+          return '<option value="' + esc(b) + '"' + (a.broker === b ? " selected" : "") + ">" + esc(b) + "</option>";
+        })
+        .join("") +
+      "</select></div>" +
+      '<div class="form-field"><label>Account Type / 账户类型</label><select id="cfg-type">' +
+      ["Paper", "Shadow", "Live"]
+        .map(function (t) {
+          return '<option value="' + t + '"' + (a.account_type === t ? " selected" : "") + ">" + t + "</option>";
+        })
+        .join("") +
+      "</select></div>" +
+      field("cfg-capital", "Initial Capital / 初始资金", a.initial_capital, "number", 'min="1000" step="1000"') +
+      '<div class="form-field"><label>Currency / 币种</label><select id="cfg-ccy">' +
+      ["USD", "CNY", "HKD"]
+        .map(function (c) {
+          return '<option value="' + c + '"' + (a.currency === c ? " selected" : "") + ">" + c + "</option>";
+        })
+        .join("") +
+      "</select></div>" +
+      field("cfg-daily", "Max Daily Loss / 单日最大亏损 (%)", r.max_daily_loss_pct, "number", 'min="0.1" max="50" step="0.1"') +
+      field("cfg-maxdd", "Max Drawdown / 最大回撤限制 (%)", r.max_drawdown_pct, "number", 'min="0.1" max="90" step="0.1"') +
+      field("cfg-pertrade", "Risk Per Trade / 单笔风险 (%)", r.risk_per_trade_pct, "number", 'min="0.01" max="10" step="0.01"') +
+      "</div>" +
+      '<div class="form-actions"><button type="submit" id="btn-config-save" class="btn btn-primary">Save / 保存</button>' +
+      '<span class="metric-sub">保存需 OPERATOR / ADMIN 权限，将被审计</span></div>' +
+      "</form></div>" +
+      '<div class="grid grid-2">' +
+      '<div class="card"><div class="card-title">Live Trading / 实盘交易</div>' +
+      '<div class="alert alert-critical" style="margin:0">🔴 LIVE TRADING — NOT ENABLED / 实盘交易未启用<div class="metric-sub">Factor Discovery v2 已 CLOSED；当前阶段为 Validation / Observation（Paper → Shadow → Live 决策流）。实盘开关由系统冻结，不由本页控制。</div></div></div>' +
+      '<div class="card"><div class="card-title">Broker Connections / 券商连接</div>' +
+      '<div class="table-wrap"><table><thead><tr><th>Broker / 券商</th><th>Status / 状态</th></tr></thead><tbody>' +
+      (brokers || '<tr><td colspan="2"><div class="empty">None / 无</div></td></tr>') +
+      "</tbody></table></div>" +
+      '<div class="metric-sub">选择券商仅保存显示偏好；在真实接入前一律显示未连接。</div></div>' +
       "</div>"
     );
   }
@@ -1327,6 +1584,8 @@
     { re: /^#\/executions$/, title: "Executions / 成交", render: pageExecutions },
     { re: /^#\/strategies$/, title: "Strategies / 策略", render: pageStrategies },
     { re: /^#\/factor$/, title: "Factor / 因子纸面交易", render: pageFactor },
+    { re: /^#\/backtest$/, title: "Backtest / 回测", render: pageBacktest },
+    { re: /^#\/settings$/, title: "Settings / 设置", render: pageSettings },
     { re: /^#\/risk$/, title: "Risk / 风控", render: pageRisk },
     { re: /^#\/reconciliation$/, title: "Reconciliation / 对账", render: pageReconciliation },
     { re: /^#\/system$/, title: "System / 系统", render: pageSystem },
@@ -1359,6 +1618,8 @@
       "#/executions": "executions",
       "#/strategies": "strategies",
       "#/factor": "factor",
+      "#/backtest": "backtest",
+      "#/settings": "settings",
       "#/risk": "risk",
       "#/reconciliation": "reconciliation",
       "#/system": "system",
@@ -1460,6 +1721,74 @@
         }
       });
     }
+    // Backtest page form
+    const btForm = document.getElementById("bt-form");
+    if (btForm) {
+      btForm.addEventListener("submit", async function (ev) {
+        ev.preventDefault();
+        const btn = document.getElementById("btn-backtest-run");
+        const out = document.getElementById("backtest-result");
+        const symbols = Array.prototype.slice
+          .call(btForm.querySelectorAll('input[name="bt-sym"]:checked'))
+          .map(function (c) { return c.value; });
+        if (!symbols.length) {
+          showToast("Select at least one market / 至少选择一个市场", "error");
+          return;
+        }
+        const body = {
+          symbols: symbols,
+          initial_capital: parseFloat(btForm.querySelector("#bt-capital").value) || 1_000_000,
+        };
+        const s = btForm.querySelector("#bt-start").value;
+        const e = btForm.querySelector("#bt-end").value;
+        if (s) body.start = s;
+        if (e) body.end = e;
+        btn.disabled = true;
+        btn.textContent = "Running… / 回测中…";
+        out.innerHTML = '<div class="card"><div class="empty">Running backtest… / 回测运行中…</div></div>';
+        try {
+          const data = await api.post("/dashboard/backtest/run", body);
+          out.innerHTML = renderBacktestResult(data);
+        } catch (err) {
+          out.innerHTML =
+            '<div class="card"><div class="alert alert-critical" style="margin:0">Backtest failed / 回测失败: ' +
+            esc(err.message || String(err)) + "</div></div>";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Run Backtest / 运行回测";
+        }
+      });
+    }
+    // Settings page form
+    const cfgForm = document.getElementById("cfg-form");
+    if (cfgForm) {
+      cfgForm.addEventListener("submit", async function (ev) {
+        ev.preventDefault();
+        const btn = document.getElementById("btn-config-save");
+        const body = {
+          account_name: cfgForm.querySelector("#cfg-name").value,
+          broker: cfgForm.querySelector("#cfg-broker").value,
+          account_type: cfgForm.querySelector("#cfg-type").value,
+          initial_capital: parseFloat(cfgForm.querySelector("#cfg-capital").value) || 1_000_000,
+          currency: cfgForm.querySelector("#cfg-ccy").value,
+          max_daily_loss_pct: parseFloat(cfgForm.querySelector("#cfg-daily").value),
+          max_drawdown_pct: parseFloat(cfgForm.querySelector("#cfg-maxdd").value),
+          risk_per_trade_pct: parseFloat(cfgForm.querySelector("#cfg-pertrade").value),
+        };
+        btn.disabled = true;
+        btn.textContent = "Saving… / 保存中…";
+        try {
+          await api.post("/dashboard/config", body);
+          showToast("Config saved / 配置已保存", "ok");
+          render();
+        } catch (err) {
+          showToast("Save failed / 保存失败: " + (err.message || err), "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Save / 保存";
+        }
+      });
+    }
   }
 
   function updateConnDot() {
@@ -1508,8 +1837,11 @@
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(function () {
       if (api.isAuthenticated() && location.hash && location.hash !== "#/login") {
-        // factor page is a static historical replay - skip the 5s re-render
+        // static / interactive pages skip the 5s re-render:
+        // factor = historical replay; backtest & settings hold form state
         if (location.hash.indexOf("#/factor") === 0) return;
+        if (location.hash.indexOf("#/backtest") === 0) return;
+        if (location.hash.indexOf("#/settings") === 0) return;
         render();
       }
     }, state.refreshMs);

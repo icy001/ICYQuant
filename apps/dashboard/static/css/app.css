@@ -462,3 +462,38 @@ svg { display: block; width: 100%; height: auto; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: #2c3c60; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ===================================================================
+ * Forms (Backtest / Settings pages)
+ * =================================================================== */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px 18px;
+  margin: 14px 0 4px;
+}
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field > label {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.form-field > input,
+.form-field > select {
+  background: var(--panel-2, #0d1526);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+}
+.form-field > input:focus,
+.form-field > select:focus { border-color: var(--accent); }
+.form-checks { display: flex; flex-wrap: wrap; gap: 8px 14px; padding-top: 4px; }
+.form-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
+.form-check input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+.form-check .chk-note { color: var(--text-faint); font-size: 10px; }
+.form-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }

@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import random
 import threading
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -314,6 +315,219 @@ def factor_paper(principal: Principal = Depends(require_roles())) -> dict:
     if "error" not in payload:
         _factor_paper_cache = payload
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Backtest page (product UI) - parameterised replay over frozen components
+# ---------------------------------------------------------------------------
+class BacktestRequest(BaseModel):
+    symbols: list[str] = ["NVDA", "QQQ", "SPY"]
+    start: Optional[str] = None       # "YYYY-MM-DD"; None = full history
+    end: Optional[str] = None
+    initial_capital: float = 1_000_000.0
+
+
+@router.post("/dashboard/backtest/run")
+def backtest_run(
+    body: BacktestRequest,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Run a parameterised Alpha021 backtest on the real daily data.
+
+    Product-layer wrapper only: the factor formula, windows and the
+    train-IC orientation stay exactly as sealed in FACTOR_SPEC_REAL_D1
+    (Factor Discovery v2 — CLOSED).
+    """
+    from apps.runtime.factor_gate import run_backtest
+
+    if not body.symbols:
+        raise HTTPException(status_code=400, detail="symbols must not be empty")
+    if body.initial_capital <= 0:
+        raise HTTPException(status_code=400, detail="initial_capital must be positive")
+    try:
+        payload = run_backtest(
+            symbols=body.symbols, start=body.start, end=body.end,
+            initial_capital=body.initial_capital)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # strip per-trade latency (wall-clock noise, meaningless for a replay)
+    for r in payload["trades"]:
+        r.pop("latency_total_us", None)
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# Trading-UI config (paper account + risk rules), persisted as JSON
+# ---------------------------------------------------------------------------
+_CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "config" / "trading_ui.json"
+
+_DEFAULT_CONFIG: dict = {
+    "account": {
+        "account_name": "Main Paper Account",
+        "broker": "Simulated",
+        "account_type": "Paper",          # Paper | Shadow | Live (display only)
+        "initial_capital": 1_000_000.0,
+        "currency": "USD",
+    },
+    "risk": {
+        "max_daily_loss_pct": 3.0,
+        "max_drawdown_pct": 6.0,
+        "risk_per_trade_pct": 0.5,
+    },
+    "live_trading_enabled": False,
+}
+
+
+def _load_ui_config() -> dict:
+    import json
+
+    if _CONFIG_PATH.exists():
+        try:
+            data = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+            # merge over defaults so newly added keys never break the page
+            merged = {
+                **_DEFAULT_CONFIG,
+                **data,
+                "account": {**_DEFAULT_CONFIG["account"],
+                            **data.get("account", {})},
+                "risk": {**_DEFAULT_CONFIG["risk"],
+                         **data.get("risk", {})},
+            }
+            return merged
+        except (OSError, json.JSONDecodeError):
+            logger.warning("trading-ui config unreadable, using defaults")
+    return {**_DEFAULT_CONFIG}
+
+
+class ConfigRequest(BaseModel):
+    account_name: str = "Main Paper Account"
+    broker: str = "Simulated"
+    account_type: str = "Paper"
+    initial_capital: float = 1_000_000.0
+    currency: str = "USD"
+    max_daily_loss_pct: float = 3.0
+    max_drawdown_pct: float = 6.0
+    risk_per_trade_pct: float = 0.5
+
+
+@router.get("/dashboard/config")
+def get_config(principal: Principal = Depends(require_roles())) -> dict:
+    cfg = _load_ui_config()
+    cfg["connections"] = {
+        "simulated": True,
+        "brokers": [
+            {"name": b, "connected": False}
+            for b in ("Interactive Brokers", "盈透证券", "CTP", "Alpaca")
+        ],
+        "note": "No broker is connected. Live trading is NOT enabled.",
+    }
+    return cfg
+
+
+@router.post("/dashboard/config")
+def save_config(
+    body: ConfigRequest,
+    request: Request,
+    principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
+) -> dict:
+    import json
+
+    if body.initial_capital <= 0:
+        raise HTTPException(status_code=400, detail="initial_capital must be positive")
+    for key, lo, hi in (("max_daily_loss_pct", 0.1, 50.0),
+                        ("max_drawdown_pct", 0.1, 90.0),
+                        ("risk_per_trade_pct", 0.01, 10.0)):
+        v = getattr(body, key)
+        if not (lo <= v <= hi):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{key} must be within [{lo}, {hi}]")
+    cfg = {
+        "account": {
+            "account_name": body.account_name.strip() or "Main Paper Account",
+            "broker": body.broker,
+            "account_type": body.account_type,
+            "initial_capital": body.initial_capital,
+            "currency": body.currency,
+        },
+        "risk": {
+            "max_daily_loss_pct": body.max_daily_loss_pct,
+            "max_drawdown_pct": body.max_drawdown_pct,
+            "risk_per_trade_pct": body.risk_per_trade_pct,
+        },
+        "live_trading_enabled": False,   # hard-off: frozen by design
+    }
+    _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CONFIG_PATH.write_text(
+        json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+    auth.record(
+        AuditAction.ADMIN_ACTION,
+        principal,
+        target="trading_ui_config",
+        severity=AuditSeverity.MEDIUM,
+        details={"action": "save",
+                 "account_type": body.account_type,
+                 "broker": body.broker},
+        ip_address=_client_ip(request),
+    )
+    return {"ok": True, "config": cfg}
+
+
+# ---------------------------------------------------------------------------
+# Factor candidates (Strategy page) - read-only view of the discovery report
+# ---------------------------------------------------------------------------
+@router.get("/dashboard/factor-candidates")
+def factor_candidates(principal: Principal = Depends(require_roles())) -> dict:
+    """Gate outcomes for the Strategy page (read-only).
+
+    The Gate decides a candidate's stage — the UI only displays it.  Reads
+    the sealed factor-real-d1 report; returns an empty list when absent.
+    """
+    import json
+
+    report_path = (Path(__file__).resolve().parents[2]
+                   / "research" / "discovery" / "output"
+                   / "factor-real-d1" / "report.json")
+    if not report_path.exists():
+        return {"candidates": [], "source": "report not found"}
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"candidates": [], "source": "report unreadable"}
+    dec = data.get("decorrelation", {})
+    reps = set(dec.get("representatives", []))
+    candidates = []
+    for row in data.get("alpha_summary", []):
+        aid = row["alpha_id"]
+        if row.get("status") != "CANDIDATE":
+            continue
+        candidates.append({
+            "alpha_id": aid,
+            "stage": "PAPER" if aid == "Alpha021" else "CANDIDATE",
+            "assets": row.get("assets_passed", []),
+            "is_family_representative": aid in reps,
+            "mean_oos_ic": row.get("mean_oos_ic"),
+            "mean_oos_icir": row.get("mean_oos_icir"),
+            "mean_oos_sharpe": row.get("mean_oos_sharpe"),
+        })
+    watch = [
+        {
+            "alpha_id": r["alpha_id"],
+            "stage": "WATCH",
+            "assets": [],
+            "is_family_representative": r["alpha_id"] in reps,
+            "mean_oos_ic": r.get("mean_oos_ic"),
+            "mean_oos_icir": r.get("mean_oos_icir"),
+            "mean_oos_sharpe": r.get("mean_oos_sharpe"),
+        }
+        for r in data.get("alpha_ranking", [])
+        if r.get("status") != "CANDIDATE"
+    ][:8]
+    return {"candidates": candidates, "watch_list": watch,
+            "families": dec.get("n_families"),
+            "decorrelation_threshold": dec.get("threshold")}
 
 
 @router.get("/dashboard/session")
