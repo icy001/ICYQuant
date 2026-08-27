@@ -2912,40 +2912,397 @@
     );
   };
 
-  PAGE_FRAMEWORK["trading/orders"] = function () {
-    var kpis = UI.metricCard("Total Orders", "47", "", "") +
-      UI.metricCard("Filled", "38", "80.9%", "pos") +
-      UI.metricCard("Pending", "6", "", "warning") +
-      UI.metricCard("Rejected", "3", "", "neg");
-    var ordersTable = UI.table({
-      columns: [
-        { key: "id", label: "Order ID", numeric: true },
-        { key: "symbol", label: "Symbol" },
-        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
-        { key: "qty", label: "Qty", numeric: true },
-        { key: "type", label: "Type" },
-        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "status", label: "Status", format: function (v) {
-          var m = { FILLED: "pos", PENDING: "warning", CANCELLED: "neutral", REJECTED: "neg" };
-          return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + v + '</span>';
-        } },
-        { key: "time", label: "Time" },
+  /* ==================================================================
+   * Orders module — Commit 008
+   * Mock order state designed for future real-API swap. Maps to the
+   * Order Engine → Execution Engine → Broker Adapter → Fill lifecycle.
+   * ================================================================== */
+  var ORDERS_DATA = [
+    {
+      id: "ORD-128", time: "10:32:04", symbol: "NVDA", side: "BUY", qty: 100,
+      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Alpha021",
+      filledQty: 100, avgFillPrice: 178.42, slippage: "+0.02bp",
+      timeline: [
+        { time: "10:32:04", type: "SUBMITTED", title: "Order submitted to Order Engine", variant: "info" },
+        { time: "10:32:05", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "10:32:06", type: "FILLED", title: "Filled 100 @ 178.42", variant: "profit" },
       ],
-      rows: [
-        { id: 1024, symbol: "NVDA", side: "BUY", qty: 100, type: "Limit", price: 182.31, status: "FILLED", time: "10:23:41" },
-        { id: 1023, symbol: "QQQ", side: "BUY", qty: 200, type: "Market", price: 571.20, status: "FILLED", time: "10:25:01" },
-        { id: 1022, symbol: "AAPL", side: "SELL", qty: 100, type: "Limit", price: 224.50, status: "FILLED", time: "10:26:15" },
-        { id: 1021, symbol: "SPY", side: "BUY", qty: 50, type: "Limit", price: 645.13, status: "PENDING", time: "10:28:30" },
-        { id: 1020, symbol: "NVDA", side: "BUY", qty: 200, type: "Limit", price: 180.00, status: "REJECTED", time: "10:15:00" },
-        { id: 1019, symbol: "MSFT", side: "SELL", qty: 150, type: "Market", price: 450.20, status: "CANCELLED", time: "09:58:12" },
+    },
+    {
+      id: "ORD-127", time: "10:18:22", symbol: "QQQ", side: "BUY", qty: 50,
+      type: "Limit", limitPrice: 612.40, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Momentum",
+      filledQty: 50, avgFillPrice: 612.40, slippage: "+0.00bp",
+      timeline: [
+        { time: "10:18:22", type: "SUBMITTED", title: "Limit order submitted @ 612.40", variant: "info" },
+        { time: "10:18:23", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "10:18:31", type: "FILLED", title: "Filled 50 @ 612.40", variant: "profit" },
       ],
+    },
+    {
+      id: "ORD-126", time: "09:56:10", symbol: "SPY", side: "SELL", qty: 100,
+      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Mean Reversion",
+      filledQty: 100, avgFillPrice: 650.08, slippage: "-0.02bp",
+      timeline: [
+        { time: "09:56:10", type: "SUBMITTED", title: "Market sell submitted", variant: "info" },
+        { time: "09:56:11", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "09:56:13", type: "FILLED", title: "Filled 100 @ 650.08", variant: "profit" },
+      ],
+    },
+    {
+      id: "ORD-125", time: "09:41:48", symbol: "NVDA", side: "BUY", qty: 100,
+      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
+      status: "REJECTED", account: "Main Paper", strategy: "Alpha021",
+      filledQty: 0, avgFillPrice: null, slippage: "—",
+      timeline: [
+        { time: "09:41:48", type: "SUBMITTED", title: "Order submitted to Order Engine", variant: "info" },
+        { time: "09:41:49", type: "REJECTED", title: "Rejected by Risk Engine — exceeds daily loss limit", variant: "loss" },
+      ],
+    },
+    {
+      id: "ORD-124", time: "09:30:02", symbol: "AAPL", side: "BUY", qty: 200,
+      type: "Limit", limitPrice: 224.00, stopPrice: null, tif: "GTC",
+      status: "PARTIAL", account: "Main Paper", strategy: "Momentum",
+      filledQty: 120, avgFillPrice: 224.12, slippage: "+0.12bp",
+      timeline: [
+        { time: "09:30:02", type: "SUBMITTED", title: "Limit order submitted @ 224.00", variant: "info" },
+        { time: "09:30:03", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "09:30:15", type: "PARTIAL", title: "Partial fill 120 @ 224.12", variant: "info" },
+        { time: "09:31:00", type: "PARTIAL", title: "Working — 80 remaining", variant: "warning" },
+      ],
+    },
+    {
+      id: "ORD-123", time: "09:15:33", symbol: "MSFT", side: "SELL", qty: 150,
+      type: "Limit", limitPrice: 450.00, stopPrice: null, tif: "DAY",
+      status: "CANCELLED", account: "Main Paper", strategy: "Mean Reversion",
+      filledQty: 0, avgFillPrice: null, slippage: "—",
+      timeline: [
+        { time: "09:15:33", type: "SUBMITTED", title: "Limit order submitted @ 450.00", variant: "info" },
+        { time: "09:15:34", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "09:22:10", type: "CANCELLED", title: "Cancelled by user", variant: "neutral" },
+      ],
+    },
+    {
+      id: "ORD-122", time: "Yesterday 15:48", symbol: "QQQ", side: "SELL", qty: 100,
+      type: "Stop", limitPrice: null, stopPrice: 535.00, tif: "GTC",
+      status: "FILLED", account: "Main Paper", strategy: "Risk-Off",
+      filledQty: 100, avgFillPrice: 534.88, slippage: "-0.12bp",
+      timeline: [
+        { time: "15:48:00", type: "SUBMITTED", title: "Stop order submitted @ 535.00", variant: "info" },
+        { time: "15:48:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "15:52:14", type: "TRIGGERED", title: "Stop triggered @ 535.00", variant: "warning" },
+        { time: "15:52:15", type: "FILLED", title: "Filled 100 @ 534.88", variant: "profit" },
+      ],
+    },
+    {
+      id: "ORD-121", time: "Yesterday 14:22", symbol: "NVDA", side: "BUY", qty: 300,
+      type: "Limit", limitPrice: 172.00, stopPrice: null, tif: "DAY",
+      status: "EXPIRED", account: "Main Paper", strategy: "Alpha021",
+      filledQty: 0, avgFillPrice: null, slippage: "—",
+      timeline: [
+        { time: "14:22:00", type: "SUBMITTED", title: "Limit order submitted @ 172.00", variant: "info" },
+        { time: "14:22:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "16:00:00", type: "EXPIRED", title: "Order expired (DAY)", variant: "neutral" },
+      ],
+    },
+    {
+      id: "ORD-120", time: "Yesterday 11:05", symbol: "SPY", side: "BUY", qty: 200,
+      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Momentum",
+      filledQty: 200, avgFillPrice: 648.30, slippage: "+0.05bp",
+      timeline: [
+        { time: "11:05:00", type: "SUBMITTED", title: "Market buy submitted", variant: "info" },
+        { time: "11:05:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "11:05:03", type: "FILLED", title: "Filled 200 @ 648.30", variant: "profit" },
+      ],
+    },
+    {
+      id: "ORD-119", time: "Yesterday 09:50", symbol: "AAPL", side: "SELL", qty: 100,
+      type: "Limit", limitPrice: 228.50, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Mean Reversion",
+      filledQty: 100, avgFillPrice: 228.50, slippage: "+0.00bp",
+      timeline: [
+        { time: "09:50:00", type: "SUBMITTED", title: "Limit order submitted @ 228.50", variant: "info" },
+        { time: "09:50:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "10:12:44", type: "FILLED", title: "Filled 100 @ 228.50", variant: "profit" },
+      ],
+    },
+    {
+      id: "ORD-118", time: "Aug 25 15:30", symbol: "NVDA", side: "SELL", qty: 100,
+      type: "Stop-Limit", limitPrice: 170.00, stopPrice: 172.00, tif: "GTC",
+      status: "CANCELLED", account: "Main Paper", strategy: "Risk-Off",
+      filledQty: 0, avgFillPrice: null, slippage: "—",
+      timeline: [
+        { time: "15:30:00", type: "SUBMITTED", title: "Stop-Limit submitted (stop 172 / limit 170)", variant: "info" },
+        { time: "15:30:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "16:00:00", type: "CANCELLED", title: "Cancelled by user", variant: "neutral" },
+      ],
+    },
+    {
+      id: "ORD-117", time: "Aug 25 10:14", symbol: "QQQ", side: "BUY", qty: 150,
+      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
+      status: "FILLED", account: "Main Paper", strategy: "Alpha021",
+      filledQty: 150, avgFillPrice: 605.20, slippage: "+0.03bp",
+      timeline: [
+        { time: "10:14:00", type: "SUBMITTED", title: "Market buy submitted", variant: "info" },
+        { time: "10:14:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
+        { time: "10:14:03", type: "FILLED", title: "Filled 150 @ 605.20", variant: "profit" },
+      ],
+    },
+  ];
+
+  var ORDERS_FILTERS = { status: "ALL", side: "ALL", symbol: "ALL", account: "ALL", search: "" };
+  var ORDERS_SELECTED_ID = "ORD-128";
+
+  function ordersFiltered() {
+    return ORDERS_DATA.filter(function (o) {
+      if (ORDERS_FILTERS.status !== "ALL" && o.status !== ORDERS_FILTERS.status) return false;
+      if (ORDERS_FILTERS.side !== "ALL" && o.side !== ORDERS_FILTERS.side) return false;
+      if (ORDERS_FILTERS.symbol !== "ALL" && o.symbol !== ORDERS_FILTERS.symbol) return false;
+      if (ORDERS_FILTERS.account !== "ALL" && o.account !== ORDERS_FILTERS.account) return false;
+      if (ORDERS_FILTERS.search) {
+        var q = ORDERS_FILTERS.search.toLowerCase();
+        var hay = (o.id + " " + o.symbol + " " + o.status + " " + o.side).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
     });
+  }
+
+  function ordersStatusPill(status) {
+    var m = { FILLED: "profit", PARTIAL: "info", PENDING: "warning", CANCELLED: "neutral", REJECTED: "loss", EXPIRED: "neutral" };
+    return '<span class="ds-status-pill ds-status-' + (m[status] || "neutral") + '"><span class="ds-status-dot"></span>' + status + '</span>';
+  }
+
+  function renderOrdersRows() {
+    var rows = ordersFiltered();
+    if (rows.length === 0) {
+      return '<tr class="ord-empty-row"><td colspan="8">' + UI.empty("No orders", "No orders match the current filters.") + '</td></tr>';
+    }
+    return rows.map(function (o) {
+      var sel = o.id === ORDERS_SELECTED_ID ? " ord-row-selected" : "";
+      var price = o.limitPrice != null ? "$" + o.limitPrice.toFixed(2) : "—";
+      var sideCls = o.side === "BUY" ? "pos" : "neg";
+      return '<tr class="ord-row' + sel + '" data-ord-id="' + o.id + '">' +
+        '<td class="ds-text-mono ord-col-id">' + o.id + '</td>' +
+        '<td class="ds-text-mono ord-col-time">' + o.time + '</td>' +
+        '<td class="ord-col-symbol">' + o.symbol + '</td>' +
+        '<td class="' + sideCls + ' ord-col-side">' + o.side + '</td>' +
+        '<td class="num ds-text-mono ord-col-qty">' + o.qty + '</td>' +
+        '<td class="ord-col-type">' + o.type + '</td>' +
+        '<td class="num ds-text-mono ord-col-price">' + price + '</td>' +
+        '<td class="ord-col-status">' + ordersStatusPill(o.status) + '</td>' +
+        '</tr>';
+    }).join("");
+  }
+
+  function renderOrdersTable() {
     return (
-      UI.pageHeader("Orders", "Order management and tracking",
-        UI.button("New Order", "primary", { sm: true, action: "nav:trading/paper" })) +
-      UI.kpiGrid(kpis) +
-      UI.sectionHeading("Recent Orders") +
-      UI.panel("Orders", ordersTable)
+      '<table class="ds-table ord-table">' +
+      '<thead><tr>' +
+      '<th>Order ID</th>' +
+      '<th>Time</th>' +
+      '<th>Symbol</th>' +
+      '<th>Side</th>' +
+      '<th class="num">Qty</th>' +
+      '<th>Type</th>' +
+      '<th class="num">Price</th>' +
+      '<th>Status</th>' +
+      '</tr></thead>' +
+      '<tbody id="ord-tbody">' + renderOrdersRows() + '</tbody>' +
+      '</table>'
+    );
+  }
+
+  function renderOrdersDetail() {
+    var o = null;
+    for (var i = 0; i < ORDERS_DATA.length; i++) {
+      if (ORDERS_DATA[i].id === ORDERS_SELECTED_ID) { o = ORDERS_DATA[i]; break; }
+    }
+    if (!o) {
+      return UI.empty("No order selected", "Click an order row to view details and the execution timeline.");
+    }
+    var statusVariant = o.status === "FILLED" ? "profit" : (o.status === "REJECTED" ? "loss" : "info");
+    var sideVariant = o.side === "BUY" ? "profit" : "loss";
+    var detail = UI.statRows([
+      { label: "Order ID", value: o.id },
+      { label: "Strategy", value: o.strategy },
+      { label: "Account", value: o.account },
+      { label: "Symbol", value: o.symbol },
+      { label: "Side", value: o.side, variant: sideVariant },
+      { label: "Quantity", value: String(o.qty) },
+      { label: "Order Type", value: o.type },
+      { label: "Limit Price", value: o.limitPrice != null ? "$" + o.limitPrice.toFixed(2) : "—" },
+      { label: "Stop Price", value: o.stopPrice != null ? "$" + o.stopPrice.toFixed(2) : "—" },
+      { label: "Time in Force", value: o.tif },
+      { label: "Status", value: o.status, variant: statusVariant },
+    ]);
+    var fills = UI.statRows([
+      { label: "Filled Qty", value: String(o.filledQty) + " / " + o.qty },
+      { label: "Avg Fill Price", value: o.avgFillPrice != null ? "$" + o.avgFillPrice.toFixed(2) : "—" },
+      { label: "Slippage", value: o.slippage },
+    ]);
+    return (
+      detail +
+      UI.sectionHeading("Execution Timeline") +
+      UI.timeline(o.timeline) +
+      UI.sectionHeading("Fills") +
+      fills
+    );
+  }
+
+  function openNewOrderModal() {
+    UI.openModal({
+      title: "New Order",
+      body:
+        '<div class="ord-ticket">' +
+        UI.field("Account", UI.select({ id: "ord-new-account", options: ["Main Paper", "Shadow", "Live"] })) +
+        UI.field("Symbol", UI.input({ id: "ord-new-symbol", placeholder: "NVDA" })) +
+        UI.field("Side", UI.segToggle([
+          { value: "BUY", label: "BUY", variant: "profit" },
+          { value: "SELL", label: "SELL", variant: "loss" },
+        ], 0, "ord-new-side")) +
+        UI.field("Quantity", UI.input({ id: "ord-new-qty", type: "number", value: "100" })) +
+        UI.field("Order Type", UI.select({ id: "ord-new-type", options: [
+          { value: "Market", label: "Market" },
+          { value: "Limit", label: "Limit" },
+          { value: "Stop", label: "Stop" },
+          { value: "Stop-Limit", label: "Stop-Limit" },
+        ] })) +
+        UI.field("Limit Price", UI.input({ id: "ord-new-limit", type: "number", step: "0.01", placeholder: "0.00" })) +
+        UI.field("Stop Price", UI.input({ id: "ord-new-stop", type: "number", step: "0.01", placeholder: "0.00" })) +
+        UI.field("Time in Force", UI.select({ id: "ord-new-tif", options: ["DAY", "GTC", "IOC", "FOK"] })) +
+        '<div class="ord-ticket-est"><span class="ord-ticket-est-label">Estimated Value</span><span class="ord-ticket-est-val ds-text-mono" id="ord-new-est">$17,842</span></div>' +
+        '<div class="ord-ticket-disclaimer">Paper trading only · No real execution / 仅模拟，不真实下单</div>' +
+        '</div>',
+      footer:
+        UI.button("Cancel", "ghost", { action: "close-modal" }) +
+        UI.button("Review Order", "primary", { action: "ord:submit" }),
+      onMount: function (backdrop) {
+        var submitBtn = backdrop.querySelector('[data-action="ord:submit"]');
+        if (submitBtn) {
+          submitBtn.addEventListener("click", function () {
+            var symEl = backdrop.querySelector("#ord-new-symbol");
+            var qtyEl = backdrop.querySelector("#ord-new-qty");
+            var symVal = symEl && symEl.value ? symEl.value.toUpperCase() : "NVDA";
+            var qtyVal = qtyEl && qtyEl.value ? qtyEl.value : "100";
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting…";
+            setTimeout(function () {
+              UI.closeModal();
+              showToast(symVal + " " + qtyVal + " · Order submitted (mock) / 订单已提交（模拟）", "ok");
+            }, 600);
+          });
+        }
+      },
+    });
+  }
+
+  function bindOrdersPage() {
+    // Row selection via event delegation on the tbody (survives re-renders)
+    var tbody = document.getElementById("ord-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-ord-id]");
+        if (!row) return;
+        ORDERS_SELECTED_ID = row.getAttribute("data-ord-id");
+        tbody.innerHTML = renderOrdersRows();
+        var detail = document.getElementById("ord-detail");
+        if (detail) detail.innerHTML = renderOrdersDetail();
+      });
+    }
+
+    // Filter: status / side / symbol / account selects
+    function bindFilter(id, key) {
+      var sel = document.getElementById(id);
+      if (sel) sel.addEventListener("change", function () {
+        ORDERS_FILTERS[key] = sel.value;
+        if (tbody) tbody.innerHTML = renderOrdersRows();
+      });
+    }
+    bindFilter("ord-filter-status", "status");
+    bindFilter("ord-filter-side", "side");
+    bindFilter("ord-filter-symbol", "symbol");
+    bindFilter("ord-filter-account", "account");
+
+    // Search input
+    var search = document.getElementById("ord-filter-search");
+    if (search) search.addEventListener("input", function () {
+      ORDERS_FILTERS.search = search.value;
+      if (tbody) tbody.innerHTML = renderOrdersRows();
+    });
+
+    // New Order button → open ticket modal
+    var newBtn = document.querySelector('[data-action="ord:new-order"]');
+    if (newBtn) newBtn.addEventListener("click", openNewOrderModal);
+  }
+
+  PAGE_FRAMEWORK["trading/orders"] = function () {
+    // ── Mock KPIs ──────────────────────────────────────────────────
+    var total = ORDERS_DATA.length;
+    var open = ORDERS_DATA.filter(function (o) { return o.status === "PARTIAL" || o.status === "PENDING"; }).length;
+    var filled = ORDERS_DATA.filter(function (o) { return o.status === "FILLED"; }).length;
+    var rejected = ORDERS_DATA.filter(function (o) { return o.status === "REJECTED"; }).length;
+    var kpis = UI.metricCard("Total Orders", String(total), "", "") +
+      UI.metricCard("Open Orders", String(open), "", "warning") +
+      UI.metricCard("Filled", String(filled), "", "pos") +
+      UI.metricCard("Rejected", String(rejected), "", "neg");
+
+    // ── Filters row ────────────────────────────────────────────────
+    var symbols = ["ALL"].concat(Array.from(new Set(ORDERS_DATA.map(function (o) { return o.symbol; }))));
+    var symbolOpts = symbols.map(function (s) { return { value: s, label: s === "ALL" ? "All Symbols" : s }; });
+    var filters =
+      '<div class="ord-filters">' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Account</label>' +
+      UI.select({ id: "ord-filter-account", options: [{ value: "ALL", label: "All Accounts" }, { value: "Main Paper", label: "Main Paper" }, { value: "Shadow", label: "Shadow" }, { value: "Live", label: "Live" }] }) +
+      '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Symbol</label>' +
+      UI.select({ id: "ord-filter-symbol", options: symbolOpts }) +
+      '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Side</label>' +
+      UI.select({ id: "ord-filter-side", options: [
+        { value: "ALL", label: "All Sides" },
+        { value: "BUY", label: "BUY" },
+        { value: "SELL", label: "SELL" },
+      ] }) +
+      '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Status</label>' +
+      UI.select({ id: "ord-filter-status", options: [
+        { value: "ALL", label: "All Status" },
+        { value: "FILLED", label: "Filled" },
+        { value: "PARTIAL", label: "Partially Filled" },
+        { value: "PENDING", label: "Pending" },
+        { value: "CANCELLED", label: "Cancelled" },
+        { value: "REJECTED", label: "Rejected" },
+        { value: "EXPIRED", label: "Expired" },
+      ] }) +
+      '</div>' +
+      '<div class="ord-filter-field ord-filter-search-wrap">' + UI.search("Search ID / symbol…", "ord-filter-search") + '</div>' +
+      '</div>';
+
+    // ── Two-column layout: table (left) + detail (right) ───────────
+    var layout =
+      '<div class="ord-layout">' +
+      '<div class="ord-layout-main">' +
+      UI.panel("Orders", renderOrdersTable(), {
+        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
+      }) +
+      '</div>' +
+      '<div class="ord-layout-side">' +
+      UI.panel("Selected Order", '<div id="ord-detail">' + renderOrdersDetail() + '</div>') +
+      '</div>' +
+      '</div>';
+
+    return (
+      UI.pageHeader("Orders", "Order management and lifecycle tracking · 订单管理",
+        UI.button("+ New Order", "primary", { sm: true, action: "ord:new-order" })) +
+      UI.kpiGrid(kpis, 4) +
+      UI.sectionHeading("Filters") +
+      filters +
+      UI.sectionHeading("Orders") +
+      layout
     );
   };
 
@@ -3620,6 +3977,11 @@
           showToast("Portfolio exported (mock) / 组合已导出", "ok");
         }, 800);
       });
+    }
+
+    // Orders (Commit 008): row selection, filters, search, New Order modal
+    if (document.getElementById("ord-tbody")) {
+      bindOrdersPage();
     }
 
     // Design System: bind tabs
