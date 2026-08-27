@@ -1158,3 +1158,69 @@
   color: var(--ds-text-muted);
   text-align: center;
 }
+
+/* ==========================================================================
+   ICYQuant Portfolio — Commit 007
+   ========================================================================== */
+
+/* ── Allocation Donut ─────────────────────────────────────────── */
+.pf-alloc {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-5);
+  padding: var(--ds-space-3) 0;
+}
+.pf-alloc-chart {
+  flex-shrink: 0;
+}
+.pf-donut {
+  width: 180px;
+  height: 180px;
+  display: block;
+}
+.pf-donut-center-val {
+  fill: var(--ds-text-primary);
+  font-size: 20px;
+  font-weight: var(--ds-font-bold);
+  font-family: var(--ds-num-font);
+  font-variant-numeric: var(--ds-num-variant);
+}
+.pf-donut-center-label {
+  fill: var(--ds-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--ds-tracking-wider);
+  font-weight: var(--ds-font-semibold);
+}
+.pf-alloc-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+.pf-alloc-leg-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-1) 0;
+}
+.pf-alloc-leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.pf-alloc-leg-label {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-medium);
+  color: var(--ds-text-primary);
+  flex: 1;
+}
+.pf-alloc-leg-val {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-semibold);
+  color: var(--ds-text-secondary);
+}
+@media (max-width: 600px) {
+  .pf-alloc { flex-direction: column; align-items: center; }
+}
