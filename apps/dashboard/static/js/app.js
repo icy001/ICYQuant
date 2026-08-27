@@ -2086,29 +2086,1010 @@
   }
 
   /* ==================================================================
-   * Router
+   * Coming Soon placeholder (UI V1 Shell)
+   * ================================================================== */
+  function pageComingSoon(titleEn, titleZh, icon) {
+    return (
+      '<div class="coming-soon">' +
+      '<div class="coming-soon-icon">' + (icon || "◈") + "</div>" +
+      '<div class="coming-soon-title">' + esc(titleEn) + "</div>" +
+      '<div class="coming-soon-sub">' + esc(titleZh || "") + "</div>" +
+      '<div class="coming-soon-zh">该页面将在 UI V1 后续版本中实现</div>' +
+      '<div class="coming-soon-tag">Coming in UI V1</div>' +
+      "</div>"
+    );
+  }
+
+  async function pageMarkets() { return pageComingSoon("Markets", "行情", "◉"); }
+  async function pageSignals() { return pageComingSoon("Signals", "信号", "⚡"); }
+  async function pagePaperTrading() { return pageComingSoon("Paper Trading", "模拟交易", "paper"); }
+  async function pageAlphaLab() { return pageComingSoon("Alpha Lab", "因子实验室", "α"); }
+  async function pageFactorDiscovery() { return pageComingSoon("Factor Discovery", "因子发现", "⚗"); }
+  async function pageSnapshots() { return pageComingSoon("Snapshots", "快照", "cam"); }
+  async function pageAttribution() { return pageComingSoon("Attribution", "归因", "chart"); }
+  async function pageExposure() { return pageComingSoon("Exposure", "敞口", "▦"); }
+  async function pageData() { return pageComingSoon("Data", "数据", "▤"); }
+  async function pageServices() { return pageComingSoon("Services", "服务", "⬡"); }
+
+  /* ==================================================================
+   * Design System Showcase (Commit 002)
+   * ================================================================== */
+  async function pageDesignSystem() {
+    var html = "";
+
+    // Section: Color tokens
+    html += UI.panel("Color System / 颜色系统", "");
+    html += '<div class="ds-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--ds-space-3);margin-bottom:var(--ds-space-6);">';
+    var colors = [
+      ["Background", "var(--ds-bg-base)", "var(--ds-text-primary)"],
+      ["Surface", "var(--ds-bg-surface)", "var(--ds-text-primary)"],
+      ["Surface Elevated", "var(--ds-bg-surface-elevated)", "var(--ds-text-primary)"],
+      ["Profit", "var(--ds-profit-dim)", "var(--ds-profit)"],
+      ["Loss", "var(--ds-loss-dim)", "var(--ds-loss)"],
+      ["Warning", "var(--ds-warning-dim)", "var(--ds-warning)"],
+      ["Info", "var(--ds-info-dim)", "var(--ds-info)"],
+      ["Neutral", "var(--ds-neutral-dim)", "var(--ds-neutral)"],
+      ["Purple", "var(--ds-purple-dim)", "var(--ds-purple)"],
+    ];
+    colors.forEach(function (c) {
+      html +=
+        '<div style="background:' + c[1] + ";color:" + c[2] +
+        ";padding:var(--ds-space-3);border-radius:var(--ds-radius-md);border:1px solid var(--ds-border-soft);\">" +
+        '<div style="font-size:var(--ds-text-xs);font-weight:var(--ds-font-semibold);text-transform:uppercase;letter-spacing:var(--ds-tracking-wide);">' + c[0] + "</div>" +
+        "</div>";
+    });
+    html += "</div>";
+
+    // Section: Typography
+    html += UI.panel("Typography / 排版", "");
+    html += '<div class="ds-panel" style="margin-bottom:var(--ds-space-6);"><div class="ds-panel-body">';
+    html += '<div style="font-size:var(--ds-text-3xl);font-weight:var(--ds-font-extrabold);letter-spacing:var(--ds-tracking-tight);margin-bottom:var(--ds-space-2);">$1,073,181.00</div>';
+    html += '<div style="font-size:var(--ds-text-2xl);font-weight:var(--ds-font-bold);margin-bottom:var(--ds-space-2);">Equity / 总权益</div>';
+    html += '<div style="font-size:var(--ds-text-lg);font-weight:var(--ds-font-semibold);margin-bottom:var(--ds-space-2);">Portfolio Overview</div>';
+    html += '<div style="font-size:var(--ds-text-base);margin-bottom:var(--ds-space-2);">Body text / 正文 — normal weight</div>';
+    html += '<div style="font-size:var(--ds-text-sm);color:var(--ds-text-secondary);">Secondary text / 次要文本</div>';
+    html += '<div style="font-size:var(--ds-text-xs);color:var(--ds-text-muted);text-transform:uppercase;letter-spacing:var(--ds-tracking-wider);margin-top:var(--ds-space-2);">LABEL / 标签</div>';
+    html += '<div class="ds-text-mono" style="font-size:var(--ds-text-base);margin-top:var(--ds-space-4);">$1,073,181.00  +7.32%  -5.50%</div>';
+    html += "</div></div>";
+
+    // Section: Metric Cards
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Metric Cards / 指标卡片</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--ds-space-4);margin-bottom:var(--ds-space-6);">';
+    html += UI.metricCard("Equity", "$1,073,181", "+7.32%", "pos");
+    html += UI.metricCard("P&L", "+$67,610", "+6.73%", "pos");
+    html += UI.metricCard("Drawdown", "-5.50%", "-2.1%", "neg");
+    html += UI.metricCard("Fill Rate", "86.04%", "+1.2%", "pos");
+    html += "</div>";
+
+    // Section: Table
+    html += UI.panel("Positions / 持仓", "");
+    html += '<div class="ds-panel" style="margin-bottom:var(--ds-space-6);"><div class="ds-panel-body">';
+    html += UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "position", label: "Position", numeric: true },
+        { key: "price", label: "Price", numeric: true },
+        { key: "pnl", label: "P&L", numeric: true,
+          format: function (v) { return UI.signedMoney(v); },
+          color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "weight", label: "Weight", numeric: true,
+          format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+      ],
+      rows: [
+        { symbol: "NVDA", position: 600, price: 182.31, pnl: 5102, weight: 0.182 },
+        { symbol: "QQQ", position: 200, price: 571.20, pnl: 1204, weight: 0.106 },
+        { symbol: "SPY", position: 0, price: 645.13, pnl: 0, weight: 0.0 },
+        { symbol: "AAPL", position: -100, price: 224.50, pnl: -820, weight: -0.032 },
+      ],
+    });
+    html += "</div></div>";
+
+    // Section: Buttons
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Buttons / 按钮</h3>';
+    html += '<div style="display:flex;gap:var(--ds-space-3);flex-wrap:wrap;margin-bottom:var(--ds-space-6);">';
+    html += UI.button("Primary", "primary");
+    html += UI.button("Secondary", "secondary");
+    html += UI.button("Ghost", "ghost");
+    html += UI.button("Danger", "danger");
+    html += UI.button("Disabled", "primary", { disabled: true });
+    html += UI.button("Small", "primary", { sm: true });
+    html += "</div>";
+
+    // Section: Inputs
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Inputs / 输入</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--ds-space-4);margin-bottom:var(--ds-space-6);">';
+    html += UI.field("Account Name", UI.input({ placeholder: "Main-Paper" }));
+    html += UI.field("Capital", UI.input({ type: "number", placeholder: "100000", step: "0.01" }));
+    html += UI.field("Environment", UI.select({
+      options: ["Paper", "Shadow", "Live"], value: "Paper" }));
+    html += "</div>";
+    html += UI.search("Search symbols…", "ds-search-demo");
+    html += '<div style="margin-bottom:var(--ds-space-6);"></div>';
+
+    // Section: Badges
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Badges / 徽章</h3>';
+    html += '<div style="display:flex;gap:var(--ds-space-3);flex-wrap:wrap;align-items:center;margin-bottom:var(--ds-space-6);">';
+    html += UI.badge("CONNECTED", "profit");
+    html += UI.badge("RUNNING", "info");
+    html += UI.badge("FILLED", "profit");
+    html += UI.badge("REJECTED", "loss");
+    html += UI.badge("WARNING", "warning");
+    html += UI.badge("OFFLINE", "loss");
+    html += UI.badge("STOPPED", "neutral");
+    html += "</div>";
+
+    // Section: Environment badges
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Environment Badges / 环境徽章</h3>';
+    html += '<div style="display:flex;gap:var(--ds-space-3);flex-wrap:wrap;margin-bottom:var(--ds-space-6);">';
+    html += UI.envBadge("paper");
+    html += UI.envBadge("shadow");
+    html += UI.envBadge("live");
+    html += "</div>";
+
+    // Section: Tabs
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Tabs / 标签页</h3>';
+    var tabsHtml = UI.tabs([
+      { id: "overview", label: "Overview", content: '<div style="padding:var(--ds-space-4);">Overview tab content.</div>' },
+      { id: "detail", label: "Detail", content: '<div style="padding:var(--ds-space-4);">Detail tab content.</div>' },
+      { id: "risk", label: "Risk", content: '<div style="padding:var(--ds-space-4);">Risk tab content.</div>' },
+    ]);
+    html += '<div id="ds-tabs-container" style="margin-bottom:var(--ds-space-6);">' + tabsHtml + "</div>";
+
+    // Section: Loading / Empty / Error
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">States / 状态组件</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--ds-space-4);margin-bottom:var(--ds-space-6);">';
+    html += UI.loading("Loading positions…");
+    html += UI.empty("No positions", "There are currently no open positions.", "∅");
+    html += UI.error("Unable to load orders", "Connection timeout.", "retry-orders");
+    html += "</div>";
+
+    // Section: Modal & Drawer triggers
+    html += '<h3 style="font-size:var(--ds-text-lg);margin-bottom:var(--ds-space-3);">Modal & Drawer / 弹窗与抽屉</h3>';
+    html += '<div style="display:flex;gap:var(--ds-space-3);margin-bottom:var(--ds-space-6);">';
+    html += UI.button("Open Modal", "primary", { action: "ds-demo-modal" });
+    html += UI.button("Open Drawer", "secondary", { action: "ds-demo-drawer" });
+    html += "</div>";
+
+    return html;
+  }
+
+  /* ==================================================================
+   * Router — Commit 003 Navigation
+   * Hierarchical routes with breadcrumb + placeholder pages
    * ================================================================== */
 
-  const ROUTES = [
-    { re: /^#\/overview$/, title: "Dashboard / 仪表盘", render: pageOverview },
-    { re: /^#\/accounts$/, title: "Accounts / 账户", render: pageAccounts },
-    { re: /^#\/portfolio$/, title: "Portfolio / 组合", render: pagePortfolio },
-    { re: /^#\/positions$/, title: "Positions / 持仓", render: pagePositions },
-    { re: /^#\/orders$/, title: "Orders / 订单", render: pageOrders },
-    { re: /^#\/executions$/, title: "Executions / 成交", render: pageExecutions },
-    { re: /^#\/strategies$/, title: "Strategies / 策略", render: pageStrategies },
-    { re: /^#\/factor$/, title: "Factor / 因子纸面交易", render: pageFactor },
-    { re: /^#\/backtest$/, title: "Backtest / 回测", render: pageBacktest },
-    { re: /^#\/settings$/, title: "Settings / 设置", render: pageSettings },
-    { re: /^#\/risk$/, title: "Risk / 风控", render: pageRisk },
-    { re: /^#\/reconciliation$/, title: "Reconciliation / 对账", render: pageReconciliation },
-    { re: /^#\/system$/, title: "System / 系统", render: pageSystem },
-    { re: /^#\/alerts$/, title: "Alerts / 告警", render: pageAlerts },
-    { re: /^#\/audit$/, title: "Audit / 审计日志", render: pageAuditLog },
-    { re: /^#\/strategies\/(.+)$/, title: "Strategy Detail / 策略详情", render: function (m) { return pageStrategyDetail(decodeURIComponent(m[1])); } },
-    { re: /^#\/orders\/(.+)$/, title: "Order Detail / 订单详情", render: function (m) { return pageOrderDetail(decodeURIComponent(m[1])); } },
-    { re: /^#\/accounts\/(.+)$/, title: "Account Detail / 账户详情", render: function (m) { return pageAccountDetail(decodeURIComponent(m[1])); } },
-  ];
+  // Navigation config: route → { group, navKey, label, zh, desc }
+  const NAV = {
+    "#/dashboard": { group: "overview", navKey: "dashboard", label: "Dashboard", zh: "仪表盘", desc: "Portfolio overview" },
+    "#/research": { group: "research", navKey: "research", label: "Research", zh: "研究", desc: "Research workspace" },
+    "#/research/strategies": { group: "research", navKey: "research/strategies", label: "Strategies", zh: "策略", desc: "Strategy management" },
+    "#/research/backtest": { group: "research", navKey: "research/backtest", label: "Backtest", zh: "回测", desc: "Backtest workspace" },
+    "#/research/factors": { group: "research", navKey: "research/factors", label: "Factor Discovery", zh: "因子发现", desc: "Factor discovery engine" },
+    "#/trading/paper": { group: "trading", navKey: "trading/paper", label: "Paper Trading", zh: "模拟", desc: "Paper trading workspace" },
+    "#/trading/orders": { group: "trading", navKey: "trading/orders", label: "Orders", zh: "订单", desc: "Order management" },
+    "#/trading/positions": { group: "trading", navKey: "trading/positions", label: "Positions", zh: "持仓", desc: "Position management" },
+    "#/trading/trades": { group: "trading", navKey: "trading/trades", label: "Trades", zh: "成交", desc: "Trade history" },
+    "#/risk": { group: "risk", navKey: "risk", label: "Risk", zh: "风控", desc: "Risk monitor" },
+    "#/risk/exposure": { group: "risk", navKey: "risk/exposure", label: "Exposure", zh: "敞口", desc: "Exposure management" },
+    "#/operations/accounts": { group: "operations", navKey: "operations/accounts", label: "Accounts", zh: "账户", desc: "Account management" },
+    "#/operations/execution": { group: "operations", navKey: "operations/execution", label: "Execution", zh: "执行", desc: "Execution management" },
+    "#/operations/reconciliation": { group: "operations", navKey: "operations/reconciliation", label: "Reconciliation", zh: "对账", desc: "Reconciliation management" },
+    "#/system": { group: "system", navKey: "system", label: "System", zh: "系统", desc: "System health" },
+    "#/settings": { group: "system", navKey: "settings", label: "Settings", zh: "设置", desc: "System settings" },
+  };
+
+  // Group labels for breadcrumb
+  const GROUP_LABELS = {
+    overview: "Overview",
+    research: "Research",
+    trading: "Trading",
+    risk: "Risk",
+    operations: "Operations",
+    system: "System",
+  };
+
+  // ── Page Framework implementations (Commit 004) ─────────────────
+  // All pages use mock data. Real API integration comes in later commits.
+
+  function pageNavPlaceholder(cfg) {
+    var fn = PAGE_FRAMEWORK[cfg.navKey];
+    if (fn) return fn();
+    return (
+      UI.pageHeader(cfg.label, cfg.desc) +
+      UI.empty(cfg.label, "This page will be implemented in a future UI V1 commit.")
+    );
+  }
+
+  var PAGE_FRAMEWORK = {};
+
+  // ── Dashboard (Commit 005 — full business page) ────────────────
+  PAGE_FRAMEWORK["dashboard"] = function () {
+    // ── Mock data ────────────────────────────────────────────────
+    // Equity curve: ~22 points from Aug 20 → Aug 24, $1.00M → $1.073M
+    var eqPoints = [
+      1000000, 1001200, 1000800, 1002100, 1003400, 1002900, 1004500,
+      1005200, 1004100, 1006300, 1007800, 1006900, 1008400, 1010200,
+      1009600, 1012100, 1014300, 1015800, 1014700, 1017200, 1018900,
+      1020500, 1022100, 1023800, 1025400, 1024900, 1026700, 1028100,
+      1029600, 1031200, 1032800, 1034400, 1035900, 1037100, 1038800,
+      1040200, 1041900, 1043400, 1044800, 1046100, 1047700, 1049100,
+      1050800, 1052200, 1053900, 1055400, 1056900, 1058500, 1060100,
+      1061800, 1063300, 1064900, 1066400, 1068000, 1069500, 1071000,
+      1073181,
+    ];
+    var eqData = eqPoints.map(function (v, i) {
+      return { value: v, label: i };
+    });
+    var xLabels = ["Aug 20", "Aug 21", "Aug 22", "Aug 23", "Aug 24"];
+
+    // Positions mock
+    var positions = [
+      { symbol: "NVDA", qty: 600, avgPrice: 182.31, mktPrice: 190.82, mktValue: 114492, pnl: 5106, weight: 0.107, side: "Long" },
+      { symbol: "QQQ", qty: 200, avgPrice: 571.20, mktPrice: 577.22, mktValue: 115444, pnl: 1204, weight: 0.108, side: "Long" },
+      { symbol: "AAPL", qty: -100, avgPrice: 224.50, mktPrice: 216.28, mktValue: 21628, pnl: -822, weight: -0.020, side: "Short" },
+    ];
+
+    // 1) Account context bar
+    var acctBar =
+      '<div class="dash-acct-bar">' +
+      '<div class="dash-acct-main">' +
+      '<span class="dash-acct-label">Account</span>' +
+      '<span class="dash-acct-name">Paper-Alpha021</span>' +
+      UI.statusPill("Paper Trading", "info") +
+      '</div>' +
+      '<div class="dash-acct-meta">' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Last Update</span><span class="ds-text-mono">2026-08-24 16:05</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Session</span><span class="ds-text-mono">PAPER · Alpha021</span></span>' +
+      '</div>' +
+      '</div>';
+
+    // 2) Portfolio summary KPIs (8 metrics)
+    var kpis = UI.metricCard("Equity", "$1,073,181", "+7.32%", "pos") +
+      UI.metricCard("Realized P&L", "+$67,610", "MTD", "pos") +
+      UI.metricCard("Unrealized P&L", "+$5,488", "Open", "pos") +
+      UI.metricCard("Today's P&L", "-$638", "-0.06%", "neg") +
+      UI.metricCard("Max Drawdown", "-5.50%", "Peak → Trough", "neg") +
+      UI.metricCard("Win Rate", "68.0%", "220 signals", "pos") +
+      UI.metricCard("Exposure", "$266K", "26.6%", "info") +
+      UI.metricCard("Open Positions", "3", "2 Long · 1 Short", "");
+
+    // 3) Equity Curve + 4) P&L summary
+    var equityCurve = UI.equityCurve(eqData, {
+      height: 240,
+      yTicks: [1000000, 1025000, 1050000, 1075000],
+      yFormat: function (v) { return "$" + (v / 1000000).toFixed(2) + "M"; },
+      xLabels: xLabels,
+      color: "var(--ds-profit)",
+    });
+
+    var pnlSummary = UI.statRows([
+      { label: "Today", value: "-$638", variant: "neg" },
+      { label: "This Week", value: "+$1,824", variant: "pos" },
+      { label: "Month to Date", value: "+$7,610", variant: "pos" },
+      { label: "Since Start", value: "+$73,181", variant: "pos" },
+    ]);
+    var pnlSpark = UI.sparkline(pnlSparkData, { color: "var(--ds-loss)", width: 240, height: 56 });
+
+    var pnlBlock =
+      UI.panel("P&L Summary", UI.periodTabs(["1D", "1W", "1M", "3M", "YTD", "ALL"], 0, "dash-pnl-tabs") + pnlSpark + pnlSummary, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">mock</span>' });
+
+    var chartsRow =
+      '<div class="dash-grid-2">' +
+      '<div class="dash-grid-main">' + UI.panel("Portfolio Equity", equityCurve, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Aug 20 – Aug 24</span>' }) + '</div>' +
+      '<div class="dash-grid-side">' + pnlBlock + '</div>' +
+      '</div>';
+
+    // 5) Positions + Exposure
+    var exposureBar =
+      '<div class="dash-exposure">' +
+      '<div class="dash-exposure-head">' +
+      '<span class="dash-exposure-label">Total Exposure</span>' +
+      '<span class="ds-text-mono">$266,564 · 26.6%</span>' +
+      '</div>' +
+      '<div class="progress-bar"><div class="progress-fill info" style="width:26.6%"></div></div>' +
+      '<div class="dash-exposure-legend">' +
+      '<span><span class="ds-dot ds-dot-pos"></span>Long $229,936</span>' +
+      '<span><span class="ds-dot ds-dot-neg"></span>Short $21,628</span>' +
+      '<span><span class="ds-dot ds-dot-info"></span>Cash $806,617</span>' +
+      '</div>' +
+      '</div>';
+
+    var posTable = UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side" },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "mktPrice", label: "Mkt Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "mktValue", label: "Mkt Value", numeric: true, format: function (v) { return UI.money(v, 0); } },
+        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+      ],
+      rows: positions,
+    });
+
+    var positionsBlock =
+      UI.panel("Open Positions", exposureBar + posTable, { actions: UI.button("View All", "ghost", { sm: true, action: "nav:trading/positions" }) });
+
+    // 6) Recent Activity timeline
+    var activity = UI.timeline([
+      { time: "10:24", type: "EXECUTION", title: "NVDA · BUY 100 @ $182.31", desc: "Order #1024 filled · Paper-Alpha021", variant: "profit" },
+      { time: "10:23", type: "ORDER", title: "NVDA · BUY 100 submitted", desc: "Limit $182.50 · Alpha021 signal", variant: "info" },
+      { time: "09:58", type: "RISK", title: "Limit check PASS", desc: "Daily loss -$720 / $4,000 · Exposure 26.6%", variant: "profit" },
+      { time: "09:45", type: "POSITION", title: "QQQ · Position update", desc: "Qty 200 · Mkt value $115,444", variant: "info" },
+      { time: "09:30", type: "SIGNAL", title: "Alpha021 · Signal generated", desc: "NVDA long 600 / QQQ long 200 / AAPL short 100", variant: "purple" },
+      { time: "08:15", type: "SYSTEM", title: "Paper session started", desc: "Alpha021 · Snapshot #2 · Validation observing", variant: "neutral" },
+    ]);
+
+    var activityBlock = UI.panel("Recent Activity", activity, { actions: UI.button("View All", "ghost", { sm: true, action: "nav:system" }) });
+
+    var positionsActivityRow =
+      '<div class="dash-grid-2 dash-grid-2-1-1">' +
+      '<div class="dash-grid-main">' + positionsBlock + '</div>' +
+      '<div class="dash-grid-side">' + activityBlock + '</div>' +
+      '</div>';
+
+    // 7) Alpha021 Strategy Status + Validation
+    var stratStatus = UI.statRows([
+      { label: "Strategy", value: "Alpha021", variant: "default" },
+      { label: "Mode", value: "PAPER", variant: "info" },
+      { label: "Snapshot", value: "#2", variant: "default" },
+      { label: "Signals", value: "220", variant: "default" },
+      { label: "Fill Rate", value: "86.04%", variant: "pos" },
+      { label: "Reject Rate", value: "11.26%", variant: "warning" },
+      { label: "Win Rate", value: "68.0%", variant: "pos" },
+      { label: "Current Exposure", value: "$266K", variant: "info" },
+    ]);
+    var validation = UI.statRows([
+      { label: "Snapshot", value: "#2 vs #1", variant: "default" },
+      { label: "Signal Drift", value: "NORMAL", variant: "pos" },
+      { label: "Execution Drift", value: "NORMAL", variant: "pos" },
+      { label: "Attribution", value: "OBSERVING", variant: "warning" },
+    ]);
+    var stratBlock =
+      '<div class="dash-grid-2">' +
+      '<div class="dash-grid-main">' + UI.panel("Alpha021 · Strategy Status", stratStatus) + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Validation", validation) + '</div>' +
+      '</div>';
+
+    // 8) System Health
+    var services = [
+      ["API Gateway", "Healthy", "profit"],
+      ["Strategy Runtime", "Healthy", "profit"],
+      ["Risk Engine", "Healthy", "profit"],
+      ["Order Engine", "Healthy", "profit"],
+      ["Execution", "Healthy", "profit"],
+      ["Position Ledger", "Healthy", "profit"],
+      ["Reconciliation", "Healthy", "profit"],
+      ["Event Bus", "Healthy", "profit"],
+      ["Database", "Warning", "warning"],
+      ["Cache (Redis)", "Healthy", "profit"],
+    ];
+    var servicesHtml = services.map(function (s) {
+      return '<div class="dash-svc">' + UI.statusPill(s[1], s[2]) + '<span class="dash-svc-name">' + s[0] + '</span></div>';
+    }).join("");
+    var dataStatus = [
+      ["Market Data", "Updated", "profit", "16:05:00"],
+      ["Factor Data", "Updated", "profit", "16:04:58"],
+      ["Snapshot", "2026-08-24", "info", "#2"],
+    ];
+    var dataHtml = dataStatus.map(function (d) {
+      return '<div class="dash-svc"><span class="ds-text-muted">' + d[3] + '</span>' + UI.statusPill(d[1], d[2]) + '<span class="dash-svc-name">' + d[0] + '</span></div>';
+    }).join("");
+    var healthBlock =
+      '<div class="dash-grid-2">' +
+      '<div class="dash-grid-main">' + UI.panel("Services", '<div class="dash-svc-grid">' + servicesHtml + '</div>') + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Data", '<div class="dash-svc-grid">' + dataHtml + '</div>') + '</div>' +
+      '</div>';
+
+    return (
+      UI.pageHeader("Dashboard", "Portfolio overview and system health",
+        UI.button("Refresh", "ghost", { sm: true, action: "dash:refresh" })) +
+      acctBar +
+      UI.kpiGrid(kpis, 4) +
+      chartsRow +
+      positionsActivityRow +
+      UI.sectionHeading("Alpha021") +
+      stratBlock +
+      UI.sectionHeading("System Health") +
+      healthBlock
+    );
+  };
+
+  // Placeholder P&L sparkline data — generated inline to avoid bloat.
+  // Simple oscillating positive-then-negative intraday P&L.
+  function _dashPnlSpark() {
+    var arr = [];
+    for (var i = 0; i < 48; i++) {
+      var base = i * 18;
+      var wave = Math.sin(i * 0.4) * 220;
+      var noise = (i % 7 - 3) * 40;
+      arr.push(Math.round(base + wave + noise - 600));
+    }
+    return arr;
+  }
+  var pnlSparkData = _dashPnlSpark();
+
+  // ── Research ─────────────────────────────────────────────────────
+  PAGE_FRAMEWORK["research"] = function () {
+    return (
+      UI.pageHeader("Research", "Strategy research and factor discovery workspace") +
+      UI.kpiGrid(
+        UI.metricCard("Active Strategies", "12", "+2", "pos") +
+        UI.metricCard("Factors Tracked", "101", "", "") +
+        UI.metricCard("Backtests Run", "247", "+18", "pos") +
+        UI.metricCard("Candidates", "22", "+3", "pos")
+      ) +
+      UI.sectionHeading("Research Pipeline") +
+      UI.panel("Pipeline", '<div style="display:flex;gap:var(--ds-space-3);align-items:center;flex-wrap:wrap;">' +
+        UI.badge("101 Alphas", "info") + "→" +
+        UI.badge("909 Pairs", "info") + "→" +
+        UI.badge("Validation", "warning") + "→" +
+        UI.badge("OOS", "warning") + "→" +
+        UI.badge("22 Candidates", "profit") + "→" +
+        UI.badge("15 Families", "profit") +
+        "</div>")
+    );
+  };
+
+  PAGE_FRAMEWORK["research/strategies"] = function () {
+    return (
+      UI.pageHeader("Strategies", "Strategy management and lifecycle",
+        UI.button("New Strategy", "primary", { sm: true })) +
+      UI.table({
+        columns: [
+          { key: "name", label: "Strategy" },
+          { key: "status", label: "Status" },
+          { key: "type", label: "Type" },
+          { key: "sharpe", label: "Sharpe", numeric: true },
+          { key: "return", label: "Return", numeric: true,
+            format: function (v) { return v >= 0 ? "+" : ""; } },
+          { key: "mdd", label: "Max DD", numeric: true },
+        ],
+        rows: [
+          { name: "Alpha021", status: "Active", type: "Factor", sharpe: 1.31, return: "+18.4%", mdd: "-7.8%" },
+          { name: "Momentum-Q", status: "Active", type: "Momentum", sharpe: 0.92, return: "+12.1%", mdd: "-9.2%" },
+          { name: "MeanRevert", status: "Paused", type: "MeanRev", sharpe: 0.71, return: "+5.3%", mdd: "-4.1%" },
+        ],
+      })
+    );
+  };
+
+  PAGE_FRAMEWORK["research/backtest"] = function () {
+    var kpis = UI.metricCard("Return", "+18.42%", "", "pos") +
+      UI.metricCard("Sharpe", "1.31", "", "pos") +
+      UI.metricCard("Max DD", "-7.82%", "", "neg") +
+      UI.metricCard("Win Rate", "64.2%", "", "pos");
+    var configForm =
+      UI.field("Strategy", UI.select({ options: ["Alpha021", "Momentum-Q", "MeanRevert"] })) +
+      UI.field("Universe", UI.input({ value: "NVDA QQQ SPY" })) +
+      UI.field("Timeframe", UI.select({ options: ["Daily", "1H", "15M", "5M"] })) +
+      UI.field("Start Date", UI.input({ type: "date", value: "2023-01-01" })) +
+      UI.field("End Date", UI.input({ type: "date", value: "2026-08-24" })) +
+      UI.field("Initial Capital", UI.input({ type: "number", value: "1000000" }));
+    return (
+      UI.pageHeader("Backtest", "Strategy backtesting workspace",
+        UI.button("Run Backtest", "primary", { sm: true })) +
+      UI.panel("Configuration", configForm) +
+      UI.sectionHeading("Performance") +
+      UI.kpiGrid(kpis) +
+      UI.panel("Equity Curve", '<div class="chart-placeholder">Equity curve chart placeholder</div>')
+    );
+  };
+
+  PAGE_FRAMEWORK["research/factors"] = function () {
+    return (
+      UI.pageHeader("Factor Discovery", "Factor discovery and validation pipeline") +
+      UI.kpiGrid(
+        UI.metricCard("Total Alphas", "101", "", "") +
+        UI.metricCard("Pairs Tested", "909", "", "") +
+        UI.metricCard("Validated", "42", "", "pos") +
+        UI.metricCard("Candidates", "22", "+3", "pos")
+      ) +
+      UI.sectionHeading("Discovery Pipeline") +
+      UI.panel("Pipeline Stages", '<div style="display:flex;flex-direction:column;gap:var(--ds-space-3);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>Alpha Generation</span>' + UI.badge("101 alphas", "info") +
+        "</div>" +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>Pair Correlation</span>' + UI.badge("909 pairs", "info") +
+        "</div>" +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>Validation (IS)</span>' + UI.badge("42 validated", "profit") +
+        "</div>" +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>Out-of-Sample</span>' + UI.badge("28 passed", "profit") +
+        "</div>" +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>De-correlation</span>' + UI.badge("15 families", "profit") +
+        "</div>" +
+        "</div>")
+    );
+  };
+
+  // ── Trading ─────────────────────────────────────────────────────
+  // ── Trading / Paper Trading (Commit 006 — full terminal) ───────
+  PAGE_FRAMEWORK["trading/paper"] = function () {
+    // ── Mock data ──────────────────────────────────────────────
+    var watchlist = [
+      { symbol: "NVDA", price: 178.42, changePct: 0.0124 },
+      { symbol: "QQQ", price: 540.20, changePct: 0.0085 },
+      { symbol: "SPY", price: 650.10, changePct: 0.0048 },
+      { symbol: "AAPL", price: 216.28, changePct: -0.0062 },
+      { symbol: "MSFT", price: 448.70, changePct: 0.0150 },
+      { symbol: "TSLA", price: 412.60, changePct: -0.0230 },
+    ];
+
+    // Mock candlestick data (~32 candles around $178)
+    var candles = [
+      { o: 176.5, h: 177.2, l: 176.1, c: 176.9 },
+      { o: 177.0, h: 177.8, l: 176.8, c: 177.5 },
+      { o: 177.4, h: 178.1, l: 177.0, c: 177.2 },
+      { o: 177.2, h: 178.0, l: 176.9, c: 177.8 },
+      { o: 177.9, h: 178.5, l: 177.6, c: 178.3 },
+      { o: 178.2, h: 178.6, l: 177.5, c: 177.7 },
+      { o: 177.6, h: 178.0, l: 176.8, c: 177.0 },
+      { o: 177.1, h: 177.5, l: 176.4, c: 176.6 },
+      { o: 176.5, h: 177.0, l: 175.8, c: 176.2 },
+      { o: 176.3, h: 176.9, l: 175.9, c: 176.8 },
+      { o: 176.9, h: 177.6, l: 176.5, c: 177.4 },
+      { o: 177.3, h: 178.0, l: 177.0, c: 177.8 },
+      { o: 177.9, h: 178.4, l: 177.5, c: 178.1 },
+      { o: 178.0, h: 178.7, l: 177.7, c: 178.5 },
+      { o: 178.4, h: 179.0, l: 178.0, c: 178.2 },
+      { o: 178.3, h: 178.8, l: 177.6, c: 177.8 },
+      { o: 177.9, h: 178.2, l: 177.2, c: 177.4 },
+      { o: 177.3, h: 177.8, l: 176.9, c: 177.0 },
+      { o: 177.1, h: 177.5, l: 176.5, c: 176.7 },
+      { o: 176.8, h: 177.3, l: 176.4, c: 177.1 },
+      { o: 177.2, h: 177.9, l: 177.0, c: 177.7 },
+      { o: 177.6, h: 178.3, l: 177.4, c: 178.1 },
+      { o: 178.0, h: 178.6, l: 177.7, c: 178.4 },
+      { o: 178.5, h: 179.0, l: 178.2, c: 178.7 },
+      { o: 178.8, h: 179.2, l: 178.4, c: 178.5 },
+      { o: 178.4, h: 178.9, l: 177.8, c: 178.0 },
+      { o: 178.1, h: 178.5, l: 177.6, c: 177.9 },
+      { o: 177.8, h: 178.3, l: 177.5, c: 178.2 },
+      { o: 178.3, h: 178.8, l: 178.0, c: 178.6 },
+      { o: 178.5, h: 179.0, l: 178.2, c: 178.9 },
+      { o: 178.8, h: 179.1, l: 178.3, c: 178.4 },
+      { o: 178.4, h: 178.7, l: 178.0, c: 178.42 },
+    ];
+
+    // ── Top row: Watchlist + Chart + Order Ticket ───────────────
+    var watchlistHtml = UI.watchlist(watchlist, "NVDA");
+
+    var instHeader = UI.instrumentHeader({
+      symbol: "NVDA", name: "NVIDIA Corp", price: 178.42,
+      change: 2.18, changePct: 0.0124, bid: 178.40, ask: 178.44,
+      spread: "$0.04", status: "Open", time: "16:05:00",
+    });
+
+    var chartHtml = UI.candleChart(candles, { height: 300 });
+    var chartShell = UI.chartShell({
+      chartHtml: chartHtml,
+      showVolume: true,
+    });
+
+    var orderTicket = UI.orderTicket({ symbol: "NVDA", price: 178.42, qty: 100 });
+
+    var topRow =
+      '<div class="tr-grid-3">' +
+      '<div class="tr-col-left">' +
+      UI.panel("Watchlist", watchlistHtml) +
+      '</div>' +
+      '<div class="tr-col-center">' +
+      instHeader + chartShell +
+      '</div>' +
+      '<div class="tr-col-right">' +
+      orderTicket +
+      '</div>' +
+      '</div>';
+
+    // ── Account Summary ─────────────────────────────────────────
+    var acctSummary = UI.statRows([
+      { label: "Total Equity", value: "$1,073,181", variant: "default" },
+      { label: "Cash", value: "$806,617", variant: "info" },
+      { label: "Buying Power", value: "$1,613,234", variant: "default" },
+      { label: "Gross Exposure", value: "$266,564", variant: "info" },
+      { label: "Net Exposure", value: "$229,936", variant: "info" },
+      { label: "Unrealized P&L", value: "+$5,488", variant: "pos" },
+      { label: "Realized P&L", value: "+$67,610", variant: "pos" },
+    ]);
+
+    // ── Positions table ─────────────────────────────────────────
+    var posTable = UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "last", label: "Last", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "pnlPct", label: "P&L %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+      ],
+      rows: [
+        { symbol: "NVDA", qty: 500, avgPrice: 165.20, last: 178.42, pnl: 6610, pnlPct: 0.0800 },
+        { symbol: "QQQ", qty: 200, avgPrice: 520.10, last: 540.20, pnl: 4020, pnlPct: 0.0387 },
+        { symbol: "SPY", qty: 100, avgPrice: 620.20, last: 650.10, pnl: 2990, pnlPct: 0.0482 },
+      ],
+    });
+
+    // ── Orders table ────────────────────────────────────────────
+    var ordersTable = UI.table({
+      columns: [
+        { key: "id", label: "Order ID", numeric: true },
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side", format: function (v) { return v; }, color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "type", label: "Type" },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "status", label: "Status", format: function (v) {
+          var m = { FILLED: "pos", PENDING: "warning", CANCELLED: "neutral", REJECTED: "neg" };
+          return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + v + '</span>';
+        } },
+        { key: "time", label: "Time" },
+      ],
+      rows: [
+        { id: 1024, symbol: "NVDA", side: "BUY", qty: 100, type: "Limit", price: 182.31, status: "FILLED", time: "10:23:41" },
+        { id: 1023, symbol: "QQQ", side: "BUY", qty: 200, type: "Market", price: 571.20, status: "FILLED", time: "10:25:01" },
+        { id: 1022, symbol: "AAPL", side: "SELL", qty: 100, type: "Limit", price: 224.50, status: "FILLED", time: "10:26:15" },
+        { id: 1021, symbol: "SPY", side: "BUY", qty: 50, type: "Limit", price: 645.13, status: "PENDING", time: "10:28:30" },
+        { id: 1020, symbol: "NVDA", side: "BUY", qty: 200, type: "Limit", price: 180.00, status: "REJECTED", time: "10:15:00" },
+        { id: 1019, symbol: "MSFT", side: "SELL", qty: 150, type: "Market", price: 450.20, status: "CANCELLED", time: "09:58:12" },
+      ],
+    });
+
+    // ── Executions table ────────────────────────────────────────
+    var execsTable = UI.table({
+      columns: [
+        { key: "id", label: "Exec ID", numeric: true },
+        { key: "orderId", label: "Order ID", numeric: true },
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        { key: "qty", label: "Filled Qty", numeric: true },
+        { key: "price", label: "Fill Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "fee", label: "Fee", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "time", label: "Time" },
+      ],
+      rows: [
+        { id: 5001, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 100, price: 182.31, fee: 1.82, time: "10:23:41" },
+        { id: 5002, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 200, price: 182.45, fee: 3.65, time: "10:23:42" },
+        { id: 5003, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 300, price: 182.52, fee: 5.48, time: "10:23:43" },
+        { id: 5004, orderId: 1023, symbol: "QQQ", side: "BUY", qty: 200, price: 571.20, fee: 5.71, time: "10:25:01" },
+        { id: 5005, orderId: 1022, symbol: "AAPL", side: "SELL", qty: 100, price: 224.50, fee: 2.25, time: "10:26:15" },
+      ],
+    });
+
+    // ── Bottom tabs: Positions / Orders / Executions ───────────
+    var bottomTabs =
+      '<div class="ds-tabs" id="tr-bottom-tabs">' +
+      '<button class="ds-tab active" data-tab="positions">Positions</button>' +
+      '<button class="ds-tab" data-tab="orders">Orders</button>' +
+      '<button class="ds-tab" data-tab="executions">Executions</button>' +
+      '</div>';
+    var bottomContent =
+      '<div class="ds-tab-content" id="tr-tab-positions" style="display:block;">' +
+      UI.panel("Account Summary", '<div class="dash-svc-grid">' + acctSummary + '</div>') + posTable +
+      '</div>' +
+      '<div class="ds-tab-content" id="tr-tab-orders" style="display:none;">' + ordersTable + '</div>' +
+      '<div class="ds-tab-content" id="tr-tab-executions" style="display:none;">' + execsTable + '</div>';
+
+    return (
+      UI.pageHeader("Trading", "Trading terminal — Paper trading · Alpha021",
+        UI.button("New Order", "primary", { sm: true, action: "tr:focus-order" })) +
+      topRow +
+      UI.sectionHeading("Positions · Orders · Executions") +
+      bottomTabs + bottomContent
+    );
+  };
+
+  PAGE_FRAMEWORK["trading/orders"] = function () {
+    var kpis = UI.metricCard("Total Orders", "47", "", "") +
+      UI.metricCard("Filled", "38", "80.9%", "pos") +
+      UI.metricCard("Pending", "6", "", "warning") +
+      UI.metricCard("Rejected", "3", "", "neg");
+    var ordersTable = UI.table({
+      columns: [
+        { key: "id", label: "Order ID", numeric: true },
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "type", label: "Type" },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "status", label: "Status", format: function (v) {
+          var m = { FILLED: "pos", PENDING: "warning", CANCELLED: "neutral", REJECTED: "neg" };
+          return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + v + '</span>';
+        } },
+        { key: "time", label: "Time" },
+      ],
+      rows: [
+        { id: 1024, symbol: "NVDA", side: "BUY", qty: 100, type: "Limit", price: 182.31, status: "FILLED", time: "10:23:41" },
+        { id: 1023, symbol: "QQQ", side: "BUY", qty: 200, type: "Market", price: 571.20, status: "FILLED", time: "10:25:01" },
+        { id: 1022, symbol: "AAPL", side: "SELL", qty: 100, type: "Limit", price: 224.50, status: "FILLED", time: "10:26:15" },
+        { id: 1021, symbol: "SPY", side: "BUY", qty: 50, type: "Limit", price: 645.13, status: "PENDING", time: "10:28:30" },
+        { id: 1020, symbol: "NVDA", side: "BUY", qty: 200, type: "Limit", price: 180.00, status: "REJECTED", time: "10:15:00" },
+        { id: 1019, symbol: "MSFT", side: "SELL", qty: 150, type: "Market", price: 450.20, status: "CANCELLED", time: "09:58:12" },
+      ],
+    });
+    return (
+      UI.pageHeader("Orders", "Order management and tracking",
+        UI.button("New Order", "primary", { sm: true, action: "nav:trading/paper" })) +
+      UI.kpiGrid(kpis) +
+      UI.sectionHeading("Recent Orders") +
+      UI.panel("Orders", ordersTable)
+    );
+  };
+
+  PAGE_FRAMEWORK["trading/positions"] = function () {
+    var kpis = UI.metricCard("Open Positions", "3", "", "") +
+      UI.metricCard("Total P&L", "+$13,620", "", "pos") +
+      UI.metricCard("Gross Exposure", "$266,564", "26.6%", "info") +
+      UI.metricCard("Net Exposure", "$229,936", "18.6%", "info");
+    return (
+      UI.pageHeader("Positions", "Position management and P&L tracking") +
+      UI.kpiGrid(kpis) +
+      UI.sectionHeading("Open Positions") +
+      UI.panel("Positions", UI.table({
+        columns: [
+          { key: "symbol", label: "Symbol" },
+          { key: "qty", label: "Qty", numeric: true },
+          { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+          { key: "mktPrice", label: "Last", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+          { key: "pnl", label: "P&L", numeric: true,
+            format: function (v) { return UI.signedMoney(v); },
+            color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+          { key: "pnlPct", label: "P&L %", numeric: true,
+            format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; },
+            color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+          { key: "weight", label: "Weight", numeric: true,
+            format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+        ],
+        rows: [
+          { symbol: "NVDA", qty: 500, avgPrice: 165.20, mktPrice: 178.42, pnl: 6610, pnlPct: 0.0800, weight: 0.107 },
+          { symbol: "QQQ", qty: 200, avgPrice: 520.10, mktPrice: 540.20, pnl: 4020, pnlPct: 0.0387, weight: 0.108 },
+          { symbol: "SPY", qty: 100, avgPrice: 620.20, mktPrice: 650.10, pnl: 2990, pnlPct: 0.0482, weight: 0.072 },
+        ],
+      }))
+    );
+  };
+
+  PAGE_FRAMEWORK["trading/trades"] = function () {
+    return (
+      UI.pageHeader("Executions", "Execution and trade history") +
+      UI.kpiGrid(
+        UI.metricCard("Total Trades", "38", "", "") +
+        UI.metricCard("Volume", "$1.2M", "", "") +
+        UI.metricCard("Avg Slippage", "+0.03bp", "", "pos") +
+        UI.metricCard("Total Fees", "$18.91", "", "neg")
+      ) +
+      UI.sectionHeading("Recent Executions") +
+      UI.panel("Executions", UI.table({
+        columns: [
+          { key: "id", label: "Exec ID", numeric: true },
+          { key: "orderId", label: "Order ID", numeric: true },
+          { key: "symbol", label: "Symbol" },
+          { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+          { key: "qty", label: "Filled Qty", numeric: true },
+          { key: "price", label: "Fill Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+          { key: "fee", label: "Fee", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+          { key: "time", label: "Time" },
+        ],
+        rows: [
+          { id: 5001, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 100, price: 182.31, fee: 1.82, time: "10:23:41" },
+          { id: 5002, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 200, price: 182.45, fee: 3.65, time: "10:23:42" },
+          { id: 5003, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 300, price: 182.52, fee: 5.48, time: "10:23:43" },
+          { id: 5004, orderId: 1023, symbol: "QQQ", side: "BUY", qty: 200, price: 571.20, fee: 5.71, time: "10:25:01" },
+          { id: 5005, orderId: 1022, symbol: "AAPL", side: "SELL", qty: 100, price: 224.50, fee: 2.25, time: "10:26:15" },
+        ],
+      }))
+    );
+  };
+
+  // ── Risk ────────────────────────────────────────────────────────
+  PAGE_FRAMEWORK["risk"] = function () {
+    return (
+      UI.pageHeader("Risk Overview", "Risk monitoring and limits",
+        UI.button("Risk Report", "ghost", { sm: true })) +
+      UI.kpiGrid(
+        UI.metricCard("Daily Loss", "-$720", "-0.07%", "neg") +
+        UI.metricCard("Max Daily Loss", "$4,000", "limit", "warning") +
+        UI.metricCard("Exposure", "26.6%", "", "info") +
+        UI.metricCard("Open Positions", "3", "", "")
+      ) +
+      UI.sectionHeading("Risk Limits") +
+      UI.panel("Daily Loss Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
+        '<div class="progress-bar" style="flex:1;"><div class="progress-fill warning" style="width:18%"></div></div>' +
+        '<span class="ds-text-mono">-$720 / $4,000</span>' +
+        "</div>") +
+      UI.panel("Max Drawdown Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
+        '<div class="progress-bar" style="flex:1;"><div class="progress-fill loss" style="width:55%"></div></div>' +
+        '<span class="ds-text-mono">-5.50% / -10.00%</span>' +
+        "</div>") +
+      UI.panel("Position Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
+        '<div class="progress-bar" style="flex:1;"><div class="progress-fill info" style="width:3%"></div></div>' +
+        '<span class="ds-text-mono">3 / 1,000</span>' +
+        "</div>")
+    );
+  };
+
+  PAGE_FRAMEWORK["risk/exposure"] = function () {
+    return (
+      UI.pageHeader("Exposure", "Exposure breakdown and analysis") +
+      UI.kpiGrid(
+        UI.metricCard("Gross Exposure", "$266,181", "26.6%", "info") +
+        UI.metricCard("Net Exposure", "$186,181", "18.6%", "info") +
+        UI.metricCard("Long Exposure", "$226,181", "", "pos") +
+        UI.metricCard("Short Exposure", "$40,000", "", "neg")
+      ) +
+      UI.sectionHeading("By Asset") +
+      UI.panel("Exposure Breakdown", UI.table({
+        columns: [
+          { key: "symbol", label: "Symbol" },
+          { key: "exposure", label: "Exposure", numeric: true,
+            format: function (v) { return UI.money(v); } },
+          { key: "weight", label: "Weight", numeric: true,
+            format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+          { key: "side", label: "Side" },
+        ],
+        rows: [
+          { symbol: "NVDA", exposure: 109380, weight: 0.41, side: "Long" },
+          { symbol: "QQQ", exposure: 114240, weight: 0.43, side: "Long" },
+          { symbol: "AAPL", exposure: 21630, weight: 0.08, side: "Short" },
+          { symbol: "Cash", exposure: 807000, weight: 0.75, side: "—" },
+        ],
+      }))
+    );
+  };
+
+  // ── Operations ───────────────────────────────────────────────────
+  PAGE_FRAMEWORK["operations/accounts"] = function () {
+    return (
+      UI.pageHeader("Accounts", "Trading account management",
+        UI.button("Add Account", "primary", { sm: true, action: "ds-demo-modal" })) +
+      UI.table({
+        columns: [
+          { key: "name", label: "Account Name" },
+          { key: "type", label: "Type" },
+          { key: "broker", label: "Broker" },
+          { key: "equity", label: "Equity", numeric: true,
+            format: function (v) { return UI.money(v); } },
+          { key: "status", label: "Status" },
+        ],
+        rows: [
+          { name: "Paper-Alpha021", type: "Paper", broker: "Simulation", equity: 1073181, status: "Active" },
+          { name: "Paper-Momentum", type: "Paper", broker: "Simulation", equity: 441222, status: "Active" },
+          { name: "Live-US-Equity", type: "Live", broker: "IB", equity: 245300, status: "Connected" },
+          { name: "Live-FX", type: "Live", broker: "CQG", equity: 261800, status: "Connected" },
+        ],
+      })
+    );
+  };
+
+  PAGE_FRAMEWORK["operations/execution"] = function () {
+    return (
+      UI.pageHeader("Execution", "Execution monitoring and routing") +
+      UI.kpiGrid(
+        UI.metricCard("Total Executions", "38", "", "") +
+        UI.metricCard("Fill Rate", "80.9%", "", "pos") +
+        UI.metricCard("Avg Latency", "12ms", "", "pos") +
+        UI.metricCard("Slippage", "+0.03bp", "", "pos")
+      ) +
+      UI.sectionHeading("Execution Venues") +
+      UI.panel("Venues", UI.table({
+        columns: [
+          { key: "venue", label: "Venue" },
+          { key: "execs", label: "Executions", numeric: true },
+          { key: "fillRate", label: "Fill Rate", numeric: true },
+          { key: "latency", label: "Latency", numeric: true },
+          { key: "status", label: "Status" },
+        ],
+        rows: [
+          { venue: "Simulation", execs: 28, fillRate: "100%", latency: "8ms", status: "Online" },
+          { venue: "IB SmartRouter", execs: 7, fillRate: "85.7%", latency: "23ms", status: "Online" },
+          { venue: "CQG", execs: 3, fillRate: "66.7%", latency: "31ms", status: "Online" },
+        ],
+      }))
+    );
+  };
+
+  PAGE_FRAMEWORK["operations/reconciliation"] = function () {
+    return (
+      UI.pageHeader("Reconciliation", "Position and balance reconciliation") +
+      UI.kpiGrid(
+        UI.metricCard("Matched", "42", "100%", "pos") +
+        UI.metricCard("Mismatched", "0", "", "pos") +
+        UI.metricCard("Pending", "3", "", "warning") +
+        UI.metricCard("Last Run", "2 min ago", "", "")
+      ) +
+      UI.sectionHeading("Reconciliation Status") +
+      UI.panel("Account Reconciliation", UI.table({
+        columns: [
+          { key: "account", label: "Account" },
+          { key: "internal", label: "Internal Positions", numeric: true },
+          { key: "broker", label: "Broker Positions", numeric: true },
+          { key: "diff", label: "Diff", numeric: true },
+          { key: "status", label: "Status" },
+        ],
+        rows: [
+          { account: "Paper-Alpha021", internal: 3, broker: 3, diff: 0, status: "Matched" },
+          { account: "Paper-Momentum", internal: 2, broker: 2, diff: 0, status: "Matched" },
+          { account: "Live-US-Equity", internal: 5, broker: 4, diff: -1, status: "Mismatch" },
+        ],
+      }))
+    );
+  };
+
+  // ── System + Settings ───────────────────────────────────────────
+  PAGE_FRAMEWORK["system"] = function () {
+    var services = [
+      ["API Gateway", "Healthy", "profit"],
+      ["Strategy Runtime", "Healthy", "profit"],
+      ["Risk Engine", "Healthy", "profit"],
+      ["Order Engine", "Healthy", "profit"],
+      ["Execution Engine", "Healthy", "profit"],
+      ["Position Ledger", "Healthy", "profit"],
+      ["Reconciliation", "Healthy", "profit"],
+      ["Event Bus", "Healthy", "profit"],
+      ["Database", "Warning", "warning"],
+      ["Cache (Redis)", "Healthy", "profit"],
+      ["Message Bus", "Healthy", "profit"],
+      ["Monitoring", "Healthy", "profit"],
+    ];
+    var cards = services.map(function (s) {
+      return UI.metricCard(s[0], s[1], "", s[2] === "profit" ? "pos" : "warn");
+    }).join("");
+    return (
+      UI.pageHeader("System", "System health and service status") +
+      UI.kpiGrid(cards, 3)
+    );
+  };
+
+  PAGE_FRAMEWORK["settings"] = function () {
+    return (
+      UI.pageHeader("Settings", "System configuration and preferences") +
+      UI.panel("General Settings",
+        UI.field("Default Account", UI.select({ options: ["Paper-Alpha021", "Paper-Momentum", "Live-US-Equity"] })) +
+        UI.field("Base Currency", UI.select({ options: ["USD", "CNY", "EUR"] })) +
+        UI.field("Timezone", UI.select({ options: ["UTC", "Asia/Shanghai", "America/New_York"] })) +
+        UI.field("Risk Profile", UI.select({ options: ["Default", "Conservative", "Aggressive"] })) +
+        "<div style='margin-top:var(--ds-space-4);'>" +
+        UI.button("Save Settings", "primary") + " " +
+        UI.button("Reset", "ghost") +
+        "</div>"
+      )
+    );
+  };
+
+  // Build ROUTES array from NAV config
+  const ROUTES = Object.keys(NAV).map(function (hash) {
+    var cfg = NAV[hash];
+    var escaped = hash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return {
+      re: new RegExp("^" + escaped + "$"),
+      title: cfg.label + " / " + cfg.zh,
+      navKey: cfg.navKey,
+      group: cfg.group,
+      render: function () { return pageNavPlaceholder(cfg); },
+    };
+  });
+  // Add design-system showcase route
+  ROUTES.push({
+    re: /^#\/design-system$/,
+    title: "Design System / 设计系统",
+    navKey: "design-system",
+    group: "system",
+    render: pageDesignSystem,
+  });
+  // Legacy redirect routes (old → new)
+  ROUTES.push({ re: /^#\/overview$/, title: "", navKey: "dashboard", group: "overview", render: function () { location.hash = "#/dashboard"; return ""; } });
+  ROUTES.push({ re: /^#\/accounts$/, title: "", navKey: "operations/accounts", group: "operations", render: function () { location.hash = "#/operations/accounts"; return ""; } });
+  ROUTES.push({ re: /^#\/positions$/, title: "", navKey: "trading/positions", group: "trading", render: function () { location.hash = "#/trading/positions"; return ""; } });
+  ROUTES.push({ re: /^#\/orders$/, title: "", navKey: "trading/orders", group: "trading", render: function () { location.hash = "#/trading/orders"; return ""; } });
+  ROUTES.push({ re: /^#\/strategies$/, title: "", navKey: "research/strategies", group: "research", render: function () { location.hash = "#/research/strategies"; return ""; } });
+  ROUTES.push({ re: /^#\/backtest$/, title: "", navKey: "research/backtest", group: "research", render: function () { location.hash = "#/research/backtest"; return ""; } });
+  ROUTES.push({ re: /^#\/factor$/, title: "", navKey: "research/factors", group: "research", render: function () { location.hash = "#/research/factors"; return ""; } });
+  ROUTES.push({ re: /^#\/exposure$/, title: "", navKey: "risk/exposure", group: "risk", render: function () { location.hash = "#/risk/exposure"; return ""; } });
+  ROUTES.push({ re: /^#\/reconciliation$/, title: "", navKey: "operations/reconciliation", group: "operations", render: function () { location.hash = "#/operations/reconciliation"; return ""; } });
 
   function showToast(msg, cls) {
     const t = document.getElementById("toast");
@@ -2120,38 +3101,42 @@
     }, 3500);
   }
 
-  function setNavActive(hash) {
+  function setNavActive(navKey, group) {
+    // Clear all active + expanded
     document.querySelectorAll("#nav .nav-link").forEach(function (a) {
       a.classList.remove("active");
     });
-    const map = {
-      "#/overview": "overview",
-      "#/accounts": "accounts",
-      "#/portfolio": "portfolio",
-      "#/positions": "positions",
-      "#/orders": "orders",
-      "#/executions": "executions",
-      "#/strategies": "strategies",
-      "#/factor": "factor",
-      "#/backtest": "backtest",
-      "#/settings": "settings",
-      "#/risk": "risk",
-      "#/reconciliation": "reconciliation",
-      "#/system": "system",
-      "#/alerts": "alerts",
-      "#/audit": "audit",
-    };
-    let key = null;
-    for (const prefix in map) {
-      if (hash.indexOf(prefix) === 0) {
-        key = map[prefix];
-        break;
-      }
-    }
-    if (key) {
-      const el = document.querySelector('#nav .nav-link[data-nav="' + key + '"]');
+    document.querySelectorAll("#nav .nav-section").forEach(function (s) {
+      s.classList.remove("expanded");
+    });
+
+    // Set active link
+    if (navKey) {
+      var el = document.querySelector('#nav .nav-link[data-nav="' + navKey + '"]');
       if (el) el.classList.add("active");
     }
+
+    // Expand the group containing the active link
+    if (group) {
+      var section = document.querySelector('#nav .nav-section[data-group="' + group + '"]');
+      if (section) section.classList.add("expanded");
+    }
+  }
+
+  function renderBreadcrumb(group, label) {
+    var bc = document.getElementById("breadcrumb");
+    if (!bc) return;
+    var html = '<span class="crumb crumb-root">ICYQuant</span>';
+    if (group && group !== "overview") {
+      var groupLabel = GROUP_LABELS[group] || group;
+      html += '<span class="crumb-sep">/</span>';
+      html += '<span class="crumb crumb-group">' + esc(groupLabel.toUpperCase()) + "</span>";
+    }
+    if (label) {
+      html += '<span class="crumb-sep">/</span>';
+      html += '<span class="crumb crumb-page">' + esc(label) + "</span>";
+    }
+    bc.innerHTML = html;
   }
 
   async function render() {
@@ -2163,17 +3148,36 @@
     document.getElementById("login-view").classList.add("hidden");
     document.getElementById("app-view").classList.remove("hidden");
 
-    const hash = location.hash || "#/overview";
-    const user = api.user;
+    var hash = location.hash || "#/dashboard";
+    var user = api.user;
     document.getElementById("user-badge").innerHTML =
       esc(user ? user.username : "") + " · <b>" + esc(user ? user.role : "") + "</b>";
 
-    let route = ROUTES[0];
-    for (let i = 0; i < ROUTES.length; i++) {
+    var route = ROUTES[0];
+    for (var i = 0; i < ROUTES.length; i++) {
       if (ROUTES[i].re.test(hash)) { route = ROUTES[i]; break; }
     }
-    document.getElementById("page-title").textContent = route.title;
-    setNavActive(hash);
+
+    // Set page title
+    if (route.title) {
+      document.getElementById("page-title").textContent = route.title;
+    }
+
+    // Set nav active + expand group
+    setNavActive(route.navKey, route.group);
+
+    // Render breadcrumb
+    var navCfg = NAV[hash];
+    if (navCfg) {
+      renderBreadcrumb(navCfg.group, navCfg.label);
+    } else if (hash === "#/design-system") {
+      renderBreadcrumb("system", "Design System");
+    } else {
+      renderBreadcrumb(route.group, null);
+    }
+
+    // Load topbar state (environment, account, health) in background
+    loadTopbarState();
 
     const content = document.getElementById("page-content");
     content.innerHTML = '<div class="empty">Loading… / 加载中…</div>';
@@ -2194,12 +3198,290 @@
     updateConnDot();
   }
 
+  /* ==================================================================
+   * Topbar state: environment / account / system health
+   * ================================================================== */
+  let _topbarLoading = false;
+
+  async function loadTopbarState() {
+    if (_topbarLoading) return;
+    _topbarLoading = true;
+    try {
+      const [cfg, health] = await Promise.allSettled([
+        api.get("/dashboard/config"),
+        api.get("/dashboard/system"),
+      ]);
+
+      // Environment badge
+      const envBadge = document.getElementById("env-badge");
+      if (cfg.status === "fulfilled" && cfg.value) {
+        const accType = (cfg.value.account && cfg.value.account.account_type) || "Paper";
+        const envText = accType.toUpperCase();
+        envBadge.textContent = envText;
+        envBadge.className = "env-badge env-" + accType.toLowerCase();
+
+        // Account selector
+        const acctName = document.getElementById("acct-name");
+        const acctCfg = cfg.value.account || {};
+        acctName.textContent = acctCfg.account_name || "Main-Paper";
+      }
+
+      // System health
+      if (health.status === "fulfilled" && health.value) {
+        const svc = health.value.health || {};
+        const overall = svc.overall || "healthy";
+        const dot = document.getElementById("health-dot");
+        const text = document.getElementById("health-text");
+        const status = overall.toLowerCase();
+        dot.className = "health-dot " + (status === "healthy" ? "" : status);
+        text.className = "health-text " + (status === "healthy" ? "" : status);
+        text.textContent = status.toUpperCase();
+      }
+    } catch (e) {
+      // keep defaults on error
+    } finally {
+      _topbarLoading = false;
+    }
+  }
+
   function bindActions() {
     document.querySelectorAll("[data-href]").forEach(function (el) {
       el.addEventListener("click", function () {
         location.hash = el.getAttribute("data-href");
       });
     });
+
+    // Design System demo: Modal & Drawer
+    var demoModalBtn = document.querySelector('[data-action="ds-demo-modal"]');
+    if (demoModalBtn) {
+      demoModalBtn.addEventListener("click", function () {
+        UI.openModal({
+          title: "Add Trading Account",
+          body:
+            UI.field("Account Name", UI.input({ placeholder: "Main-Paper" })) +
+            UI.field("Broker", UI.select({ options: ["IB", "CQG", "Binance"] })) +
+            UI.field("Environment", UI.select({ options: ["Paper", "Shadow", "Live"] })) +
+            UI.field("Capital", UI.input({ type: "number", placeholder: "100000" })),
+          footer:
+            UI.button("Cancel", "ghost", { action: "close-modal" }) +
+            UI.button("Save", "primary", { action: "close-modal" }),
+        });
+      });
+    }
+    var demoDrawerBtn = document.querySelector('[data-action="ds-demo-drawer"]');
+    if (demoDrawerBtn) {
+      demoDrawerBtn.addEventListener("click", function () {
+        UI.openDrawer({
+          title: "Order #1024",
+          body:
+            '<div class="ds-flex ds-flex-col ds-gap-3">' +
+            UI.badge("FILLED", "profit") +
+            "<div><strong>NVDA</strong> · BUY · 100</div>" +
+            UI.metricCard("Execution Price", "$182.31", "", "") +
+            UI.metricCard("Slippage", "+0.03bp", "pos", "pos") +
+            UI.metricCard("Latency", "12ms", "", "") +
+            "</div>",
+          footer: UI.button("Close", "secondary", { action: "close-drawer" }),
+        });
+      });
+    }
+
+    // Dashboard: nav:* buttons (View All → hash navigation)
+    document.querySelectorAll('[data-action^="nav:"]').forEach(function (el) {
+      el.addEventListener("click", function () {
+        var navKey = el.getAttribute("data-action").slice(4);
+        location.hash = "#/" + navKey;
+      });
+    });
+
+    // Dashboard: refresh button (visual feedback only — mock data)
+    var refreshBtn = document.querySelector('[data-action="dash:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        setTimeout(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+          showToast("Dashboard refreshed / 仪表盘已刷新", "ok");
+        }, 600);
+      });
+    }
+
+    // Dashboard: period tabs (visual toggle — mock data)
+    document.querySelectorAll(".ds-period-tabs").forEach(function (tabs) {
+      tabs.querySelectorAll(".ds-period-tab").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          tabs.querySelectorAll(".ds-period-tab").forEach(function (t) {
+            t.classList.remove("active");
+          });
+          tab.classList.add("active");
+        });
+      });
+    });
+
+    // Trading: bottom tabs (Positions / Orders / Executions)
+    var trBottomTabs = document.getElementById("tr-bottom-tabs");
+    if (trBottomTabs) {
+      trBottomTabs.querySelectorAll(".ds-tab").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          trBottomTabs.querySelectorAll(".ds-tab").forEach(function (t) {
+            t.classList.remove("active");
+          });
+          tab.classList.add("active");
+          var target = tab.getAttribute("data-tab");
+          ["positions", "orders", "executions"].forEach(function (name) {
+            var el = document.getElementById("tr-tab-" + name);
+            if (el) el.style.display = name === target ? "block" : "none";
+          });
+        });
+      });
+    }
+
+    // Trading: chart timeframe tabs (visual toggle)
+    document.querySelectorAll(".tr-tf-group").forEach(function (grp) {
+      grp.querySelectorAll(".tr-tf").forEach(function (tf) {
+        tf.addEventListener("click", function () {
+          grp.querySelectorAll(".tr-tf").forEach(function (t) {
+            t.classList.remove("active");
+          });
+          tf.classList.add("active");
+        });
+      });
+    });
+    // Trading: chart tool tabs (visual toggle)
+    document.querySelectorAll(".tr-chart-tools").forEach(function (grp) {
+      grp.querySelectorAll(".tr-tool").forEach(function (tool) {
+        tool.addEventListener("click", function () {
+          grp.querySelectorAll(".tr-tool").forEach(function (t) {
+            t.classList.remove("active");
+          });
+          tool.classList.add("active");
+        });
+      });
+    });
+
+    // Trading: watchlist item click (visual selection)
+    document.querySelectorAll(".tr-watchlist .tr-wl-item").forEach(function (item) {
+      item.addEventListener("click", function () {
+        item.parentElement.querySelectorAll(".tr-wl-item").forEach(function (i) {
+          i.classList.remove("active");
+        });
+        item.classList.add("active");
+      });
+    });
+
+    // Trading: Order Ticket — BUY/SELL toggle
+    var otSide = document.getElementById("tr-ot-side");
+    if (otSide) {
+      otSide.querySelectorAll(".ds-seg").forEach(function (seg) {
+        seg.addEventListener("click", function () {
+          otSide.querySelectorAll(".ds-seg").forEach(function (s) {
+            s.classList.remove("active");
+          });
+          seg.classList.add("active");
+          var side = seg.getAttribute("data-value");
+          var reviewBtn = document.getElementById("tr-ot-review");
+          if (reviewBtn) {
+            reviewBtn.setAttribute("data-side", side);
+            reviewBtn.textContent = side === "BUY" ? "REVIEW BUY ORDER" : "REVIEW SELL ORDER";
+            reviewBtn.className = "ds-btn ds-btn-primary tr-ot-submit" +
+              (side === "SELL" ? " ds-btn-danger" : "");
+          }
+        });
+      });
+    }
+
+    // Trading: Order Ticket — live notional calculation
+    function updateNotional() {
+      var qtyEl = document.getElementById("tr-ot-qty");
+      var limitEl = document.getElementById("tr-ot-limit");
+      var notionalEl = document.getElementById("tr-ot-notional");
+      var typeEl = document.getElementById("tr-ot-type");
+      if (!qtyEl || !notionalEl) return;
+      var qty = parseFloat(qtyEl.value) || 0;
+      var price = parseFloat((limitEl && limitEl.value) || 178.42);
+      var type = typeEl ? typeEl.value : "market";
+      var effPrice = type === "market" ? 178.42 : (price || 178.42);
+      var notional = qty * effPrice;
+      notionalEl.textContent = "$" + notional.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    var otQty = document.getElementById("tr-ot-qty");
+    var otLimit = document.getElementById("tr-ot-limit");
+    var otType = document.getElementById("tr-ot-type");
+    if (otQty) otQty.addEventListener("input", updateNotional);
+    if (otLimit) otLimit.addEventListener("input", updateNotional);
+    if (otType) {
+      otType.addEventListener("change", function () {
+        var limitField = document.getElementById("tr-ot-limit");
+        if (limitField) {
+          limitField.disabled = otType.value === "market";
+          if (otType.value === "market") limitField.value = "";
+        }
+        updateNotional();
+      });
+    }
+
+    // Trading: REVIEW ORDER → modal → mock confirmation
+    var reviewBtn = document.getElementById("tr-ot-review");
+    if (reviewBtn) {
+      reviewBtn.addEventListener("click", function () {
+        var side = reviewBtn.getAttribute("data-side") || "BUY";
+        var qty = (document.getElementById("tr-ot-qty") || {}).value || "100";
+        var type = (document.getElementById("tr-ot-type") || {}).value || "market";
+        var limitEl = document.getElementById("tr-ot-limit");
+        var price = type === "market" ? "Market" : "$" + ((limitEl && limitEl.value) || "178.42");
+        var slEl = document.getElementById("tr-ot-sl");
+        var tpEl = document.getElementById("tr-ot-tp");
+        var notional = document.getElementById("tr-ot-notional");
+        var notionalVal = notional ? notional.textContent : "$17,842";
+
+        var reviewHtml =
+          '<div class="ds-stat-row"><span class="ds-stat-label">Side</span><span class="ds-stat-value ds-stat-' + (side === "BUY" ? "pos" : "neg") + '">' + side + '</span></div>' +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Symbol</span><span class="ds-stat-value">NVDA</span></div>' +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Type</span><span class="ds-stat-value">' + (type === "market" ? "Market" : "Limit") + '</span></div>' +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Quantity</span><span class="ds-stat-value">' + qty + '</span></div>' +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Price</span><span class="ds-stat-value">' + price + '</span></div>' +
+          (slEl && slEl.value ? '<div class="ds-stat-row"><span class="ds-stat-label">Stop Loss</span><span class="ds-stat-value ds-stat-neg">$' + slEl.value + '</span></div>' : "") +
+          (tpEl && tpEl.value ? '<div class="ds-stat-row"><span class="ds-stat-label">Take Profit</span><span class="ds-stat-value ds-stat-pos">$' + tpEl.value + '</span></div>' : "") +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Notional</span><span class="ds-stat-value ds-stat-info">' + notionalVal + '</span></div>' +
+          '<div class="ds-stat-row"><span class="ds-stat-label">Account</span><span class="ds-stat-value">Paper-Alpha021</span></div>';
+
+        UI.openModal({
+          title: "Review Order",
+          body: reviewHtml,
+          footer:
+            '<button class="ds-btn ds-btn-ghost" data-action="close-modal">Cancel</button>' +
+            '<button class="ds-btn ds-btn-primary" id="tr-confirm-order">CONFIRM (Paper)</button>',
+        });
+        setTimeout(function () {
+          var confirmBtn = document.getElementById("tr-confirm-order");
+          if (confirmBtn) {
+            confirmBtn.addEventListener("click", function () {
+              UI.closeModal();
+              showToast(side + " " + qty + " NVDA · Paper order submitted (mock)", "ok");
+            });
+          }
+        }, 50);
+      });
+    }
+
+    // Trading: "New Order" button → focus order ticket
+    var newOrderBtn = document.querySelector('[data-action="tr:focus-order"]');
+    if (newOrderBtn) {
+      newOrderBtn.addEventListener("click", function () {
+        var ot = document.getElementById("tr-order-ticket");
+        if (ot) {
+          ot.scrollIntoView({ behavior: "smooth", block: "center" });
+          var qtyEl = document.getElementById("tr-ot-qty");
+          if (qtyEl) qtyEl.focus();
+        }
+      });
+    }
+
+    // Design System: bind tabs
+    var tabsContainer = document.getElementById("ds-tabs-container");
+    if (tabsContainer) UI.bindTabs(tabsContainer);
     const startBtn = document.getElementById("btn-session-start");
     if (startBtn) {
       startBtn.addEventListener("click", async function () {

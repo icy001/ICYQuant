@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ICYQuant Trading Dashboard / 交易仪表盘</title>
+  <title>ICYQuant / 量化交易平台</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230b1220'/><path d='M20 70 L40 45 L55 58 L80 28' stroke='%2300e5a0' stroke-width='6' fill='none' stroke-linecap='round'/></svg>">
-  <link rel="stylesheet" href="/dashboard/css/app.css">
+  <link rel="stylesheet" href="/dashboard/css/tokens.css?v=006">
+  <link rel="stylesheet" href="/dashboard/css/components.css?v=006">
+  <link rel="stylesheet" href="/dashboard/css/app.css?v=006">
 </head>
 <body>
 
@@ -36,26 +38,123 @@
     </div>
   </div>
 
-  <!-- ===================== App ===================== -->
+  <!-- ===================== App Shell ===================== -->
   <div id="app-view" class="hidden">
+    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="brand"><span class="logo-icy">ICY</span><span class="logo-quant">Quant</span></div>
-      <nav id="nav">
-        <a href="#/overview" data-nav="overview" class="nav-link active"><span class="nav-ico">◈</span>Dashboard<span class="nav-zh">/ 仪表盘</span></a>
-        <a href="#/accounts" data-nav="accounts" class="nav-link"><span class="nav-ico">▦</span>Accounts<span class="nav-zh">/ 账户</span></a>
-        <a href="#/portfolio" data-nav="portfolio" class="nav-link"><span class="nav-ico">▤</span>Portfolio<span class="nav-zh">/ 组合</span></a>
-        <a href="#/positions" data-nav="positions" class="nav-link"><span class="nav-ico">▣</span>Positions<span class="nav-zh">/ 持仓</span></a>
-        <a href="#/orders" data-nav="orders" class="nav-link"><span class="nav-ico">≡</span>Orders<span class="nav-zh">/ 订单</span></a>
-        <a href="#/executions" data-nav="executions" class="nav-link"><span class="nav-ico">✕</span>Executions<span class="nav-zh">/ 成交</span></a>
-        <a href="#/strategies" data-nav="strategies" class="nav-link"><span class="nav-ico">◉</span>Strategies<span class="nav-zh">/ 策略</span></a>
-        <a href="#/factor" data-nav="factor" class="nav-link"><span class="nav-ico">α</span>Factor<span class="nav-zh">/ 因子纸面</span></a>
-        <a href="#/backtest" data-nav="backtest" class="nav-link"><span class="nav-ico">▷</span>Backtest<span class="nav-zh">/ 回测</span></a>
-        <a href="#/risk" data-nav="risk" class="nav-link"><span class="nav-ico">▲</span>Risk<span class="nav-zh">/ 风控</span></a>
-        <a href="#/audit" data-nav="audit" class="nav-link"><span class="nav-ico">◈</span>Audit<span class="nav-zh">/ 审计</span></a>
-        <a href="#/alerts" data-nav="alerts" class="nav-link"><span class="nav-ico">⚠</span>Alerts<span class="nav-zh">/ 告警</span></a>
-        <a href="#/reconciliation" data-nav="reconciliation" class="nav-link"><span class="nav-ico">◍</span>Reconciliation<span class="nav-zh">/ 对账</span></a>
-        <a href="#/system" data-nav="system" class="nav-link"><span class="nav-ico">⬡</span>System<span class="nav-zh">/ 系统</span></a>
-        <a href="#/settings" data-nav="settings" class="nav-link"><span class="nav-ico">⚙</span>Settings<span class="nav-zh">/ 设置</span></a>
+      <nav id="nav" class="nav">
+
+        <!-- OVERVIEW -->
+        <div class="nav-section" data-group="overview">
+          <div class="nav-section-label">OVERVIEW</div>
+          <a href="#/dashboard" data-nav="dashboard" class="nav-link active">
+            <span class="nav-ico">◈</span>
+            <span class="nav-text">Dashboard</span>
+            <span class="nav-zh">仪表盘</span>
+          </a>
+        </div>
+
+        <!-- RESEARCH -->
+        <div class="nav-section" data-group="research">
+          <div class="nav-section-label">RESEARCH</div>
+          <a href="#/research" data-nav="research" class="nav-link">
+            <span class="nav-ico">◎</span>
+            <span class="nav-text">Research</span>
+            <span class="nav-zh">研究</span>
+          </a>
+          <a href="#/research/strategies" data-nav="research/strategies" class="nav-link">
+            <span class="nav-ico">▷</span>
+            <span class="nav-text">Strategies</span>
+            <span class="nav-zh">策略</span>
+          </a>
+          <a href="#/research/backtest" data-nav="research/backtest" class="nav-link">
+            <span class="nav-ico">▶</span>
+            <span class="nav-text">Backtest</span>
+            <span class="nav-zh">回测</span>
+          </a>
+          <a href="#/research/factors" data-nav="research/factors" class="nav-link">
+            <span class="nav-ico">⚗</span>
+            <span class="nav-text">Factor Discovery</span>
+            <span class="nav-zh">因子发现</span>
+          </a>
+        </div>
+
+        <!-- TRADING -->
+        <div class="nav-section" data-group="trading">
+          <div class="nav-section-label">TRADING</div>
+          <a href="#/trading/paper" data-nav="trading/paper" class="nav-link">
+            <span class="nav-ico">▦</span>
+            <span class="nav-text">Paper Trading</span>
+            <span class="nav-zh">模拟</span>
+          </a>
+          <a href="#/trading/orders" data-nav="trading/orders" class="nav-link">
+            <span class="nav-ico">≡</span>
+            <span class="nav-text">Orders</span>
+            <span class="nav-zh">订单</span>
+          </a>
+          <a href="#/trading/positions" data-nav="trading/positions" class="nav-link">
+            <span class="nav-ico">▣</span>
+            <span class="nav-text">Positions</span>
+            <span class="nav-zh">持仓</span>
+          </a>
+          <a href="#/trading/trades" data-nav="trading/trades" class="nav-link">
+            <span class="nav-ico">⇄</span>
+            <span class="nav-text">Trades</span>
+            <span class="nav-zh">成交</span>
+          </a>
+        </div>
+
+        <!-- RISK -->
+        <div class="nav-section" data-group="risk">
+          <div class="nav-section-label">RISK</div>
+          <a href="#/risk" data-nav="risk" class="nav-link">
+            <span class="nav-ico">▲</span>
+            <span class="nav-text">Risk</span>
+            <span class="nav-zh">风控</span>
+          </a>
+          <a href="#/risk/exposure" data-nav="risk/exposure" class="nav-link">
+            <span class="nav-ico">▦</span>
+            <span class="nav-text">Exposure</span>
+            <span class="nav-zh">敞口</span>
+          </a>
+        </div>
+
+        <!-- OPERATIONS -->
+        <div class="nav-section" data-group="operations">
+          <div class="nav-section-label">OPERATIONS</div>
+          <a href="#/operations/accounts" data-nav="operations/accounts" class="nav-link">
+            <span class="nav-ico">▤</span>
+            <span class="nav-text">Accounts</span>
+            <span class="nav-zh">账户</span>
+          </a>
+          <a href="#/operations/execution" data-nav="operations/execution" class="nav-link">
+            <span class="nav-ico">⬡</span>
+            <span class="nav-text">Execution</span>
+            <span class="nav-zh">执行</span>
+          </a>
+          <a href="#/operations/reconciliation" data-nav="operations/reconciliation" class="nav-link">
+            <span class="nav-ico">⟲</span>
+            <span class="nav-text">Reconciliation</span>
+            <span class="nav-zh">对账</span>
+          </a>
+        </div>
+
+        <!-- SYSTEM -->
+        <div class="nav-section" data-group="system">
+          <div class="nav-section-label">SYSTEM</div>
+          <a href="#/system" data-nav="system" class="nav-link">
+            <span class="nav-ico">⬢</span>
+            <span class="nav-text">System</span>
+            <span class="nav-zh">系统</span>
+          </a>
+          <a href="#/settings" data-nav="settings" class="nav-link">
+            <span class="nav-ico">⚙</span>
+            <span class="nav-text">Settings</span>
+            <span class="nav-zh">设置</span>
+          </a>
+        </div>
+
       </nav>
       <div class="sidebar-footer">
         <span id="conn-dot" class="conn-dot"></span>
@@ -63,12 +162,31 @@
       </div>
     </aside>
 
+    <!-- Main -->
     <main class="main">
+      <!-- Topbar -->
       <header class="topbar">
         <div class="topbar-left">
+          <div id="breadcrumb" class="breadcrumb">
+            <span class="crumb">ICYQuant</span>
+          </div>
           <h1 id="page-title">Dashboard / 仪表盘</h1>
         </div>
         <div class="topbar-right">
+          <!-- Environment badge -->
+          <span id="env-badge" class="env-badge env-paper">PAPER</span>
+          <!-- Account selector -->
+          <div id="account-selector" class="account-selector">
+            <span class="acct-label">Account</span>
+            <span id="acct-name" class="acct-name">Main-Paper</span>
+            <span class="acct-caret">▾</span>
+          </div>
+          <!-- System health -->
+          <div id="sys-health" class="sys-health">
+            <span class="health-dot" id="health-dot"></span>
+            <span id="health-text" class="health-text">HEALTHY</span>
+          </div>
+          <!-- User & logout -->
           <span id="session-chip" class="chip hidden"></span>
           <span id="user-badge" class="user-badge"></span>
           <button id="btn-logout" class="btn btn-ghost">Sign out / 退出</button>
@@ -81,6 +199,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="/dashboard/js/api.js"></script>
-  <script src="/dashboard/js/app.js"></script>
+  <script src="/dashboard/js/ui.js?v=006"></script>
+  <script src="/dashboard/js/app.js?v=006"></script>
 </body>
 </html>
