@@ -2261,6 +2261,7 @@
   // Navigation config: route → { group, navKey, label, zh, desc }
   const NAV = {
     "#/dashboard": { group: "overview", navKey: "dashboard", label: "Dashboard", zh: "仪表盘", desc: "Portfolio overview" },
+    "#/portfolio": { group: "overview", navKey: "portfolio", label: "Portfolio", zh: "组合", desc: "Portfolio allocation and exposure" },
     "#/research": { group: "research", navKey: "research", label: "Research", zh: "研究", desc: "Research workspace" },
     "#/research/strategies": { group: "research", navKey: "research/strategies", label: "Strategies", zh: "策略", desc: "Strategy management" },
     "#/research/backtest": { group: "research", navKey: "research/backtest", label: "Backtest", zh: "回测", desc: "Backtest workspace" },
@@ -2509,6 +2510,134 @@
     return arr;
   }
   var pnlSparkData = _dashPnlSpark();
+
+  // ── Portfolio (Commit 007) ────────────────────────────────────
+  PAGE_FRAMEWORK["portfolio"] = function () {
+    // ── Mock data ──────────────────────────────────────────────
+    // Equity curve: 40 points growing from $1.00M to $1.073M
+    var eqPts = [];
+    for (var i = 0; i < 40; i++) {
+      var base = 1000000 + i * 1830;
+      var wave = Math.sin(i * 0.35) * 4200;
+      eqPts.push(Math.round(base + wave));
+    }
+    eqPts[eqPts.length - 1] = 1073181;
+    var eqData = eqPts.map(function (v, i) { return { value: v, label: i }; });
+    var xLabels = ["Aug 03", "Aug 10", "Aug 17", "Aug 24"];
+
+    // Allocation segments
+    var allocSegments = [
+      { label: "NVDA", value: 114492, color: "var(--ds-profit)" },
+      { label: "QQQ", value: 115444, color: "var(--ds-info)" },
+      { label: "SPY", value: 65010, color: "var(--ds-purple)" },
+      { label: "Cash", value: 806617, color: "var(--ds-neutral)" },
+    ];
+
+    // Positions
+    var positions = [
+      { symbol: "NVDA", qty: 600, avgPrice: 165.20, last: 178.42, mktValue: 107052, pnl: 7932, pnlPct: 0.0800, weight: 0.482 },
+      { symbol: "QQQ", qty: 200, avgPrice: 520.10, last: 540.20, mktValue: 108040, pnl: 4020, pnlPct: 0.0387, weight: 0.314 },
+      { symbol: "SPY", qty: 100, avgPrice: 620.20, last: 650.10, mktValue: 65010, pnl: 2990, pnlPct: 0.0482, weight: 0.098 },
+    ];
+
+    // 1) Account context bar
+    var acctBar =
+      '<div class="dash-acct-bar">' +
+      '<div class="dash-acct-main">' +
+      '<span class="dash-acct-label">Account</span>' +
+      '<span class="dash-acct-name">Main Paper</span>' +
+      UI.statusPill("Paper Trading", "info") +
+      '</div>' +
+      '<div class="dash-acct-meta">' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Updated</span><span class="ds-text-mono">10:32</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Base Currency</span><span class="ds-text-mono">USD</span></span>' +
+      '</div>' +
+      '</div>';
+
+    // 2) KPI cards
+    var kpis = UI.metricCard("Total Equity", "$1,073,181", "+7.32%", "pos") +
+      UI.metricCard("Today P&L", "+$2,481", "+0.23%", "pos") +
+      UI.metricCard("Total Return", "+7.32%", "+$73,181", "pos") +
+      UI.metricCard("Drawdown", "-5.50%", "Peak → Trough", "neg");
+
+    // 3) Equity Curve + 4) Allocation donut
+    var equityCurve = UI.equityCurve(eqData, {
+      height: 260,
+      yTicks: [1000000, 1025000, 1050000, 1075000],
+      yFormat: function (v) { return "$" + (v / 1000000).toFixed(2) + "M"; },
+      xLabels: xLabels,
+      color: "var(--ds-profit)",
+    });
+    var donut = UI.donutChart(allocSegments, {
+      size: 180,
+      thickness: 24,
+      centerValue: "$1.07M",
+      centerLabel: "Total",
+    });
+
+    var chartsRow =
+      '<div class="dash-grid-2">' +
+      '<div class="dash-grid-main">' + UI.panel("Equity Curve", equityCurve, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Aug 03 – Aug 24</span>' }) + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Allocation", donut) + '</div>' +
+      '</div>';
+
+    // 5) Positions table
+    var posTable = UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "last", label: "Last Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "mktValue", label: "Market Value", numeric: true, format: function (v) { return UI.money(v, 0); } },
+        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "pnlPct", label: "P&L %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+      ],
+      rows: positions,
+    });
+
+    // 6) Exposure & Risk summary
+    var exposureBar =
+      '<div class="dash-exposure">' +
+      '<div class="dash-exposure-head">' +
+      '<span class="dash-exposure-label">Gross Exposure</span>' +
+      '<span class="ds-text-mono">79.4% · $852,946</span>' +
+      '</div>' +
+      '<div class="progress-bar"><div class="progress-fill info" style="width:79.4%"></div></div>' +
+      '<div class="dash-exposure-legend">' +
+      '<span><span class="ds-dot ds-dot-pos"></span>Long $852,946</span>' +
+      '<span><span class="ds-dot ds-dot-info"></span>Cash $220,235</span>' +
+      '</div>' +
+      '</div>';
+
+    var riskSummary = UI.statRows([
+      { label: "Gross Exposure", value: "79.4%", variant: "info" },
+      { label: "Net Exposure", value: "79.4%", variant: "info" },
+      { label: "Cash", value: "$220,235 (20.6%)", variant: "default" },
+      { label: "Concentration (Top)", value: "48.2% · NVDA", variant: "warning" },
+      { label: "Max Drawdown", value: "-5.50%", variant: "neg" },
+      { label: "Sharpe (mock)", value: "1.31", variant: "pos" },
+    ]);
+
+    var riskRow =
+      '<div class="dash-grid-2 dash-grid-2-1-1">' +
+      '<div class="dash-grid-main">' + exposureBar + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Risk Summary", riskSummary) + '</div>' +
+      '</div>';
+
+    return (
+      UI.pageHeader("Portfolio", "Portfolio allocation, positions and exposure",
+        UI.button("Export", "ghost", { sm: true, action: "pf:export" })) +
+      acctBar +
+      UI.kpiGrid(kpis, 4) +
+      chartsRow +
+      UI.sectionHeading("Positions",
+        UI.button("View All", "ghost", { sm: true, action: "nav:trading/positions" })) +
+      UI.panel("Open Positions", posTable) +
+      UI.sectionHeading("Exposure & Risk") +
+      riskRow
+    );
+  };
 
   // ── Research ─────────────────────────────────────────────────────
   PAGE_FRAMEWORK["research"] = function () {
@@ -3476,6 +3605,20 @@
           var qtyEl = document.getElementById("tr-ot-qty");
           if (qtyEl) qtyEl.focus();
         }
+      });
+    }
+
+    // Portfolio: export button (visual feedback — mock)
+    var pfExportBtn = document.querySelector('[data-action="pf:export"]');
+    if (pfExportBtn) {
+      pfExportBtn.addEventListener("click", function () {
+        pfExportBtn.disabled = true;
+        pfExportBtn.textContent = "Exporting…";
+        setTimeout(function () {
+          pfExportBtn.disabled = false;
+          pfExportBtn.textContent = "Export";
+          showToast("Portfolio exported (mock) / 组合已导出", "ok");
+        }, 800);
       });
     }
 

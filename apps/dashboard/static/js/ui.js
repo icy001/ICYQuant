@@ -763,6 +763,73 @@
     );
   };
 
+  // ── Donut Chart (allocation pie) ──────────────────────────────
+  // segments: [{ label, value, color }]  (color = CSS var or hex)
+  // opts: { size, thickness, centerLabel, centerValue }
+  UI.donutChart = function (segments, opts) {
+    opts = opts || {};
+    if (!segments || segments.length === 0) return UI.empty("No data", "Allocation unavailable.");
+    var size = opts.size || 180;
+    var r = size / 2;
+    var thickness = opts.thickness || 22;
+    var cx = r, cy = r;
+    var radius = r - thickness / 2 - 2;
+    var total = segments.reduce(function (s, seg) { return s + (seg.value || 0); }, 0) || 1;
+
+    // SVG arc path generator
+    function polar(cx, cy, r, angle) {
+      var rad = (angle - 90) * Math.PI / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+    function arcPath(cx, cy, r, startAngle, endAngle) {
+      var s = polar(cx, cy, r, endAngle);
+      var e = polar(cx, cy, r, startAngle);
+      var large = endAngle - startAngle <= 180 ? 0 : 1;
+      return "M " + s.x.toFixed(2) + " " + s.y.toFixed(2) +
+        " A " + r + " " + r + " 0 " + large + " 0 " + e.x.toFixed(2) + " " + e.y.toFixed(2);
+    }
+
+    var angle = 0;
+    var paths = "";
+    var legendItems = "";
+    segments.forEach(function (seg) {
+      var pctVal = (seg.value / total) * 100;
+      var sweep = (seg.value / total) * 360;
+      if (sweep >= 360) {
+        // Full circle — draw as circle
+        paths += '<circle cx="' + cx + '" cy="' + cy + '" r="' + radius + '" fill="none" stroke="' + (seg.color || "var(--ds-info)") + '" stroke-width="' + thickness + '" />';
+      } else {
+        var path = arcPath(cx, cy, radius, angle, angle + sweep);
+        paths += '<path d="' + path + '" fill="none" stroke="' + (seg.color || "var(--ds-info)") + '" stroke-width="' + thickness + '" stroke-linecap="butt" />';
+      }
+      angle += sweep;
+      legendItems +=
+        '<div class="pf-alloc-leg-item">' +
+        '<span class="pf-alloc-leg-dot" style="background:' + (seg.color || "var(--ds-info)") + '"></span>' +
+        '<span class="pf-alloc-leg-label">' + esc(seg.label) + '</span>' +
+        '<span class="pf-alloc-leg-val ds-text-mono">' + pctVal.toFixed(1) + '%</span>' +
+        '</div>';
+    });
+
+    var centerHtml = "";
+    if (opts.centerLabel || opts.centerValue) {
+      centerHtml =
+        '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="pf-donut-center-val">' + esc(opts.centerValue || "") + '</text>' +
+        '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="pf-donut-center-label">' + esc(opts.centerLabel || "") + '</text>';
+    }
+
+    return (
+      '<div class="pf-alloc">' +
+      '<div class="pf-alloc-chart">' +
+      '<svg class="pf-donut" viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="Allocation chart">' +
+      paths + centerHtml +
+      '</svg>' +
+      '</div>' +
+      '<div class="pf-alloc-legend">' + legendItems + '</div>' +
+      '</div>'
+    );
+  };
+
   // ── Formatting utilities (exposed for page code) ──────────────────
   UI.fmtNum = fmtNum;
   UI.pct = pct;
