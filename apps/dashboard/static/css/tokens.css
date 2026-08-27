@@ -1,0 +1,124 @@
+/* ==========================================================================
+   ICYQuant Design System — Semantic Tokens
+   Dark Quant Trading Terminal | Desktop-first | Data-dense | Low-distraction
+
+   These tokens provide a semantic layer on top of the raw CSS variables in
+   app.css. All new UI components should reference these tokens, never the
+   raw values. Existing pages continue to work unchanged.
+
+   Usage:
+     background: var(--ds-bg-surface);
+     color: var(--ds-text-secondary);
+     border: 1px solid var(--ds-border-default);
+   ========================================================================== */
+
+:root {
+  /* ── Background ───────────────────────────────────────────────── */
+  --ds-bg-base: #0a0e17;            /* app canvas */
+  --ds-bg-surface: #111a2b;         /* card / panel */
+  --ds-bg-surface-elevated: #16213a;/* modal / dropdown / hover */
+  --ds-bg-surface-sunken: #0d1322;  /* inputs / sidebar */
+  --ds-bg-overlay: rgba(0, 0, 0, 0.55); /* modal backdrop */
+
+  /* ── Border ───────────────────────────────────────────────────── */
+  --ds-border-default: #1e2a44;
+  --ds-border-soft: #1a2438;
+  --ds-border-strong: #2c3c60;
+  --ds-border-focus: #00e5a0;
+
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --ds-text-primary: #e6edf7;
+  --ds-text-secondary: #94a3b8;
+  --ds-text-muted: #64748b;
+  --ds-text-inverse: #0a0e17;
+
+  /* ── Semantic: Profit / Loss / Warning / Info / Neutral ───────── */
+  --ds-profit: #00e5a0;
+  --ds-profit-dim: rgba(0, 229, 160, 0.14);
+  --ds-profit-strong: #00ff88;
+
+  --ds-loss: #ff5c6c;
+  --ds-loss-dim: rgba(255, 92, 108, 0.14);
+  --ds-loss-strong: #ff4444;
+
+  --ds-warning: #ffb020;
+  --ds-warning-dim: rgba(255, 176, 32, 0.14);
+
+  --ds-info: #4da3ff;
+  --ds-info-dim: rgba(77, 163, 255, 0.14);
+
+  --ds-neutral: #94a3b8;
+  --ds-neutral-dim: rgba(148, 163, 184, 0.12);
+
+  --ds-purple: #a78bfa;
+  --ds-purple-dim: rgba(167, 139, 250, 0.14);
+
+  /* ── Typography ───────────────────────────────────────────────── */
+  --ds-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --ds-font-mono: "JetBrains Mono", "Cascadia Code", Consolas,
+    "SF Mono", monospace;
+
+  --ds-text-xs: 10px;
+  --ds-text-sm: 12px;
+  --ds-text-base: 14px;
+  --ds-text-lg: 16px;
+  --ds-text-xl: 18px;
+  --ds-text-2xl: 24px;
+  --ds-text-3xl: 32px;
+
+  --ds-font-normal: 400;
+  --ds-font-medium: 500;
+  --ds-font-semibold: 600;
+  --ds-font-bold: 700;
+  --ds-font-extrabold: 800;
+
+  --ds-leading-tight: 1.2;
+  --ds-leading-normal: 1.5;
+  --ds-leading-loose: 1.75;
+
+  --ds-tracking-tight: -0.02em;
+  --ds-tracking-normal: 0;
+  --ds-tracking-wide: 0.06em;
+  --ds-tracking-wider: 1.2px;
+
+  /* ── Spacing (4px scale) ──────────────────────────────────────── */
+  --ds-space-0: 0;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-space-10: 40px;
+  --ds-space-12: 48px;
+
+  /* ── Radius ────────────────────────────────────────────────────── */
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-radius-full: 9999px;
+
+  /* ── Shadow ───────────────────────────────────────────────────── */
+  --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --ds-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --ds-shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.45);
+  --ds-shadow-glow: 0 0 12px rgba(0, 229, 160, 0.3);
+
+  /* ── Transition ───────────────────────────────────────────────── */
+  --ds-transition-fast: 0.12s ease;
+  --ds-transition-normal: 0.2s ease;
+  --ds-transition-slow: 0.35s ease;
+
+  /* ── Z-index ──────────────────────────────────────────────────── */
+  --ds-z-dropdown: 100;
+  --ds-z-drawer: 200;
+  --ds-z-modal: 300;
+  --ds-z-toast: 400;
+
+  /* ── Tabular numbers for financial data ───────────────────────── */
+  --ds-num-font: var(--ds-font-mono);
+  --ds-num-variant: tabular-nums;
+  --ds-num-align: right;
+}

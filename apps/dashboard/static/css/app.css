@@ -772,3 +772,214 @@ svg { display: block; width: 100%; height: auto; }
 
 /* Drawdown chart container */
 .dd-chart { width: 100%; }
+
+/* ==========================================================================
+   UI V1 Commit 003 — Navigation
+   ========================================================================== */
+
+/* --- Breadcrumb --- */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 2px;
+  font-family: var(--ds-font-mono);
+}
+.crumb { color: var(--text-faint); letter-spacing: 0.5px; }
+.crumb-root { color: var(--accent); font-weight: 700; }
+.crumb-group { color: var(--text-dim); font-weight: 600; }
+.crumb-page { color: var(--text); font-weight: 600; }
+.crumb-sep { color: var(--text-faint); opacity: 0.5; }
+
+/* --- Nav group expand state --- */
+.nav-section .nav-section-label {
+  transition: color 0.12s;
+}
+.nav-section.expanded .nav-section-label {
+  color: var(--accent);
+}
+.nav-section.expanded {
+  position: relative;
+}
+.nav-section.expanded::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+/* --- Topbar layout for breadcrumb + title --- */
+.topbar-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.topbar-left h1 {
+  font-size: 18px;
+}
+
+/* ==========================================================================
+   UI V1 Shell — Professional Terminal Layout
+   ========================================================================== */
+
+/* --- Sidebar navigation sections --- */
+.nav { flex: 1; display: flex; flex-direction: column; gap: 0; overflow-y: auto; }
+.nav-section { margin-bottom: 4px; }
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  padding: 14px 12px 6px;
+  user-select: none;
+}
+.nav-section:first-child .nav-section-label { padding-top: 4px; }
+
+/* Override nav-link for section layout */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition: background 0.12s, color 0.12s;
+  margin: 1px 0;
+}
+.nav-link .nav-text { flex: 1; }
+.nav-link .nav-zh { font-size: 11px; color: var(--text-faint); font-weight: 400; }
+.nav-link.active .nav-zh { color: var(--accent); opacity: 0.8; }
+
+/* --- Topbar: Environment / Account / Health --- */
+.topbar-right { gap: 10px; }
+
+.env-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-family: var(--mono);
+}
+.env-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.env-paper { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0, 229, 160, 0.3); }
+.env-shadow { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(255, 176, 32, 0.3); }
+.env-live { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255, 92, 108, 0.3); }
+
+.account-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.account-selector:hover { border-color: var(--text-faint); }
+.acct-label { color: var(--text-faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
+.acct-name { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.acct-caret { color: var(--text-faint); font-size: 10px; }
+
+.sys-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-family: var(--mono);
+}
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+.health-dot.degraded { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.health-dot.down { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.health-dot.unknown { background: var(--text-faint); box-shadow: none; }
+.health-text { color: var(--accent); }
+.health-text.degraded { color: var(--amber); }
+.health-text.down { color: var(--red); }
+.health-text.unknown { color: var(--text-faint); }
+
+/* --- Coming Soon placeholder --- */
+.coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+}
+.coming-soon-icon {
+  font-size: 48px;
+  color: var(--text-faint);
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+.coming-soon-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.coming-soon-sub {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.coming-soon-tag {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(0, 229, 160, 0.3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-family: var(--mono);
+}
+.coming-soon-zh {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+
+/* --- Responsive: collapsed sidebar --- */
+@media (max-width: 980px) {
+  .nav-section-label { display: none; }
+  .nav-link .nav-text, .nav-link .nav-zh { display: none; }
+  .account-selector .acct-label, .account-selector .acct-name { display: none; }
+  .sys-health .health-text { display: none; }
+  .env-badge { font-size: 9px; padding: 3px 6px; }
+}
+
