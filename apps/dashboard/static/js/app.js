@@ -8,8 +8,147 @@
   const state = {
     history: { equity: [], pnl: [], exposure: [] },
     refreshMs: 5000,
+    backend: {
+      // "unknown" | "probe" | "connected" | "degraded" | "disconnected"
+      status: "unknown",
+      lastCheckAt: null,
+      lastData: null,
+      lastError: null,
+      consecutiveFails: 0,
+      polling: false,
+      intervalMs: 5000,
+      timer: null,
+    },
   };
   let refreshTimer = null;
+
+  /* ==================================================================
+   * Integration 001 - Backend connectivity via GET /api/health
+   *
+   * Responsibilities:
+   *   - Periodically call api.health().
+   *   - Translate result into topbar Backend badge + sidebar conn-dot.
+   *   - Provide getBackendStatus() / onBackendStatusChange() primitives
+   *     for downstream pages (in later Integration commits).
+   * ================================================================== */
+
+  function _setBackendBadge(status, text, extraClass) {
+    var dot = document.getElementById("backend-dot");
+    var label = document.getElementById("backend-text");
+    if (!dot || !label) return;
+    var dotClass = "health-dot " + (extraClass || "");
+    var textClass = "health-text " + (extraClass || "");
+    dot.className = dotClass;
+    label.className = textClass;
+    label.textContent = text || "Backend / 后端";
+    label.title =
+      "Status: " + (status || "unknown") +
+      (state.backend.lastCheckAt ? "\nLast check: " + state.backend.lastCheckAt : "") +
+      (state.backend.lastError ? "\nLast error: " + state.backend.lastError : "");
+  }
+
+  function renderBackendStatus() {
+    var s = state.backend.status;
+    if (s === "connected") {
+      _setBackendBadge("connected", "Backend Connected / 已连接", "");
+    } else if (s === "degraded") {
+      _setBackendBadge("degraded", "Backend Degraded / 降级", "degraded");
+    } else if (s === "disconnected") {
+      _setBackendBadge("disconnected", "Backend Disconnected / 未连接", "down");
+    } else if (s === "probe") {
+      _setBackendBadge("probe", "Backend Probing / 探测中", "unknown");
+    } else {
+      _setBackendBadge("unknown", "Backend Unknown / 未知", "unknown");
+    }
+  }
+
+  function _overallStatusFromHealth(health) {
+    // Backend root /health (and /api/health mirror) returns:
+    //   { status, version, timestamp, services: {name: {status, ...}}, bootstrap }
+    // Prefer explicit snapshot["status"] when present.
+    if (health && typeof health.status === "string") {
+      var top = String(health.status).toLowerCase();
+      if (top === "healthy" || top === "ok" || top === "up") return "connected";
+      if (top === "degraded" || top === "warning") return "degraded";
+      if (top === "down" || top === "unhealthy" || top === "error") return "disconnected";
+    }
+    // Fallback: aggregate services if no top-level status we recognize.
+    if (health && health.services && typeof health.services === "object") {
+      var names = Object.keys(health.services);
+      if (!names.length) return "degraded";
+      var down = 0, degraded = 0;
+      names.forEach(function (n) {
+        var svc = health.services[n] || {};
+        var st = String(svc.status || svc.state || "").toLowerCase();
+        if (!st) return;
+        if (st === "down" || st === "unhealthy" || st === "error" || st === "offline") down++;
+        else if (st === "degraded" || st === "warning" || st === "warn") degraded++;
+      });
+      if (down > 0) return "disconnected";
+      if (degraded > 0) return "degraded";
+      return "connected";
+    }
+    return "connected"; // 200 OK -> consider connected at minimum
+  }
+
+  async function probeBackendOnce() {
+    state.backend.status = "probe";
+    renderBackendStatus();
+    try {
+      var data = await api.health();
+      state.backend.lastData = data || null;
+      state.backend.lastError = null;
+      state.backend.consecutiveFails = 0;
+      state.backend.status = _overallStatusFromHealth(data);
+    } catch (err) {
+      state.backend.consecutiveFails = (state.backend.consecutiveFails || 0) + 1;
+      state.backend.lastData = null;
+      state.backend.lastError = (err && err.message) ? err.message : String(err || "");
+      // First failure -> probe still transient; 2+ consecutive -> disconnected.
+      // Also treat network/timeout kinds as "disconnected" regardless.
+      var kind = err && err.kind;
+      if (kind === "network" || kind === "timeout" || state.backend.consecutiveFails >= 2) {
+        state.backend.status = "disconnected";
+      } else {
+        state.backend.status = "degraded";
+      }
+    } finally {
+      state.backend.lastCheckAt = new Date().toLocaleString();
+      renderBackendStatus();
+      updateConnDot();
+    }
+  }
+
+  function startBackendHealthPolling() {
+    if (state.backend.polling) return;
+    state.backend.polling = true;
+    probeBackendOnce();
+    state.backend.timer = setInterval(
+      probeBackendOnce,
+      state.backend.intervalMs
+    );
+  }
+
+  function getBackendStatus() {
+    return {
+      status: state.backend.status,
+      lastCheckAt: state.backend.lastCheckAt,
+      lastData: state.backend.lastData,
+      lastError: state.backend.lastError,
+      consecutiveFails: state.backend.consecutiveFails,
+      config: api && api.config ? api.config : null,
+    };
+  }
+
+  // Expose for console QA: window.__ICY.backend.status()
+  if (typeof window !== "undefined") {
+    window.__ICY = window.__ICY || {};
+    window.__ICY.backend = {
+      status: getBackendStatus,
+      probe: probeBackendOnce,
+      configure: function (patch) { if (api.configure) api.configure(patch); return api.config; },
+    };
+  }
 
   /* ==================================================================
    * Formatting helpers
@@ -2276,7 +2415,9 @@
     "#/operations/execution": { group: "operations", navKey: "operations/execution", label: "Execution", zh: "执行", desc: "Execution management" },
     "#/operations/reconciliation": { group: "operations", navKey: "operations/reconciliation", label: "Reconciliation", zh: "对账", desc: "Reconciliation management" },
     "#/system": { group: "system", navKey: "system", label: "System", zh: "系统", desc: "System health" },
+    "#/system/data": { group: "system", navKey: "system/data", label: "Data", zh: "数据", desc: "Market data center" },
     "#/settings": { group: "system", navKey: "settings", label: "Settings", zh: "设置", desc: "System settings" },
+    "#/alerts": { group: "system", navKey: "alerts", label: "Alerts", zh: "告警", desc: "Unified alert center" },
   };
 
   // Group labels for breadcrumb
@@ -2303,126 +2444,309 @@
 
   var PAGE_FRAMEWORK = {};
 
-  // ── Dashboard (Commit 005 — full business page) ────────────────
-  PAGE_FRAMEWORK["dashboard"] = function () {
-    // ── Mock data ────────────────────────────────────────────────
-    // Equity curve: ~22 points from Aug 20 → Aug 24, $1.00M → $1.073M
-    var eqPoints = [
-      1000000, 1001200, 1000800, 1002100, 1003400, 1002900, 1004500,
-      1005200, 1004100, 1006300, 1007800, 1006900, 1008400, 1010200,
-      1009600, 1012100, 1014300, 1015800, 1014700, 1017200, 1018900,
-      1020500, 1022100, 1023800, 1025400, 1024900, 1026700, 1028100,
-      1029600, 1031200, 1032800, 1034400, 1035900, 1037100, 1038800,
-      1040200, 1041900, 1043400, 1044800, 1046100, 1047700, 1049100,
-      1050800, 1052200, 1053900, 1055400, 1056900, 1058500, 1060100,
-      1061800, 1063300, 1064900, 1066400, 1068000, 1069500, 1071000,
-      1073181,
-    ];
-    var eqData = eqPoints.map(function (v, i) {
-      return { value: v, label: i };
-    });
-    var xLabels = ["Aug 20", "Aug 21", "Aug 22", "Aug 23", "Aug 24"];
+  /* ==================================================================
+   * Integration 002 — Dashboard API Hook
+   *
+   * useDashboard() is the single entry point the Dashboard page uses to
+   * fetch real data from ``GET /api/dashboard``.  It wraps the unified
+   * API Client and returns a normalised payload or throws an ApiError
+   * (caught by the render() outer try/catch → stateError + Retry).
+   * ================================================================== */
 
-    // Positions mock
-    var positions = [
-      { symbol: "NVDA", qty: 600, avgPrice: 182.31, mktPrice: 190.82, mktValue: 114492, pnl: 5106, weight: 0.107, side: "Long" },
-      { symbol: "QQQ", qty: 200, avgPrice: 571.20, mktPrice: 577.22, mktValue: 115444, pnl: 1204, weight: 0.108, side: "Long" },
-      { symbol: "AAPL", qty: -100, avgPrice: 224.50, mktPrice: 216.28, mktValue: 21628, pnl: -822, weight: -0.020, side: "Short" },
-    ];
+  async function useDashboard() {
+    var data = await api.get("/dashboard");
+    // Normalise: guarantee all 7 sections + meta exist
+    return {
+      account: data.account || { equity: 0, cash: 0, daily_pnl: 0, daily_return: 0 },
+      positions: data.positions || { count: 0, market_value: 0, unrealized_pnl: 0, items: [] },
+      orders: data.orders || { pending: 0, filled_today: 0, rejected_today: 0 },
+      risk: data.risk || { status: "UNKNOWN", drawdown: 0, exposure: 0 },
+      execution: data.execution || { fill_rate: 0, reject_rate: 0, slippage: 0 },
+      strategies: data.strategies || { active: 0, signals_today: 0, items: [] },
+      alerts: data.alerts || { critical: 0, warning: 0, items: [] },
+      meta: data.meta || { pipeline_attached: false, timestamp: null, environment: "PAPER", account_name: "—" },
+    };
+  }
+
+  /* ==================================================================
+   * Integration 004 — Portfolio API Hook
+   *
+   * usePortfolio() is the single entry point the Portfolio page uses to
+   * fetch the global aggregated portfolio from
+   * ``GET /api/dashboard/portfolio``. One endpoint, no duplicate
+   * requests — returns the full summary + market/currency exposure +
+   * accounts + positions, normalised. Throws ApiError on failure
+   * (caught by render() outer try/catch → stateError + Retry).
+   * ================================================================== */
+  async function usePortfolio() {
+    var data = await api.get("/dashboard/portfolio");
+    return {
+      summary: data.summary || {
+        total_equity_usd: 0, total_cash_usd: 0, gross_exposure_usd: 0,
+        net_exposure_usd: 0, daily_pnl_usd: 0, total_pnl_usd: 0, drawdown_usd: 0,
+      },
+      market_exposure: data.market_exposure || {},
+      currency_exposure: data.currency_exposure || {},
+      accounts: data.accounts || [],
+      positions: data.positions || [],
+    };
+  }
+
+  /* ==================================================================
+   * Integration 005 — Orders API Hooks
+   *
+   * useOrders() / useOrderDetail() / useOrderCancel() are the single
+   * entry points the Orders page uses to talk to icyquant-api.
+   *
+   * Flow:  List → Detail → Cancel → Refresh
+   *   - useOrders()           GET   /api/dashboard/orders
+   *   - useOrderDetail(id)     GET   /api/dashboard/orders/{order_id}
+   *   - useOrderCancel(id)     POST  /api/dashboard/orders/{order_id}/cancel
+   *
+   * All throw ApiError on failure. List-level errors propagate to
+   * render() outer try/catch → stateError + Retry. Detail / Cancel
+   * errors are handled by the page-level handlers so a failed detail
+   * fetch or cancel does not blank the whole page.
+   * ================================================================== */
+  async function useOrders() {
+    var data = await api.get("/dashboard/orders");
+    return Array.isArray(data && data.orders) ? data.orders : [];
+  }
+
+  async function useOrderDetail(orderId) {
+    return await api.get("/dashboard/orders/" + encodeURIComponent(orderId));
+  }
+
+  async function useOrderCancel(orderId) {
+    var data = await api.post(
+      "/dashboard/orders/" + encodeURIComponent(orderId) + "/cancel"
+    );
+    return data && data.order ? data.order : null;
+  }
+
+  /* ==================================================================
+   * Integration 006 — Positions API Hooks
+   *
+   * usePositions() / usePositionDetail(symbol) are the single entry
+   * points the Positions page uses to talk to icyquant-api. The Position
+   * Ledger is the single source of truth for quantity / side / avg price;
+   * the UI never fabricates or reconciles numbers itself.
+   *
+   * Flow:  List (summary + positions) → Detail (position + ledger fills)
+   *   - usePositions()              GET  /api/dashboard/positions
+   *   - usePositionDetail(symbol)   GET  /api/dashboard/positions/{symbol}
+   *
+   * List-level errors propagate to render() outer try/catch → stateError +
+   * Retry. Detail errors are handled by the page-level handler so a failed
+   * detail fetch does not blank the whole page.
+   * ================================================================== */
+  async function usePositions() {
+    var data = await api.get("/dashboard/positions");
+    return {
+      summary: (data && data.summary) || {},
+      positions: Array.isArray(data && data.positions) ? data.positions : [],
+    };
+  }
+
+  async function usePositionDetail(symbol) {
+    return await api.get("/dashboard/positions/" + encodeURIComponent(symbol));
+  }
+
+  /* ==================================================================
+   * Integration 003 — Trading API Hooks
+   *
+   * useQuote / useOrderPreview / useOrderSubmit are the single entry
+   * points the Trading page uses to talk to icyquant-api.
+   *
+   * Flow:  Quote → Order Ticket → Preview → Submit → Result
+   *   - useQuote(symbol)            GET  /api/dashboard/quote/{symbol}
+   *   - useOrderPreview(ticket)     POST /api/dashboard/orders/preview
+   *   - useOrderSubmit(ticket)      POST /api/dashboard/orders
+   *
+   * All throw ApiError on failure (caught by the render() outer
+   * try/catch → stateError + Retry, or by the ticket-level handlers).
+   * ================================================================== */
+
+  async function useQuote(symbol) {
+    var data = await api.get("/dashboard/quote/" + encodeURIComponent(symbol));
+    return {
+      symbol: data.symbol || symbol,
+      last_price: data.last_price || 0,
+      bid: data.bid || 0,
+      ask: data.ask || 0,
+      spread: data.spread || 0,
+      change: data.change || 0,
+      change_pct: data.change_pct || 0,
+      timestamp: data.timestamp || null,
+      source: data.source || "none",
+      session_running: !!data.session_running,
+    };
+  }
+
+  async function useOrderPreview(ticket) {
+    var data = await api.post("/dashboard/orders/preview", ticket);
+    return {
+      symbol: data.symbol || ticket.symbol,
+      side: data.side || ticket.side,
+      quantity: data.quantity || ticket.quantity,
+      order_type: data.order_type || ticket.order_type,
+      price: data.price || 0,
+      last_price: data.last_price || 0,
+      estimated_value: data.estimated_value || 0,
+      risk_check: data.risk_check || { status: "UNKNOWN", warnings: [], session_running: false, pipeline_attached: false },
+      preview_only: data.preview_only !== false,
+      timestamp: data.timestamp || null,
+    };
+  }
+
+  async function useOrderSubmit(ticket) {
+    var data = await api.post("/dashboard/orders", ticket);
+    return {
+      order: data.order || null,
+      result: data.result || {},
+      risk_decision: data.risk_decision || null,
+      status: data.status || "UNKNOWN",
+      rejection_reason: data.rejection_reason || null,
+      timestamp: data.timestamp || null,
+    };
+  }
+
+  // ── Dashboard (Integration 002 — real API data) ──────────────
+  PAGE_FRAMEWORK["dashboard"] = async function () {
+    var d = await useDashboard();
+
+    // ── Helpers ────────────────────────────────────────────────
+    function fmtMoney(v) { return UI.money(v, 2); }
+    function fmtSigned(v) { return UI.signedMoney(v); }
+    function fmtPct(v) { return (v >= 0 ? "+" : "") + v.toFixed(2) + "%"; }
+    function fmtPctRaw(v) { return (v * 100).toFixed(2) + "%"; }
+
+    // ── Empty state (no pipeline attached) ─────────────────────
+    var noPipeline = !d.meta.pipeline_attached;
 
     // 1) Account context bar
+    var ts = d.meta.timestamp ? new Date(d.meta.timestamp).toLocaleString() : "—";
     var acctBar =
       '<div class="dash-acct-bar">' +
       '<div class="dash-acct-main">' +
       '<span class="dash-acct-label">Account</span>' +
-      '<span class="dash-acct-name">Paper-Alpha021</span>' +
-      UI.statusPill("Paper Trading", "info") +
+      '<span class="dash-acct-name">' + esc(d.meta.account_name || "Paper-Alpha021") + '</span>' +
+      UI.statusPill(esc(d.meta.environment || "PAPER"), "info") +
       '</div>' +
       '<div class="dash-acct-meta">' +
-      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Last Update</span><span class="ds-text-mono">2026-08-24 16:05</span></span>' +
-      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Session</span><span class="ds-text-mono">PAPER · Alpha021</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Last Update</span><span class="ds-text-mono">' + ts + '</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Session</span><span class="ds-text-mono">' + esc(d.meta.environment || "PAPER") + (d.meta.pipeline_attached ? " · LIVE" : " · IDLE") + '</span></span>' +
       '</div>' +
       '</div>';
 
-    // 2) Portfolio summary KPIs (8 metrics)
-    var kpis = UI.metricCard("Equity", "$1,073,181", "+7.32%", "pos") +
-      UI.metricCard("Realized P&L", "+$67,610", "MTD", "pos") +
-      UI.metricCard("Unrealized P&L", "+$5,488", "Open", "pos") +
-      UI.metricCard("Today's P&L", "-$638", "-0.06%", "neg") +
-      UI.metricCard("Max Drawdown", "-5.50%", "Peak → Trough", "neg") +
-      UI.metricCard("Win Rate", "68.0%", "220 signals", "pos") +
-      UI.metricCard("Exposure", "$266K", "26.6%", "info") +
-      UI.metricCard("Open Positions", "3", "2 Long · 1 Short", "");
+    // 2) Portfolio summary KPIs (8 metrics from real data)
+    var pnlVar = d.account.daily_pnl >= 0 ? "pos" : "neg";
+    var retVar = d.account.daily_return >= 0 ? "pos" : "neg";
+    var kpis =
+      UI.metricCard("Equity", fmtMoney(d.account.equity), fmtPct(d.account.daily_return), retVar) +
+      UI.metricCard("Daily P&L", fmtSigned(d.account.daily_pnl), fmtPct(d.account.daily_return), pnlVar) +
+      UI.metricCard("Unrealized P&L", fmtSigned(d.positions.unrealized_pnl), d.positions.count + " positions", d.positions.unrealized_pnl >= 0 ? "pos" : "neg") +
+      UI.metricCard("Cash", fmtMoney(d.account.cash), "Available", "") +
+      UI.metricCard("Exposure", fmtMoney(d.risk.exposure), fmtPctRaw(d.risk.exposure / (d.account.equity || 1)), "info") +
+      UI.metricCard("Fill Rate", fmtPctRaw(d.execution.fill_rate), d.orders.filled_today + " filled", d.execution.fill_rate >= 0.5 ? "pos" : "warning") +
+      UI.metricCard("Open Positions", String(d.positions.count), d.orders.pending + " pending", "") +
+      UI.metricCard("Alerts", String(d.alerts.critical + d.alerts.warning), d.alerts.critical + " crit · " + d.alerts.warning + " warn", d.alerts.critical > 0 ? "neg" : "");
 
-    // 3) Equity Curve + 4) P&L summary
+    // 3) Equity Curve (single-point when no history; flat line at equity)
+    var eqData = [{ value: d.account.equity, label: 0 }];
     var equityCurve = UI.equityCurve(eqData, {
       height: 240,
-      yTicks: [1000000, 1025000, 1050000, 1075000],
+      yTicks: [d.account.equity * 0.98, d.account.equity, d.account.equity * 1.02],
       yFormat: function (v) { return "$" + (v / 1000000).toFixed(2) + "M"; },
-      xLabels: xLabels,
+      xLabels: ["Now"],
       color: "var(--ds-profit)",
     });
 
+    // 4) P&L Summary
     var pnlSummary = UI.statRows([
-      { label: "Today", value: "-$638", variant: "neg" },
-      { label: "This Week", value: "+$1,824", variant: "pos" },
-      { label: "Month to Date", value: "+$7,610", variant: "pos" },
-      { label: "Since Start", value: "+$73,181", variant: "pos" },
+      { label: "Today", value: fmtSigned(d.account.daily_pnl), variant: d.account.daily_pnl >= 0 ? "pos" : "neg" },
+      { label: "Exposure", value: fmtMoney(d.risk.exposure), variant: "info" },
+      { label: "Positions", value: String(d.positions.count), variant: "" },
+      { label: "Cash", value: fmtMoney(d.account.cash), variant: "" },
     ]);
-    var pnlSpark = UI.sparkline(pnlSparkData, { color: "var(--ds-loss)", width: 240, height: 56 });
+    var pnlSpark = UI.sparkline([d.account.daily_pnl, 0, d.account.daily_pnl, 0], { color: "var(--ds-profit)", width: 240, height: 56 });
 
     var pnlBlock =
-      UI.panel("P&L Summary", UI.periodTabs(["1D", "1W", "1M", "3M", "YTD", "ALL"], 0, "dash-pnl-tabs") + pnlSpark + pnlSummary, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">mock</span>' });
+      UI.panel("P&L Summary", UI.periodTabs(["1D", "1W", "1M", "3M", "YTD", "ALL"], 0, "dash-pnl-tabs") + pnlSpark + pnlSummary,
+        { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">live</span>' });
 
     var chartsRow =
       '<div class="dash-grid-2">' +
-      '<div class="dash-grid-main">' + UI.panel("Portfolio Equity", equityCurve, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Aug 20 – Aug 24</span>' }) + '</div>' +
+      '<div class="dash-grid-main">' + UI.panel("Portfolio Equity", equityCurve,
+        { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">current</span>' }) + '</div>' +
       '<div class="dash-grid-side">' + pnlBlock + '</div>' +
       '</div>';
 
-    // 5) Positions + Exposure
+    // 5) Positions + Exposure (real items)
+    var posItems = (d.positions.items || []).map(function (p) {
+      return {
+        symbol: p.symbol || "—",
+        side: (p.side || (p.quantity >= 0 ? "Long" : "Short")),
+        qty: p.quantity,
+        avgPrice: p.avg_price,
+        mktPrice: p.last_price,
+        mktValue: p.market_value,
+        pnl: p.unrealized_pnl,
+        weight: (p.market_value / (d.account.equity || 1)),
+      };
+    });
+
+    var longVal = 0, shortVal = 0;
+    posItems.forEach(function (p) {
+      if (p.qty >= 0) longVal += p.mktValue; else shortVal += Math.abs(p.mktValue);
+    });
+
     var exposureBar =
       '<div class="dash-exposure">' +
       '<div class="dash-exposure-head">' +
       '<span class="dash-exposure-label">Total Exposure</span>' +
-      '<span class="ds-text-mono">$266,564 · 26.6%</span>' +
+      '<span class="ds-text-mono">' + fmtMoney(d.risk.exposure) + ' · ' + fmtPctRaw(d.risk.exposure / (d.account.equity || 1)) + '</span>' +
       '</div>' +
-      '<div class="progress-bar"><div class="progress-fill info" style="width:26.6%"></div></div>' +
+      '<div class="progress-bar"><div class="progress-fill info" style="width:' + Math.min(100, (d.risk.exposure / (d.account.equity || 1)) * 100) + '%"></div></div>' +
       '<div class="dash-exposure-legend">' +
-      '<span><span class="ds-dot ds-dot-pos"></span>Long $229,936</span>' +
-      '<span><span class="ds-dot ds-dot-neg"></span>Short $21,628</span>' +
-      '<span><span class="ds-dot ds-dot-info"></span>Cash $806,617</span>' +
+      '<span><span class="ds-dot ds-dot-pos"></span>Long ' + fmtMoney(longVal) + '</span>' +
+      '<span><span class="ds-dot ds-dot-neg"></span>Short ' + fmtMoney(shortVal) + '</span>' +
+      '<span><span class="ds-dot ds-dot-info"></span>Cash ' + fmtMoney(d.account.cash) + '</span>' +
       '</div>' +
       '</div>';
 
-    var posTable = UI.table({
+    var posTable = posItems.length ? UI.table({
       columns: [
         { key: "symbol", label: "Symbol" },
         { key: "side", label: "Side" },
         { key: "qty", label: "Qty", numeric: true },
-        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "mktPrice", label: "Mkt Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
+        { key: "mktPrice", label: "Mkt Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
         { key: "mktValue", label: "Mkt Value", numeric: true, format: function (v) { return UI.money(v, 0); } },
         { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
         { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
       ],
-      rows: positions,
-    });
+      rows: posItems,
+    }) : UI.empty("No Open Positions", "No positions in the current pipeline snapshot.");
 
     var positionsBlock =
-      UI.panel("Open Positions", exposureBar + posTable, { actions: UI.button("View All", "ghost", { sm: true, action: "nav:trading/positions" }) });
+      UI.panel("Open Positions", exposureBar + posTable,
+        { actions: UI.button("View All", "ghost", { sm: true, action: "nav:trading/positions" }) });
 
-    // 6) Recent Activity timeline
-    var activity = UI.timeline([
-      { time: "10:24", type: "EXECUTION", title: "NVDA · BUY 100 @ $182.31", desc: "Order #1024 filled · Paper-Alpha021", variant: "profit" },
-      { time: "10:23", type: "ORDER", title: "NVDA · BUY 100 submitted", desc: "Limit $182.50 · Alpha021 signal", variant: "info" },
-      { time: "09:58", type: "RISK", title: "Limit check PASS", desc: "Daily loss -$720 / $4,000 · Exposure 26.6%", variant: "profit" },
-      { time: "09:45", type: "POSITION", title: "QQQ · Position update", desc: "Qty 200 · Mkt value $115,444", variant: "info" },
-      { time: "09:30", type: "SIGNAL", title: "Alpha021 · Signal generated", desc: "NVDA long 600 / QQQ long 200 / AAPL short 100", variant: "purple" },
-      { time: "08:15", type: "SYSTEM", title: "Paper session started", desc: "Alpha021 · Snapshot #2 · Validation observing", variant: "neutral" },
-    ]);
+    // 6) Recent Activity (derived from alerts.items)
+    var alertItems = (d.alerts.items || []).slice(0, 6);
+    var activity = alertItems.length ? UI.timeline(alertItems.map(function (a) {
+      return {
+        time: a.timestamp ? new Date(a.timestamp).toLocaleTimeString().slice(0, 5) : "—",
+        type: (a.source || "SYSTEM").toUpperCase(),
+        title: esc(a.message || "—"),
+        desc: "Level: " + esc(a.level || "INFO"),
+        variant: a.level === "CRITICAL" ? "danger" : a.level === "WARNING" ? "warning" : "info",
+      };
+    })) : UI.empty("No Recent Activity", "No alerts in the current session.");
 
-    var activityBlock = UI.panel("Recent Activity", activity, { actions: UI.button("View All", "ghost", { sm: true, action: "nav:system" }) });
+    var activityBlock = UI.panel("Recent Activity", activity,
+      { actions: UI.button("View All", "ghost", { sm: true, action: "nav:system" }) });
 
     var positionsActivityRow =
       '<div class="dash-grid-2 dash-grid-2-1-1">' +
@@ -2430,52 +2754,46 @@
       '<div class="dash-grid-side">' + activityBlock + '</div>' +
       '</div>';
 
-    // 7) Alpha021 Strategy Status + Validation
+    // 7) Strategy Status (real strategies.items)
+    var stratItems = (d.strategies.items || []);
     var stratStatus = UI.statRows([
-      { label: "Strategy", value: "Alpha021", variant: "default" },
-      { label: "Mode", value: "PAPER", variant: "info" },
-      { label: "Snapshot", value: "#2", variant: "default" },
-      { label: "Signals", value: "220", variant: "default" },
-      { label: "Fill Rate", value: "86.04%", variant: "pos" },
-      { label: "Reject Rate", value: "11.26%", variant: "warning" },
-      { label: "Win Rate", value: "68.0%", variant: "pos" },
-      { label: "Current Exposure", value: "$266K", variant: "info" },
-    ]);
-    var validation = UI.statRows([
-      { label: "Snapshot", value: "#2 vs #1", variant: "default" },
-      { label: "Signal Drift", value: "NORMAL", variant: "pos" },
-      { label: "Execution Drift", value: "NORMAL", variant: "pos" },
-      { label: "Attribution", value: "OBSERVING", variant: "warning" },
+      { label: "Active Strategies", value: String(d.strategies.active), variant: "pos" },
+      { label: "Signals Today", value: String(d.strategies.signals_today), variant: "" },
+      { label: "Fill Rate", value: fmtPctRaw(d.execution.fill_rate), variant: d.execution.fill_rate >= 0.5 ? "pos" : "warning" },
+      { label: "Reject Rate", value: fmtPctRaw(d.execution.reject_rate), variant: d.execution.reject_rate > 0.2 ? "neg" : "" },
+      { label: "Slippage", value: d.execution.slippage.toFixed(4), variant: "" },
+      { label: "Exposure", value: fmtMoney(d.risk.exposure), variant: "info" },
+      { label: "Positions", value: String(d.positions.count), variant: "" },
+      { label: "Risk Status", value: esc(d.risk.status), variant: d.risk.status === "HEALTHY" ? "pos" : d.risk.status === "NO_PIPELINE" ? "warning" : "neg" },
     ]);
     var stratBlock =
       '<div class="dash-grid-2">' +
-      '<div class="dash-grid-main">' + UI.panel("Alpha021 · Strategy Status", stratStatus) + '</div>' +
-      '<div class="dash-grid-side">' + UI.panel("Validation", validation) + '</div>' +
+      '<div class="dash-grid-main">' + UI.panel("Strategy & Execution", stratStatus) + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Alerts",
+        '<div class="dash-svc-grid">' +
+        (alertItems.length ? alertItems.map(function (a) {
+          return '<div class="dash-svc">' + UI.statusPill(a.level, a.level === "CRITICAL" ? "danger" : a.level === "WARNING" ? "warning" : "info") + '<span class="dash-svc-name">' + esc(a.source) + '</span></div>';
+        }).join("") : '<span class="ds-text-muted">No active alerts</span>') +
+        '</div>') + '</div>' +
       '</div>';
 
-    // 8) System Health
+    // 8) System Health (from risk + pipeline state)
+    var riskColor = d.risk.status === "HEALTHY" ? "profit" : d.risk.status === "NO_PIPELINE" ? "warning" : "danger";
     var services = [
-      ["API Gateway", "Healthy", "profit"],
-      ["Strategy Runtime", "Healthy", "profit"],
-      ["Risk Engine", "Healthy", "profit"],
-      ["Order Engine", "Healthy", "profit"],
-      ["Execution", "Healthy", "profit"],
-      ["Position Ledger", "Healthy", "profit"],
-      ["Reconciliation", "Healthy", "profit"],
-      ["Event Bus", "Healthy", "profit"],
-      ["Database", "Warning", "warning"],
-      ["Cache (Redis)", "Healthy", "profit"],
+      ["Pipeline", d.meta.pipeline_attached ? "Attached" : "Detached", d.meta.pipeline_attached ? "profit" : "warning"],
+      ["Risk Engine", esc(d.risk.status), riskColor],
+      ["Reconciliation", esc(d.risk.status), riskColor],
     ];
     var servicesHtml = services.map(function (s) {
       return '<div class="dash-svc">' + UI.statusPill(s[1], s[2]) + '<span class="dash-svc-name">' + s[0] + '</span></div>';
     }).join("");
     var dataStatus = [
-      ["Market Data", "Updated", "profit", "16:05:00"],
-      ["Factor Data", "Updated", "profit", "16:04:58"],
-      ["Snapshot", "2026-08-24", "info", "#2"],
+      ["Environment", esc(d.meta.environment || "PAPER"), "info", "—"],
+      ["Last Update", ts, "profit", ""],
+      ["Backend", state.backend.status === "connected" ? "Connected" : state.backend.status === "degraded" ? "Degraded" : "Disconnected", state.backend.status === "connected" ? "profit" : state.backend.status === "degraded" ? "warning" : "danger", ""],
     ];
-    var dataHtml = dataStatus.map(function (d) {
-      return '<div class="dash-svc"><span class="ds-text-muted">' + d[3] + '</span>' + UI.statusPill(d[1], d[2]) + '<span class="dash-svc-name">' + d[0] + '</span></div>';
+    var dataHtml = dataStatus.map(function (dd) {
+      return '<div class="dash-svc"><span class="ds-text-muted">' + dd[3] + '</span>' + UI.statusPill(dd[1], dd[2]) + '<span class="dash-svc-name">' + dd[0] + '</span></div>';
     }).join("");
     var healthBlock =
       '<div class="dash-grid-2">' +
@@ -2490,7 +2808,7 @@
       UI.kpiGrid(kpis, 4) +
       chartsRow +
       positionsActivityRow +
-      UI.sectionHeading("Alpha021") +
+      UI.sectionHeading("Strategy & Execution") +
       stratBlock +
       UI.sectionHeading("System Health") +
       healthBlock
@@ -2511,112 +2829,198 @@
   }
   var pnlSparkData = _dashPnlSpark();
 
-  // ── Portfolio (Commit 007) ────────────────────────────────────
-  PAGE_FRAMEWORK["portfolio"] = function () {
-    // ── Mock data ──────────────────────────────────────────────
-    // Equity curve: 40 points growing from $1.00M to $1.073M
-    var eqPts = [];
-    for (var i = 0; i < 40; i++) {
-      var base = 1000000 + i * 1830;
-      var wave = Math.sin(i * 0.35) * 4200;
-      eqPts.push(Math.round(base + wave));
-    }
-    eqPts[eqPts.length - 1] = 1073181;
-    var eqData = eqPts.map(function (v, i) { return { value: v, label: i }; });
-    var xLabels = ["Aug 03", "Aug 10", "Aug 17", "Aug 24"];
+  // ── Portfolio (Integration 004 — real API data) ──────────────
+  // Single aggregated endpoint GET /api/dashboard/portfolio returns the
+  // full global portfolio: summary (equity/cash/exposure/pnl/drawdown) +
+  // market_exposure (allocation) + currency_exposure + accounts +
+  // positions. UI derives return %, weight, long/short exposure from
+  // this — no second source, no fabricated account truth.
+  PAGE_FRAMEWORK["portfolio"] = async function () {
+    var pf = await usePortfolio();
+    var s = pf.summary;
+    var positions = pf.positions;
+    var accounts = pf.accounts;
+    var marketExposure = pf.market_exposure;
+    var currencyExposure = pf.currency_exposure;
+    var lastUpdated = new Date().toLocaleTimeString("en-US", { hour12: false });
 
-    // Allocation segments
-    var allocSegments = [
-      { label: "NVDA", value: 114492, color: "var(--ds-profit)" },
-      { label: "QQQ", value: 115444, color: "var(--ds-info)" },
-      { label: "SPY", value: 65010, color: "var(--ds-purple)" },
-      { label: "Cash", value: 806617, color: "var(--ds-neutral)" },
-    ];
+    // ── Safe number coercion ─────────────────────────────────────
+    function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+    function fmtSigned(v) { return UI.signedMoney(v); }
+    function fmtPctVal(v) { return (num(v) >= 0 ? "+" : "") + num(v).toFixed(2) + "%"; }
+    function pnlVar(v) { return num(v) >= 0 ? "pos" : "neg"; }
+    function sideLabel(s) { return s === "BUY" ? "LONG" : s === "SELL" ? "SHORT" : "FLAT"; }
 
-    // Positions
-    var positions = [
-      { symbol: "NVDA", qty: 600, avgPrice: 165.20, last: 178.42, mktValue: 107052, pnl: 7932, pnlPct: 0.0800, weight: 0.482 },
-      { symbol: "QQQ", qty: 200, avgPrice: 520.10, last: 540.20, mktValue: 108040, pnl: 4020, pnlPct: 0.0387, weight: 0.314 },
-      { symbol: "SPY", qty: 100, avgPrice: 620.20, last: 650.10, mktValue: 65010, pnl: 2990, pnlPct: 0.0482, weight: 0.098 },
-    ];
+    // ── Derived metrics (UI does not invent account truth) ──────
+    var totalEquity = num(s.total_equity_usd);
+    var cash = num(s.total_cash_usd);
+    var grossExposure = num(s.gross_exposure_usd);
+    var netExposure = num(s.net_exposure_usd);
+    var dailyPnl = num(s.daily_pnl_usd);
+    var totalPnl = num(s.total_pnl_usd);
+    var drawdown = num(s.drawdown_usd);
 
-    // 1) Account context bar
+    var cost = totalEquity - totalPnl;              // implied cost basis
+    var returnPct = cost > 0 ? (totalPnl / cost) * 100 : 0;
+    var cashPct = totalEquity > 0 ? (cash / totalEquity) * 100 : 0;
+    var grossPct = totalEquity > 0 ? (grossExposure / totalEquity) * 100 : 0;
+    var dayRetPct = (totalEquity - dailyPnl) > 0 ? (dailyPnl / (totalEquity - dailyPnl)) * 100 : 0;
+
+    var realizedPnl = 0, unrealizedPnl = 0, longExposure = 0, shortExposure = 0;
+    positions.forEach(function (p) {
+      realizedPnl += num(p.realized_pnl);
+      unrealizedPnl += num(p.unrealized_pnl);
+      if (p.side === "BUY") longExposure += num(p.exposure);
+      else if (p.side === "SELL") shortExposure += num(p.exposure);
+    });
+
+    // Concentration: top position by market value
+    var top = positions.slice()
+      .sort(function (a, b) { return num(b.market_value) - num(a.market_value); })[0];
+    var topSymbol = top ? top.symbol : "—";
+    var topWeight = (top && totalEquity > 0)
+      ? (num(top.market_value) / totalEquity) * 100 : 0;
+
+    // ── Account context bar ──────────────────────────────────────
     var acctBar =
       '<div class="dash-acct-bar">' +
       '<div class="dash-acct-main">' +
-      '<span class="dash-acct-label">Account</span>' +
-      '<span class="dash-acct-name">Main Paper</span>' +
-      UI.statusPill("Paper Trading", "info") +
+      '<span class="dash-acct-label">Portfolio</span>' +
+      '<span class="dash-acct-name">Global · ' + accounts.length + ' accounts</span>' +
+      UI.statusPill("Live", "profit") +
       '</div>' +
       '<div class="dash-acct-meta">' +
-      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Updated</span><span class="ds-text-mono">10:32</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Updated</span><span class="ds-text-mono">' + esc(lastUpdated) + '</span></span>' +
       '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Base Currency</span><span class="ds-text-mono">USD</span></span>' +
+      '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Positions</span><span class="ds-text-mono">' + positions.length + '</span></span>' +
       '</div>' +
       '</div>';
 
-    // 2) KPI cards
-    var kpis = UI.metricCard("Total Equity", "$1,073,181", "+7.32%", "pos") +
-      UI.metricCard("Today P&L", "+$2,481", "+0.23%", "pos") +
-      UI.metricCard("Total Return", "+7.32%", "+$73,181", "pos") +
-      UI.metricCard("Drawdown", "-5.50%", "Peak → Trough", "neg");
+    // ── KPI cards (real summary values) ──────────────────────────
+    var kpis =
+      UI.metricCard("Total Equity", fmtMoney(totalEquity), "USD", "info") +
+      UI.metricCard("Cash", fmtMoney(cash), cashPct.toFixed(1) + "% of equity", "default") +
+      UI.metricCard("Today P&L", fmtSigned(dailyPnl), fmtPctVal(dayRetPct), pnlVar(dailyPnl)) +
+      UI.metricCard("Total Return", fmtPctVal(returnPct), fmtSigned(totalPnl), pnlVar(totalPnl)) +
+      UI.metricCard("Drawdown", fmtMoney(drawdown), "Peak → Trough", "neg") +
+      UI.metricCard("Positions", String(positions.length), accounts.length + " accounts", "default");
 
-    // 3) Equity Curve + 4) Allocation donut
-    var equityCurve = UI.equityCurve(eqData, {
-      height: 260,
-      yTicks: [1000000, 1025000, 1050000, 1075000],
-      yFormat: function (v) { return "$" + (v / 1000000).toFixed(2) + "M"; },
-      xLabels: xLabels,
-      color: "var(--ds-profit)",
+    // ── Equity panel: live value only (no historical series) ────
+    // Per Integration 004 boundary: backend has no equity time-series,
+    // so the UI shows the live value + an explicit "historical pending"
+    // note rather than fabricating a curve.
+    var equityPanel =
+      '<div class="ds-callout" style="padding:var(--ds-space-lg);text-align:center;">' +
+      '<div class="ds-text-muted" style="font-size:var(--ds-text-xs);">LIVE EQUITY (USD)</div>' +
+      '<div class="ds-text-mono" style="font-size:var(--ds-text-3xl);color:var(--ds-profit);margin:var(--ds-space-sm) 0;">' + fmtMoney(totalEquity) + '</div>' +
+      '<div class="ds-text-muted" style="font-size:var(--ds-text-xs);">Historical equity series pending backend support — not fabricated</div>' +
+      '</div>';
+
+    // ── Allocation donut (real market_exposure + cash) ───────────
+    var allocColors = {
+      "A-Share": "var(--ds-profit)", "Futures": "var(--ds-info)",
+      "US Equity": "var(--ds-purple)", "FX": "var(--ds-warning)",
+      "Cash": "var(--ds-neutral)",
+    };
+    var allocSegments = Object.keys(marketExposure).map(function (k) {
+      return { label: k, value: num(marketExposure[k]), color: allocColors[k] || "var(--ds-info)" };
     });
+    if (cash > 0) allocSegments.push({ label: "Cash", value: cash, color: allocColors["Cash"] });
     var donut = UI.donutChart(allocSegments, {
-      size: 180,
-      thickness: 24,
-      centerValue: "$1.07M",
+      size: 180, thickness: 24,
+      centerValue: "$" + (totalEquity / 1000000).toFixed(2) + "M",
       centerLabel: "Total",
     });
 
     var chartsRow =
       '<div class="dash-grid-2">' +
-      '<div class="dash-grid-main">' + UI.panel("Equity Curve", equityCurve, { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Aug 03 – Aug 24</span>' }) + '</div>' +
-      '<div class="dash-grid-side">' + UI.panel("Allocation", donut) + '</div>' +
+      '<div class="dash-grid-main">' + UI.panel("Equity Curve", equityPanel) + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Allocation by Market", donut) + '</div>' +
       '</div>';
 
-    // 5) Positions table
-    var posTable = UI.table({
-      columns: [
-        { key: "symbol", label: "Symbol" },
-        { key: "qty", label: "Qty", numeric: true },
-        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "last", label: "Last Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "mktValue", label: "Market Value", numeric: true, format: function (v) { return UI.money(v, 0); } },
-        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
-        { key: "pnlPct", label: "P&L %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
-        { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
-      ],
-      rows: positions,
-    });
+    // ── P&L breakdown (real) + period note ───────────────────────
+    var pnlRows = UI.statRows([
+      { label: "Realized P&L", value: fmtSigned(realizedPnl), variant: pnlVar(realizedPnl) },
+      { label: "Unrealized P&L", value: fmtSigned(unrealizedPnl), variant: pnlVar(unrealizedPnl) },
+      { label: "Total P&L", value: fmtSigned(totalPnl), variant: pnlVar(totalPnl) },
+      { label: "Daily P&L", value: fmtSigned(dailyPnl), variant: pnlVar(dailyPnl) },
+    ]);
+    var pnlNote = '<div class="ds-callout ds-callout-info" style="margin-top:var(--ds-space-sm);font-size:var(--ds-text-xs);">Periods 1D / 1W / 1M / YTD: <strong>unavailable</strong> — backend exposes only Today / Total. Not fabricated.</div>';
 
-    // 6) Exposure & Risk summary
+    // ── Currency exposure (real) ─────────────────────────────────
+    var currRows = UI.statRows(
+      Object.keys(currencyExposure).map(function (k) {
+        return { label: k, value: fmtMoney(num(currencyExposure[k])), variant: "info" };
+      })
+    );
+
+    var pnlRow =
+      '<div class="dash-grid-2 dash-grid-2-1-1">' +
+      '<div class="dash-grid-main">' + UI.panel("P&L Breakdown", pnlRows + pnlNote) + '</div>' +
+      '<div class="dash-grid-side">' + UI.panel("Currency Exposure", currRows) + '</div>' +
+      '</div>';
+
+    // ── Positions table (real ledger) + Empty state ─────────────
+    var posTable;
+    if (positions.length === 0) {
+      posTable = UI.empty("No Positions", "This portfolio has no open positions. Submit an order to build a position.");
+    } else {
+      var posRows = positions.map(function (p) {
+        var weight = totalEquity > 0 ? (num(p.market_value) / totalEquity) * 100 : 0;
+        return {
+          symbol: p.symbol,
+          account: (p.account_id || "—") + " · " + (p.currency || ""),
+          side: sideLabel(p.side),
+          quantity: num(p.quantity),
+          avgPrice: num(p.average_price),
+          last: num(p.last_price),
+          mktValue: num(p.market_value),
+          unrealized: num(p.unrealized_pnl),
+          realized: num(p.realized_pnl),
+          weight: weight,
+        };
+      });
+      posTable = UI.table({
+        columns: [
+          { key: "symbol", label: "Symbol" },
+          { key: "account", label: "Account · Curr" },
+          { key: "side", label: "Side" },
+          { key: "quantity", label: "Qty", numeric: true },
+          { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+          { key: "last", label: "Last Price", numeric: true, format: function (v) { return v > 0 ? "$" + v.toFixed(2) : "—"; } },
+          { key: "mktValue", label: "Market Value", numeric: true, format: function (v) { return UI.money(v, 0); } },
+          { key: "unrealized", label: "Unreal P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+          { key: "realized", label: "Real P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+          { key: "weight", label: "Weight", numeric: true, format: function (v) { return v.toFixed(1) + "%"; } },
+        ],
+        rows: posRows,
+      });
+    }
+
+    // ── Exposure bar (real gross/net + derived long/short) ──────
     var exposureBar =
       '<div class="dash-exposure">' +
       '<div class="dash-exposure-head">' +
       '<span class="dash-exposure-label">Gross Exposure</span>' +
-      '<span class="ds-text-mono">79.4% · $852,946</span>' +
+      '<span class="ds-text-mono">' + grossPct.toFixed(1) + '% · ' + fmtMoney(grossExposure) + '</span>' +
       '</div>' +
-      '<div class="progress-bar"><div class="progress-fill info" style="width:79.4%"></div></div>' +
+      '<div class="progress-bar"><div class="progress-fill info" style="width:' + Math.min(grossPct, 100) + '%"></div></div>' +
       '<div class="dash-exposure-legend">' +
-      '<span><span class="ds-dot ds-dot-pos"></span>Long $852,946</span>' +
-      '<span><span class="ds-dot ds-dot-info"></span>Cash $220,235</span>' +
+      '<span><span class="ds-dot ds-dot-pos"></span>Long ' + fmtMoney(longExposure) + '</span>' +
+      '<span><span class="ds-dot ds-dot-neg"></span>Short ' + fmtMoney(shortExposure) + '</span>' +
+      '<span><span class="ds-dot ds-dot-info"></span>Cash ' + fmtMoney(cash) + ' (' + cashPct.toFixed(1) + '%)</span>' +
       '</div>' +
       '</div>';
 
+    // ── Risk summary (real) ──────────────────────────────────────
     var riskSummary = UI.statRows([
-      { label: "Gross Exposure", value: "79.4%", variant: "info" },
-      { label: "Net Exposure", value: "79.4%", variant: "info" },
-      { label: "Cash", value: "$220,235 (20.6%)", variant: "default" },
-      { label: "Concentration (Top)", value: "48.2% · NVDA", variant: "warning" },
-      { label: "Max Drawdown", value: "-5.50%", variant: "neg" },
-      { label: "Sharpe (mock)", value: "1.31", variant: "pos" },
+      { label: "Gross Exposure", value: grossPct.toFixed(1) + "% · " + fmtMoney(grossExposure), variant: "info" },
+      { label: "Net Exposure", value: fmtMoney(netExposure), variant: "info" },
+      { label: "Long Exposure", value: fmtMoney(longExposure), variant: "pos" },
+      { label: "Short Exposure", value: fmtMoney(shortExposure), variant: "neg" },
+      { label: "Cash", value: fmtMoney(cash) + " (" + cashPct.toFixed(1) + "%)", variant: "default" },
+      { label: "Concentration (Top)", value: topWeight.toFixed(1) + "% · " + esc(topSymbol), variant: "warning" },
+      { label: "Drawdown", value: fmtMoney(drawdown), variant: "neg" },
     ]);
 
     var riskRow =
@@ -2631,78 +3035,1260 @@
       acctBar +
       UI.kpiGrid(kpis, 4) +
       chartsRow +
+      pnlRow +
       UI.sectionHeading("Positions",
         UI.button("View All", "ghost", { sm: true, action: "nav:trading/positions" })) +
-      UI.panel("Open Positions", posTable) +
+      UI.panel("Open Positions · " + positions.length + " across " + accounts.length + " accounts", posTable) +
       UI.sectionHeading("Exposure & Risk") +
       riskRow
     );
   };
 
-  // ── Research ─────────────────────────────────────────────────────
-  PAGE_FRAMEWORK["research"] = function () {
+  /* ==================================================================
+   * Research module — Commit 010
+   * Mock research state designed for future real-API swap. Maps to the
+   * Factor Discovery v2 pipeline (Alphas → Pairs → Validation → OOS →
+   * Robustness → De-correlation → Paper). Research is the research entry
+   * point: discover → review results → judge candidates → verify.
+   * Display-only — does NOT advance factor status or touch Research Engine.
+   * ================================================================== */
+  var RESEARCH_FUNNEL = [
+    { stage: "Alphas", count: 101, sub: "Alpha candidates generated", variant: "info", rate: "100%", cap: true },
+    { stage: "Pairs", count: 909, sub: "Pairwise correlations tested", variant: "info", rate: "9.0×", cap: true },
+    { stage: "Validation", count: 28, sub: "In-sample passed", variant: "warning", rate: "27.7%" },
+    { stage: "OOS", count: 26, sub: "Out-of-sample passed", variant: "warning", rate: "92.9%" },
+    { stage: "Robustness", count: 22, sub: "Survivors → Candidates", variant: "profit", rate: "84.6%" },
+    { stage: "De-correlation", count: 15, sub: "Independent families", variant: "profit", rate: "68.2%" },
+    { stage: "Paper", count: 1, sub: "Promoted to paper", variant: "purple", rate: "6.7%" },
+  ];
+
+  var EXPERIMENTS_DATA = [
+    { name: "factor-v1", dataset: "Synthetic", tf: "1H", factors: 101, candidates: 22, flow: "22 → 15", status: "Completed" },
+    { name: "factor-real-d1", dataset: "Real", tf: "D1", factors: 101, candidates: 1, flow: "1 → 1", status: "Completed" },
+    { name: "Alpha021 Paper", dataset: "Real", tf: "D1", factors: 1, candidates: 1, flow: "ACTIVE", status: "Running" },
+  ];
+
+  // Factor candidate status set (display-only — UI does not auto-advance):
+  // DISCOVERED → VALIDATED → OOS PASSED → ROBUST → CANDIDATE → DECORRELATED → PAPER → SHADOW → LIVE
+  var FACTOR_CANDIDATES = [
+    {
+      alpha: "Alpha021", score: 0.73, oosIc: 0.109, robustness: "PASS", correlation: "Unique",
+      status: "PAPER", family: "Alpha021",
+      detail: {
+        assets: ["NVDA", "QQQ", "SPY"],
+        icCurve: [0.082, 0.091, 0.078, 0.104, 0.096, 0.112, 0.101, 0.115, 0.108, 0.109],
+        zScore: [0.61, 0.78, 0.69, 0.88, 0.73, 0.84, 0.76, 0.82],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
+        paper: { signals: 220, fillRate: 0.8591, rejectRate: 0.1136, errorRate: 0.0273 },
+      },
+    },
+    {
+      alpha: "Alpha060", score: 0.84, oosIc: 0.051, robustness: "PASS", correlation: "Family D1",
+      status: "DECORRELATED", family: "Family D1",
+      detail: {
+        assets: ["NVDA", "QQQ"],
+        icCurve: [0.041, 0.048, 0.039, 0.055, 0.051, 0.058, 0.049, 0.051],
+        zScore: [0.72, 0.81, 0.69, 0.88, 0.84, 0.79, 0.82, 0.86],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
+      },
+    },
+    {
+      alpha: "Alpha047", score: 0.85, oosIc: 0.038, robustness: "PASS", correlation: "Family D2",
+      status: "DECORRELATED", family: "Family D2",
+      detail: {
+        assets: ["SPY", "QQQ"],
+        icCurve: [0.029, 0.035, 0.041, 0.033, 0.044, 0.038, 0.040, 0.038],
+        zScore: [0.66, 0.79, 0.72, 0.85, 0.80, 0.76, 0.83, 0.85],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
+      },
+    },
+    {
+      alpha: "Alpha008", score: 0.96, oosIc: 0.045, robustness: "PASS", correlation: "Family D3",
+      status: "CANDIDATE", family: "Family D3",
+      detail: {
+        assets: ["NVDA"],
+        icCurve: [0.033, 0.041, 0.038, 0.050, 0.044, 0.047, 0.042, 0.045],
+        zScore: [0.74, 0.82, 0.77, 0.90, 0.96, 0.88, 0.91, 0.93],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PEND" },
+      },
+    },
+    {
+      alpha: "Alpha031", score: 0.71, oosIc: 0.062, robustness: "PASS", correlation: "Family D2",
+      status: "OOS PASSED", family: "Family D2",
+      detail: {
+        assets: ["QQQ", "SPY"],
+        icCurve: [0.048, 0.057, 0.052, 0.066, 0.061, 0.064, 0.059, 0.062],
+        zScore: [0.58, 0.69, 0.63, 0.77, 0.71, 0.74, 0.70, 0.72],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PEND", decorrelation: "—" },
+      },
+    },
+    {
+      alpha: "Alpha013", score: 0.68, oosIc: 0.041, robustness: "PASS", correlation: "Family D1",
+      status: "ROBUST", family: "Family D1",
+      detail: {
+        assets: ["NVDA", "SPY"],
+        icCurve: [0.030, 0.038, 0.034, 0.045, 0.041, 0.043, 0.039, 0.041],
+        zScore: [0.55, 0.64, 0.59, 0.71, 0.68, 0.66, 0.70, 0.69],
+        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "—" },
+      },
+    },
+    {
+      alpha: "Alpha077", score: 0.59, oosIc: 0.033, robustness: "PEND", correlation: "Family D3",
+      status: "VALIDATED", family: "Family D3",
+      detail: {
+        assets: ["QQQ"],
+        icCurve: [0.024, 0.031, 0.028, 0.036, 0.033, 0.035, 0.030, 0.033],
+        zScore: [0.48, 0.57, 0.52, 0.63, 0.59, 0.61, 0.58, 0.60],
+        validation: { train: "PASS", validation: "PASS", oos: "PEND", robustness: "—", decorrelation: "—" },
+      },
+    },
+    {
+      alpha: "Alpha052", score: 0.42, oosIc: 0.018, robustness: "PEND", correlation: "Unassigned",
+      status: "DISCOVERED", family: "Unassigned",
+      detail: {
+        assets: ["AG", "AU"],
+        icCurve: [0.011, 0.016, 0.014, 0.020, 0.018, 0.019, 0.015, 0.018],
+        zScore: [0.31, 0.38, 0.35, 0.46, 0.42, 0.44, 0.40, 0.43],
+        validation: { train: "PEND", validation: "—", oos: "—", robustness: "—", decorrelation: "—" },
+      },
+    },
+  ];
+
+  var RESEARCH_SELECTED_ALPHA = "Alpha021";
+
+  function factorStatusClass(status) {
+    var m = {
+      "DISCOVERED": "discovered", "VALIDATED": "validated", "OOS PASSED": "oos",
+      "ROBUST": "robust", "CANDIDATE": "candidate", "DECORRELATED": "decorrelated",
+      "PAPER": "paper", "SHADOW": "shadow", "LIVE": "live",
+    };
+    return "rs-status rs-status-" + (m[status] || "discovered");
+  }
+
+  function factorStatusBadge(status) {
+    return '<span class="' + factorStatusClass(status) + '">' + esc(status) + "</span>";
+  }
+
+  function renderFactorFunnel() {
+    var rows = "";
+    RESEARCH_FUNNEL.forEach(function (s, i) {
+      var w = s.cap ? 100 : Math.max(10, Math.round((s.count / 101) * 100));
+      rows +=
+        '<div class="rs-funnel-row">' +
+        '<div class="rs-funnel-label">' + esc(s.stage) +
+        '<span class="rs-funnel-sub">' + esc(s.sub) + "</span></div>" +
+        '<div class="rs-funnel-bar-wrap">' +
+        '<div class="rs-funnel-bar rs-funnel-bar-' + s.variant + '" style="width:' + w + '%">' +
+        '<span class="rs-funnel-count">' + s.count + "</span>" +
+        "</div></div>" +
+        '<div class="rs-funnel-rate">' + esc(s.rate) + "</div>" +
+        "</div>";
+      if (i < RESEARCH_FUNNEL.length - 1) {
+        rows += '<div class="rs-funnel-arrow">↓</div>';
+      }
+    });
+    rows +=
+      '<div class="rs-funnel-arrow">↓</div>' +
+      '<div class="rs-funnel-terminal">' +
+      factorStatusBadge("PAPER") +
+      '<span class="rs-funnel-terminal-name">Alpha021</span>' +
+      "</div>";
+    return '<div class="rs-funnel">' + rows + "</div>";
+  }
+
+  function renderExperimentsList() {
+    var html = '<div class="rs-exp-list">';
+    EXPERIMENTS_DATA.forEach(function (e) {
+      var flowCls = e.status === "Running" ? " rs-exp-flow-active" : "";
+      html +=
+        '<div class="rs-exp-item" data-rs-exp="' + esc(e.name) + '">' +
+        '<div class="rs-exp-main">' +
+        '<span class="rs-exp-name">' + esc(e.name) + "</span>" +
+        '<span class="rs-exp-meta">' + esc(e.dataset) + " · " + esc(e.tf) + " · " +
+        e.factors + " factors · " + e.candidates + " candidates</span>" +
+        "</div>" +
+        '<span class="rs-exp-flow' + flowCls + '">' + esc(e.flow) + "</span>" +
+        "</div>";
+    });
+    html += "</div>";
+    return html;
+  }
+
+  function renderFactorRows() {
+    return FACTOR_CANDIDATES.map(function (f) {
+      var sel = f.alpha === RESEARCH_SELECTED_ALPHA ? " rs-cand-row-selected" : "";
+      var icCls = f.oosIc >= 0 ? "pos" : "neg";
+      var icTxt = (f.oosIc >= 0 ? "+" : "") + f.oosIc.toFixed(3);
+      return (
+        '<tr class="rs-cand-row' + sel + '" data-rs-alpha="' + esc(f.alpha) + '">' +
+        '<td class="rs-col-alpha">' + esc(f.alpha) + "</td>" +
+        '<td class="num ds-text-mono">' + f.score.toFixed(2) + "</td>" +
+        '<td class="num ds-text-mono ' + icCls + '">' + icTxt + "</td>" +
+        '<td class="num ds-text-mono">' + esc(f.robustness) + "</td>" +
+        "<td>" + esc(f.correlation) + "</td>" +
+        "<td>" + factorStatusBadge(f.status) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function renderFactorTable() {
     return (
-      UI.pageHeader("Research", "Strategy research and factor discovery workspace") +
-      UI.kpiGrid(
-        UI.metricCard("Active Strategies", "12", "+2", "pos") +
-        UI.metricCard("Factors Tracked", "101", "", "") +
-        UI.metricCard("Backtests Run", "247", "+18", "pos") +
-        UI.metricCard("Candidates", "22", "+3", "pos")
-      ) +
-      UI.sectionHeading("Research Pipeline") +
-      UI.panel("Pipeline", '<div style="display:flex;gap:var(--ds-space-3);align-items:center;flex-wrap:wrap;">' +
-        UI.badge("101 Alphas", "info") + "→" +
-        UI.badge("909 Pairs", "info") + "→" +
-        UI.badge("Validation", "warning") + "→" +
-        UI.badge("OOS", "warning") + "→" +
-        UI.badge("22 Candidates", "profit") + "→" +
-        UI.badge("15 Families", "profit") +
-        "</div>")
+      '<table class="ds-table rs-cand-table">' +
+      "<thead><tr>" +
+      "<th>Factor</th>" +
+      '<th class="num">Score</th>' +
+      '<th class="num">OOS IC</th>' +
+      '<th class="num">Robustness</th>' +
+      "<th>Correlation</th>" +
+      "<th>Status</th>" +
+      "</tr></thead>" +
+      '<tbody id="rs-factor-tbody">' + renderFactorRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  function rsDetailCell(label, value, cls) {
+    return (
+      '<div class="rs-detail-cell"><div class="rs-detail-label">' + esc(label) + "</div>" +
+      '<div class="rs-detail-value' + (cls ? " " + cls : "") + '">' + esc(value) + "</div></div>"
+    );
+  }
+
+  function rsPerfCard(title, body) {
+    return (
+      '<div class="rs-perf-card"><div class="rs-perf-title">' + esc(title) + "</div>" +
+      '<div class="rs-perf-body">' + body + "</div></div>"
+    );
+  }
+
+  function rsValidationCell(name, result) {
+    var pass = result === "PASS";
+    return (
+      '<div class="rs-validation-cell"><div class="rs-validation-name">' + esc(name) + "</div>" +
+      '<div class="rs-validation-result ' + (pass ? "rs-validation-pass" : "rs-validation-fail") + '">' +
+      esc(result || "—") + "</div></div>"
+    );
+  }
+
+  function renderFactorDetail() {
+    var f = null;
+    for (var i = 0; i < FACTOR_CANDIDATES.length; i++) {
+      if (FACTOR_CANDIDATES[i].alpha === RESEARCH_SELECTED_ALPHA) {
+        f = FACTOR_CANDIDATES[i];
+        break;
+      }
+    }
+    if (!f) {
+      return UI.empty("No factor selected", "Click a factor row to inspect its detail.");
+    }
+    var d = f.detail || {};
+    var icTxt = (f.oosIc >= 0 ? "+" : "") + f.oosIc.toFixed(3);
+
+    var head =
+      '<div class="rs-detail-head">' +
+      '<span class="rs-detail-alpha">' + esc(f.alpha) + "</span>" +
+      factorStatusBadge(f.status) +
+      "</div>";
+
+    var kpi =
+      '<div class="rs-detail-grid">' +
+      rsDetailCell("Score", f.score.toFixed(2)) +
+      rsDetailCell("Mean OOS IC", icTxt, f.oosIc >= 0 ? "pos" : "neg") +
+      rsDetailCell("Robustness", f.robustness) +
+      rsDetailCell("Family", f.family) +
+      "</div>";
+
+    var assetsHtml = (d.assets || [])
+      .map(function (a) {
+        return '<span class="rs-asset-chip">' + esc(a) + "</span>";
+      })
+      .join("");
+    var assetsBlock =
+      '<div style="margin-bottom:var(--ds-space-4);">' +
+      '<div class="rs-detail-label" style="margin-bottom:var(--ds-space-2);">Assets</div>' +
+      '<div class="rs-detail-assets">' + assetsHtml + "</div></div>";
+
+    var icSpark = d.icCurve
+      ? UI.sparkline(d.icCurve, { color: "var(--ds-info)", width: 200, height: 56 })
+      : '<span class="rs-perf-empty">—</span>';
+    var zSpark = d.zScore
+      ? UI.sparkline(d.zScore, { color: "var(--ds-purple)", width: 200, height: 56 })
+      : '<span class="rs-perf-empty">—</span>';
+    var perf =
+      '<div class="rs-perf-grid">' +
+      rsPerfCard("IC Curve", icSpark) +
+      rsPerfCard("Factor Z-Score", zSpark) +
+      rsPerfCard("Position", '<span class="rs-perf-empty">Coming in UI V1</span>') +
+      rsPerfCard("Signal", '<span class="rs-perf-empty">Coming in UI V1</span>') +
+      "</div>";
+
+    var v = d.validation || {};
+    var validationHtml =
+      '<div class="rs-validation-grid">' +
+      rsValidationCell("Train", v.train) +
+      rsValidationCell("Val", v.validation) +
+      rsValidationCell("OOS", v.oos) +
+      rsValidationCell("Robust", v.robustness) +
+      rsValidationCell("Decorr", v.decorrelation) +
+      "</div>";
+
+    var html =
+      head + kpi + assetsBlock +
+      UI.sectionHeading("Performance") + perf +
+      UI.sectionHeading("Validation") + validationHtml;
+
+    if (f.status === "PAPER" && d.paper) {
+      var p = d.paper;
+      var paperGrid =
+        '<div class="rs-detail-grid">' +
+        rsDetailCell("Signals", String(p.signals)) +
+        rsDetailCell("Fill Rate", (p.fillRate * 100).toFixed(2) + "%", "pos") +
+        rsDetailCell("Reject Rate", (p.rejectRate * 100).toFixed(2) + "%", "neg") +
+        rsDetailCell("Error Rate", (p.errorRate * 100).toFixed(2) + "%", "neg") +
+        "</div>";
+      html += UI.sectionHeading("Paper") + paperGrid;
+    }
+    return html;
+  }
+
+  function rsHeaderSelect(id, options) {
+    return '<div style="min-width:140px;">' + UI.select({ id: id, options: options }) + "</div>";
+  }
+
+  function bindResearchPage() {
+    // Factor row selection (master → detail)
+    var tbody = document.getElementById("rs-factor-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-rs-alpha]");
+        if (!row) return;
+        RESEARCH_SELECTED_ALPHA = row.getAttribute("data-rs-alpha");
+        tbody.innerHTML = renderFactorRows();
+        var detail = document.getElementById("rs-factor-detail");
+        if (detail) detail.innerHTML = renderFactorDetail();
+      });
+    }
+    // Experiment rows → Experiment Detail is a future UI commit (display-only)
+    document.querySelectorAll("[data-rs-exp]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        showToast("Experiment detail — coming in UI V1 / 实验详情待后续 UI 版本", "info");
+      });
+    });
+    // Refresh button (mock visual feedback)
+    var refreshBtn = document.querySelector('[data-action="rs:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        setTimeout(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+          showToast("Research refreshed (mock) / 研究数据已刷新", "ok");
+        }, 700);
+      });
+    }
+  }
+
+  // ── Research (Commit 010 — full research workspace) ─────────────
+  PAGE_FRAMEWORK["research"] = function () {
+    var kpis =
+      UI.metricCard("Experiments", "12", "", "") +
+      UI.metricCard("Factors Tested", "101", "", "") +
+      UI.metricCard("Candidates", "22", "", "pos") +
+      UI.metricCard("OOS Passed", "26", "", "pos") +
+      UI.metricCard("Paper Candidates", "1", "Alpha021", "pos");
+
+    var headerActions =
+      rsHeaderSelect("rs-filter-exp", [
+        { value: "ALL", label: "All Experiments" },
+        { value: "factor-v1", label: "factor-v1" },
+        { value: "factor-real-d1", label: "factor-real-d1" },
+        { value: "Alpha021 Paper", label: "Alpha021 Paper" },
+      ]) +
+      rsHeaderSelect("rs-filter-asset", [
+        { value: "ALL", label: "All Assets" },
+        { value: "NVDA", label: "NVDA" },
+        { value: "QQQ", label: "QQQ" },
+        { value: "SPY", label: "SPY" },
+        { value: "AG", label: "AG" },
+        { value: "AU", label: "AU" },
+      ]) +
+      rsHeaderSelect("rs-filter-tf", [
+        { value: "D1", label: "D1" },
+        { value: "1H", label: "1H" },
+        { value: "15M", label: "15M" },
+        { value: "5M", label: "5M" },
+      ]) +
+      UI.button("Refresh", "ghost", { sm: true, action: "rs:refresh" });
+
+    var grid =
+      '<div class="rs-grid-2">' +
+      '<div class="rs-grid-main">' +
+      UI.panel("Recent Experiments", renderExperimentsList(), {
+        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click to inspect</span>',
+      }) +
+      "</div>" +
+      '<div class="rs-grid-side">' +
+      UI.panel("Factor Funnel", renderFactorFunnel()) +
+      "</div>" +
+      "</div>";
+
+    var candLayout =
+      '<div class="rs-cand-layout">' +
+      '<div class="rs-cand-main">' +
+      UI.panel("Factor Candidates", renderFactorTable(), {
+        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
+      }) +
+      "</div>" +
+      '<div class="rs-cand-side">' +
+      UI.panel("Factor Detail", '<div id="rs-factor-detail">' + renderFactorDetail() + "</div>") +
+      "</div>" +
+      "</div>";
+
+    return (
+      UI.pageHeader("Research", "Research Workspace", headerActions) +
+      UI.kpiGrid(kpis, 5) +
+      grid +
+      UI.sectionHeading("Factor Candidates") +
+      candLayout
     );
   };
 
+  /* ==================================================================
+   * Strategy module — Commit 012
+   * Strategy lifecycle management center: list → detail (tabs) →
+   * lifecycle → validation → signals. UI-only state machine; does NOT
+   * modify the strategy engine, paper trading, shadow/live execution,
+   * risk engine, or any API/database.
+   * ================================================================== */
+
+  // ── Strategy data ──────────────────────────────────────────────
+  var ST_LIFECYCLE_STAGES = ["Research", "Validation", "De-correlation", "Paper", "Shadow", "Live"];
+
+  // lifecycle state per strategy status (index-aligned to ST_LIFECYCLE_STAGES)
+  // values: passed | running | pending | locked | paused
+  var ST_LIFECYCLE_MAP = {
+    CANDIDATE: ["passed", "running", "pending", "locked", "locked", "locked"],
+    VALIDATED: ["passed", "passed", "passed", "pending", "locked", "locked"],
+    PAPER:     ["passed", "passed", "passed", "running", "pending", "locked"],
+    SHADOW:    ["passed", "passed", "passed", "passed", "running", "pending"],
+    LIVE:      ["passed", "passed", "passed", "passed", "passed", "running"],
+    PAUSED:    ["passed", "passed", "passed", "paused", "locked", "locked"],
+    RETIRED:   ["passed", "passed", "passed", "passed", "passed", "passed"],
+  };
+  var ST_LC_ICON = { passed: "✓", running: "●", pending: "○", locked: "🔒", paused: "⏸" };
+  var ST_LC_STATE = { passed: "PASSED", running: "RUNNING", pending: "NOT STARTED", locked: "LOCKED", paused: "PAUSED" };
+
+  var STRATEGIES = [
+    {
+      id: "alpha021", name: "Alpha021", type: "Factor", version: "v1",
+      universe: ["NVDA", "QQQ", "SPY"], timeframe: "1D", status: "PAPER",
+      ret: 0.0812, sharpe: 1.38, maxDD: -0.055, winRate: 0.68, turnover: 1.24,
+      capital: 1000000, positionSize: 100, maxPosition: 5, riskLimit: 0.06, execution: "Paper",
+      validation: {
+        snapshots: [
+          { label: "Snapshot #1", date: "2026-08-20" },
+          { label: "Snapshot #2", date: "2026-08-24" },
+        ],
+        drift: [
+          { label: "Signal Drift", value: "NORMAL" },
+          { label: "Execution Drift", value: "NORMAL" },
+          { label: "Attribution", value: "PENDING" },
+        ],
+        compare: [
+          { metric: "Fill Rate", from: "85.91%", to: "86.04%" },
+          { metric: "Reject Rate", from: "11.36%", to: "11.26%" },
+          { metric: "Return", from: "+8.12%", to: "+7.32%" },
+          { metric: "Max DD", from: "-5.0%", to: "-5.5%" },
+        ],
+      },
+      signals: [
+        { date: "08-20", symbol: "NVDA", side: "BUY", qty: 100 },
+        { date: "08-24", symbol: "SPY", side: "SELL", qty: 100 },
+        { date: "08-25", symbol: "QQQ", side: "BUY", qty: 200 },
+        { date: "08-27", symbol: "NVDA", side: "SELL", qty: 100 },
+      ],
+      positions: [
+        { symbol: "QQQ", qty: 200, side: "LONG", entry: 380.50, current: 410.20, pnl: 5346.00 },
+      ],
+      risk: { dailyLoss: -0.012, maxDrawdown: -0.055, exposure: 0.40, positionLimit: 5, varLimit: 0.03 },
+      executionCfg: { venue: "Paper", orderType: "Market", tif: "DAY", slippage: "3 bps" },
+      history: [
+        { date: "2026-07-15", event: "Research passed", detail: "Alpha021 validated on NVDA/QQQ/SPY" },
+        { date: "2026-07-28", event: "Backtest completed", detail: "+8.12% return, Sharpe 1.38" },
+        { date: "2026-08-10", event: "De-correlation passed", detail: "Low correlation to existing book" },
+        { date: "2026-08-20", event: "Paper trading started", detail: "Snapshot #1 captured" },
+        { date: "2026-08-24", event: "Snapshot #2", detail: "Drift NORMAL" },
+      ],
+    },
+    { id: "ms001", name: "Momentum S001", type: "System", universe: ["NVDA"], timeframe: "15m", status: "PAPER", ret: 0.054, sharpe: 1.02, maxDD: -0.072, winRate: 0.61, turnover: 2.10 },
+    { id: "mrev2", name: "MeanRev-M2", type: "MeanRev", universe: ["SPY"], timeframe: "1H", status: "PAPER", ret: 0.031, sharpe: 0.88, maxDD: -0.041, winRate: 0.64, turnover: 0.95 },
+    { id: "csq1", name: "Cross-Section Q", type: "Factor", universe: ["QQQ", "SPY"], timeframe: "1D", status: "SHADOW", ret: 0.067, sharpe: 1.21, maxDD: -0.061, winRate: 0.59, turnover: 1.40 },
+    { id: "a101", name: "Alpha101", type: "Factor", universe: ["QQQ"], timeframe: "1D", status: "VALIDATED", ret: 0.045, sharpe: 1.15, maxDD: -0.048, winRate: 0.62, turnover: 1.10 },
+    { id: "dcv2", name: "De-correlation v2", type: "Factor", universe: ["NVDA", "SPY"], timeframe: "1D", status: "VALIDATED", ret: 0.038, sharpe: 1.08, maxDD: -0.044, winRate: 0.60, turnover: 1.05 },
+    { id: "a008", name: "Alpha008", type: "Factor", universe: ["NVDA"], timeframe: "1D", status: "CANDIDATE", ret: 0.022, sharpe: 0.74, maxDD: -0.039, winRate: 0.55, turnover: 0.88 },
+    { id: "a060", name: "Alpha060", type: "Factor", universe: ["SPY"], timeframe: "1D", status: "CANDIDATE", ret: 0.018, sharpe: 0.69, maxDD: -0.035, winRate: 0.53, turnover: 0.82 },
+    { id: "mq1", name: "Momentum-Q", type: "System", universe: ["QQQ"], timeframe: "30m", status: "PAUSED", ret: 0.041, sharpe: 0.92, maxDD: -0.092, winRate: 0.58, turnover: 1.80 },
+    { id: "mrev1", name: "MeanRevert", type: "MeanRev", universe: ["AAPL"], timeframe: "1H", status: "PAUSED", ret: 0.015, sharpe: 0.71, maxDD: -0.041, winRate: 0.60, turnover: 0.90 },
+    { id: "a047", name: "Alpha047", type: "Factor", universe: ["MSFT"], timeframe: "1D", status: "RETIRED", ret: -0.012, sharpe: 0.42, maxDD: -0.118, winRate: 0.47, turnover: 1.30 },
+    { id: "va1", name: "Vol Arb v1", type: "System", universe: ["TSLA"], timeframe: "5m", status: "RETIRED", ret: -0.008, sharpe: 0.38, maxDD: -0.134, winRate: 0.45, turnover: 2.40 },
+  ];
+
+  var ST_STATE = { selectedId: "alpha021", signalFilter: "ALL" };
+
+  function stPct(x) { return (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%"; }
+  function stStatusBadge(status) {
+    return '<span class="st-status st-status-' + (status || "").toLowerCase() + '">' + esc(status) + "</span>";
+  }
+  function stFind(id) {
+    for (var i = 0; i < STRATEGIES.length; i++) {
+      if (STRATEGIES[i].id === id) return STRATEGIES[i];
+    }
+    return STRATEGIES[0];
+  }
+
+  // ── KPI grid ───────────────────────────────────────────────────
+  function renderStKpis() {
+    var total = STRATEGIES.length, active = 0, paper = 0, shadow = 0, live = 0;
+    STRATEGIES.forEach(function (s) {
+      if (s.status === "PAPER" || s.status === "SHADOW" || s.status === "LIVE") active++;
+      if (s.status === "PAPER") paper++;
+      if (s.status === "SHADOW") shadow++;
+      if (s.status === "LIVE") live++;
+    });
+    var cards =
+      UI.metricCard("Strategies", String(total), "", "") +
+      UI.metricCard("Active", String(active), "", "pos") +
+      UI.metricCard("Paper", String(paper), "", "") +
+      UI.metricCard("Shadow", String(shadow), "", "") +
+      UI.metricCard("Live", String(live), "", live > 0 ? "pos" : "");
+    return '<div class="st-kpi-grid">' + cards + "</div>";
+  }
+
+  // ── Strategy list (clickable rows) ─────────────────────────────
+  function renderStRows() {
+    return STRATEGIES.map(function (s) {
+      var sel = s.id === ST_STATE.selectedId ? " st-row-selected" : "";
+      var retCls = s.ret >= 0 ? "pos" : "neg";
+      return (
+        '<tr class="st-row' + sel + '" data-st-id="' + esc(s.id) + '">' +
+        '<td class="st-col-name">' + esc(s.name) + "</td>" +
+        "<td>" + esc(s.type) + "</td>" +
+        "<td>" + esc(s.universe.join(" / ")) + "</td>" +
+        '<td class="num">' + esc(s.timeframe) + "</td>" +
+        "<td>" + stStatusBadge(s.status) + "</td>" +
+        '<td class="num ' + retCls + '">' + stPct(s.ret) + "</td>" +
+        '<td class="num">' + s.sharpe.toFixed(2) + "</td>" +
+        '<td class="num neg">' + stPct(s.maxDD) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function renderStList() {
+    return (
+      '<table class="ds-table st-list-table">' +
+      "<thead><tr>" +
+      "<th>Strategy</th><th>Type</th><th>Asset</th>" +
+      '<th class="num">Timeframe</th><th>Status</th>' +
+      '<th class="num">Return</th><th class="num">Sharpe</th><th class="num">Max DD</th>' +
+      "</tr></thead>" +
+      '<tbody id="st-list-tbody">' + renderStRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  // ── Lifecycle stepper ──────────────────────────────────────────
+  function renderStLifecycle(s) {
+    var states = ST_LIFECYCLE_MAP[s.status] || ST_LIFECYCLE_MAP.VALIDATED;
+    var html = '<div class="st-lifecycle">';
+    for (var i = 0; i < ST_LIFECYCLE_STAGES.length; i++) {
+      var st = states[i];
+      html +=
+        '<div class="st-lc-stage st-lc-' + st + '">' +
+        '<div class="st-lc-icon">' + ST_LC_ICON[st] + "</div>" +
+        '<div class="st-lc-label">' + esc(ST_LIFECYCLE_STAGES[i]) + "</div>" +
+        '<div class="st-lc-state">' + ST_LC_STATE[st] + "</div>" +
+        "</div>";
+      if (i < ST_LIFECYCLE_STAGES.length - 1) {
+        var connCls = states[i] === "passed" ? " st-lc-conn-done" : "";
+        html += '<div class="st-lc-connector' + connCls + '"></div>';
+      }
+    }
+    return html + "</div>";
+  }
+
+  // ── Detail header + actions ────────────────────────────────────
+  function renderStActions(s) {
+    var isPaper = s.status === "PAPER";
+    var lockedPaper = s.status === "SHADOW" || s.status === "LIVE" || s.status === "RETIRED";
+    var runBtn = lockedPaper
+      ? '<span class="st-action-locked"><span class="st-lock-icon">🔒</span>' + UI.button("Paper", "secondary", { sm: true, disabled: true }) + "</span>"
+      : UI.button(isPaper ? "Pause Paper" : "Start Paper", isPaper ? "secondary" : "primary", { sm: true, action: isPaper ? "st:pause" : "st:start-paper" });
+    return (
+      UI.button("Backtest", "ghost", { sm: true, action: "st:backtest" }) +
+      runBtn +
+      UI.button("View Signals", "ghost", { sm: true, action: "st:view-signals" }) +
+      '<span class="st-action-locked"><span class="st-lock-icon">🔒</span>' + UI.button("Shadow", "secondary", { sm: true, disabled: true }) + "</span>" +
+      '<span class="st-action-locked"><span class="st-lock-icon">🔒</span>' + UI.button("Live", "secondary", { sm: true, disabled: true }) + "</span>" +
+      UI.button("Configure", "secondary", { sm: true, action: "st:configure" })
+    );
+  }
+
+  function stSummaryCell(label, value, cls) {
+    return (
+      '<div class="st-summary-cell">' +
+      '<div class="st-summary-label">' + esc(label) + "</div>" +
+      '<div class="st-summary-value' + (cls ? " " + cls : "") + '">' + esc(value) + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderStOverviewTab(s) {
+    var cfg = s.capital != null;
+    return '<div class="st-summary-grid">' +
+      stSummaryCell("Status", s.status) +
+      stSummaryCell("Type", s.type) +
+      stSummaryCell("Universe", s.universe.join(" / ")) +
+      stSummaryCell("Timeframe", s.timeframe) +
+      stSummaryCell("Version", s.version || "v1") +
+      stSummaryCell("Capital", cfg ? UI.money(s.capital, 0) : "—") +
+      stSummaryCell("Position Size", cfg ? String(s.positionSize) : "—") +
+      stSummaryCell("Max Position", cfg ? String(s.maxPosition) : "—") +
+      stSummaryCell("Risk Limit", cfg ? (s.riskLimit * 100).toFixed(2) + "%" : "—") +
+      stSummaryCell("Execution", cfg ? s.execution : "—") +
+      "</div>";
+  }
+
+  function renderStPerformanceTab(s) {
+    return '<div class="st-kpi-grid">' +
+      UI.metricCard("Return", stPct(s.ret), "", s.ret >= 0 ? "pos" : "neg") +
+      UI.metricCard("Sharpe", s.sharpe.toFixed(2), "", "") +
+      UI.metricCard("Max Drawdown", stPct(s.maxDD), "", "neg") +
+      UI.metricCard("Win Rate", stPct(s.winRate), "", "pos") +
+      UI.metricCard("Turnover", s.turnover.toFixed(2) + "x", "", "") +
+      "</div>";
+  }
+
+  // ── Signals tab (filterable) ───────────────────────────────────
+  function stSignalSide(side) {
+    var cls = side === "BUY" ? "st-signal-buy" : "st-signal-sell";
+    return '<span class="st-signal-side ' + cls + '">' + esc(side) + "</span>";
+  }
+
+  function renderStSignalsRows(s) {
+    var sigs = s.signals || [];
+    var filtered = sigs.filter(function (sig) {
+      return ST_STATE.signalFilter === "ALL" || sig.side === ST_STATE.signalFilter;
+    });
+    if (!filtered.length) {
+      return '<tr><td colspan="4">' + UI.empty("No signals", "No signals match the current filter.") + "</td></tr>";
+    }
+    return filtered.map(function (sig) {
+      return "<tr>" +
+        '<td class="num">' + esc(sig.date) + "</td>" +
+        "<td>" + esc(sig.symbol) + "</td>" +
+        "<td>" + stSignalSide(sig.side) + "</td>" +
+        '<td class="num">' + sig.qty + "</td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  function renderStSignalsTab(s) {
+    if (!s.signals) {
+      return UI.empty("Coming in UI V1", "Signal log for this strategy will be available in a future UI commit.");
+    }
+    var filters = ["ALL", "BUY", "SELL"];
+    var filterHtml = filters.map(function (f) {
+      var active = ST_STATE.signalFilter === f ? " active" : "";
+      return '<button class="st-filter-btn' + active + '" data-st-filter="' + f + '">' + f + "</button>";
+    }).join("");
+    return '<div class="st-signal-filters">' + filterHtml + "</div>" +
+      '<table class="ds-table st-signals-table">' +
+      "<thead><tr>" +
+      '<th class="num">Time</th><th>Symbol</th><th>Signal</th><th class="num">Qty</th>' +
+      "</tr></thead>" +
+      '<tbody id="st-signals-tbody">' + renderStSignalsRows(s) + "</tbody>" +
+      "</table>";
+  }
+
+  function updateStSignals() {
+    var s = stFind(ST_STATE.selectedId);
+    var tbody = document.getElementById("st-signals-tbody");
+    if (tbody) tbody.innerHTML = renderStSignalsRows(s);
+    document.querySelectorAll("[data-st-filter]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-st-filter") === ST_STATE.signalFilter);
+    });
+  }
+
+  // ── Positions / Risk / Execution / Validation / History tabs ──
+  function renderStPositionsTab(s) {
+    if (!s.positions) {
+      return UI.empty("Coming in UI V1", "Position history for this strategy will be available in a future UI commit.");
+    }
+    return UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side" },
+        { key: "qty", label: "Qty", numeric: true },
+        { key: "entry", label: "Entry", numeric: true, format: function (v) { return UI.money(v); } },
+        { key: "current", label: "Current", numeric: true, format: function (v) { return UI.money(v); } },
+        { key: "pnl", label: "PnL", numeric: true, color: function (v) { return v >= 0 ? "pos" : "neg"; }, format: function (v) { return UI.signedMoney(v); } },
+      ],
+      rows: s.positions,
+    });
+  }
+
+  function renderStRiskTab(s) {
+    if (!s.risk) {
+      return UI.empty("Coming in UI V1", "Risk metrics for this strategy will be available in a future UI commit.");
+    }
+    var r = s.risk;
+    return '<div class="st-kpi-grid">' +
+      UI.metricCard("Daily Loss", stPct(r.dailyLoss), "", "neg") +
+      UI.metricCard("Max Drawdown", stPct(r.maxDrawdown), "", "neg") +
+      UI.metricCard("Exposure", stPct(r.exposure), "", "") +
+      UI.metricCard("Position Limit", String(r.positionLimit), "", "") +
+      UI.metricCard("VaR Limit", stPct(r.varLimit), "", "") +
+      "</div>";
+  }
+
+  function renderStExecutionTab(s) {
+    if (!s.executionCfg) {
+      return UI.empty("Coming in UI V1", "Execution configuration for this strategy will be available in a future UI commit.");
+    }
+    var e = s.executionCfg;
+    return '<div class="st-summary-grid">' +
+      stSummaryCell("Venue", e.venue) +
+      stSummaryCell("Order Type", e.orderType) +
+      stSummaryCell("TIF", e.tif) +
+      stSummaryCell("Slippage", e.slippage) +
+      "</div>";
+  }
+
+  function renderStValidationTab(s) {
+    if (!s.validation) {
+      return UI.empty("Coming in UI V1", "Validation snapshots for this strategy will be available after paper trading begins.");
+    }
+    var v = s.validation;
+    var snapHtml = v.snapshots.map(function (snap) {
+      return '<div class="st-snap-card">' +
+        '<div class="st-snap-label">' + esc(snap.label) + "</div>" +
+        '<div class="st-snap-date">' + esc(snap.date) + "</div>" +
+        "</div>";
+    }).join("");
+    var driftHtml = v.drift.map(function (d) {
+      var cls = d.value === "NORMAL" ? "st-drift-normal" : "st-drift-pending";
+      return '<div class="st-drift-cell">' +
+        '<div class="st-drift-label">' + esc(d.label) + "</div>" +
+        '<div class="st-drift-value ' + cls + '">' + esc(d.value) + "</div>" +
+        "</div>";
+    }).join("");
+    var compareRows = v.compare.map(function (c) {
+      return "<tr><td>" + esc(c.metric) + "</td>" +
+        '<td class="num">' + esc(c.from) + "</td>" +
+        '<td class="num">' + esc(c.to) + "</td></tr>";
+    }).join("");
+    return '<div class="st-snapshots">' + snapHtml + "</div>" +
+      '<div class="st-drift">' + driftHtml + "</div>" +
+      UI.panel("Snapshot Comparison",
+        '<table class="ds-table st-compare-table">' +
+        "<thead><tr><th>Metric</th><th>Snapshot #1</th><th>Snapshot #2</th></tr></thead>" +
+        "<tbody>" + compareRows + "</tbody></table>"
+      );
+  }
+
+  function renderStHistoryTab(s) {
+    if (!s.history) {
+      return UI.empty("Coming in UI V1", "Lifecycle history for this strategy will be available in a future UI commit.");
+    }
+    return UI.table({
+      columns: [
+        { key: "date", label: "Date" },
+        { key: "event", label: "Event" },
+        { key: "detail", label: "Detail" },
+      ],
+      rows: s.history,
+    });
+  }
+
+  function renderStDetail() {
+    var s = stFind(ST_STATE.selectedId);
+    return (
+      '<div class="st-detail-head">' +
+      '<div class="st-detail-title">' +
+      '<span class="st-detail-name">' + esc(s.name) + "</span>" +
+      stStatusBadge(s.status) +
+      '<span class="st-detail-meta">' +
+      esc(s.universe.join(" / ")) +
+      '<span class="st-sep">·</span>' + esc(s.timeframe) +
+      '<span class="st-sep">·</span>' + esc(s.version || "v1") +
+      "</span>" +
+      "</div>" +
+      '<div class="st-actions">' + renderStActions(s) + "</div>" +
+      "</div>" +
+      renderStLifecycle(s) +
+      UI.tabs([
+        { id: "st-overview", label: "Overview", content: renderStOverviewTab(s) },
+        { id: "st-performance", label: "Performance", content: renderStPerformanceTab(s) },
+        { id: "st-signals", label: "Signals", content: renderStSignalsTab(s) },
+        { id: "st-positions", label: "Positions", content: renderStPositionsTab(s) },
+        { id: "st-risk", label: "Risk", content: renderStRiskTab(s) },
+        { id: "st-execution", label: "Execution", content: renderStExecutionTab(s) },
+        { id: "st-validation", label: "Validation", content: renderStValidationTab(s) },
+        { id: "st-history", label: "History", content: renderStHistoryTab(s) },
+      ])
+    );
+  }
+
+  function updateStDetail() {
+    var host = document.getElementById("st-detail");
+    if (host) {
+      host.innerHTML = renderStDetail();
+      UI.bindTabs(host);
+    }
+  }
+
+  // ── Config drawer body ─────────────────────────────────────────
+  function renderStConfigBody(s) {
+    var universeChecks = ["NVDA", "QQQ", "SPY", "AAPL", "MSFT"].map(function (sym) {
+      var checked = s.universe.indexOf(sym) >= 0 ? " checked" : "";
+      return '<label class="st-check"><input type="checkbox"' + checked + ">" + esc(sym) + "</label>";
+    }).join("");
+    return '<div class="st-config-grid">' +
+      UI.field("Name", UI.input({ value: s.name })) +
+      '<div class="ds-field"><label class="ds-field-label">Universe</label><div class="st-universe-checks">' + universeChecks + "</div></div>" +
+      UI.field("Timeframe", UI.select({ value: s.timeframe, options: ["1D", "1H", "30m", "15m", "5m"] })) +
+      '<div class="st-config-row">' +
+      UI.field("Capital", UI.input({ type: "number", value: s.capital || 1000000, step: "1000" })) +
+      UI.field("Position Size", UI.input({ type: "number", value: s.positionSize || 100, step: "10" })) +
+      "</div>" +
+      '<div class="st-config-row">' +
+      UI.field("Max Position", UI.input({ type: "number", value: s.maxPosition || 5, step: "1" })) +
+      UI.field("Risk Limit (%)", UI.input({ type: "number", value: ((s.riskLimit || 0.06) * 100).toFixed(2), step: "0.5" })) +
+      "</div>" +
+      UI.field("Execution", UI.select({ value: s.execution || "Paper", options: ["Paper", "Shadow", "Live"] })) +
+      "</div>";
+  }
+
+  // ── Bindings (row select, tabs, signal filter, actions, config) ──
+  function bindStrategiesPage() {
+    // Row selection — delegated on persistent tbody
+    var tbody = document.getElementById("st-list-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-st-id]");
+        if (!row) return;
+        ST_STATE.selectedId = row.getAttribute("data-st-id");
+        ST_STATE.signalFilter = "ALL";
+        tbody.innerHTML = renderStRows();
+        updateStDetail();
+      });
+    }
+
+    // Detail area — tabs + delegated signal filters & action buttons
+    var detailHost = document.getElementById("st-detail");
+    if (detailHost) {
+      UI.bindTabs(detailHost);
+      detailHost.addEventListener("click", function (e) {
+        var filterBtn = e.target.closest("[data-st-filter]");
+        if (filterBtn) {
+          ST_STATE.signalFilter = filterBtn.getAttribute("data-st-filter");
+          updateStSignals();
+          return;
+        }
+        var btn = e.target.closest("[data-action]");
+        if (!btn) return;
+        var action = btn.getAttribute("data-action");
+        var s = stFind(ST_STATE.selectedId);
+        if (action === "st:backtest") {
+          location.hash = "#/research/backtest";
+        } else if (action === "st:view-signals") {
+          var sigTab = detailHost.querySelector('[data-tab="st-signals"]');
+          if (sigTab) sigTab.click();
+        } else if (action === "st:configure") {
+          UI.openDrawer({
+            title: "Configure " + s.name,
+            body: renderStConfigBody(s),
+            footer:
+              UI.button("Cancel", "ghost", { sm: true, action: "close-drawer" }) +
+              UI.button("Save", "primary", { sm: true, action: "close-drawer" }),
+          });
+        } else if (action === "st:start-paper") {
+          UI.openModal({
+            title: "Start Paper Trading",
+            body:
+              '<div class="ds-flex ds-flex-col ds-gap-3">' +
+              "<div>Start paper trading for <strong>" + esc(s.name) + "</strong>?</div>" +
+              UI.metricCard("Capital", UI.money(s.capital || 1000000, 0), "", "") +
+              "</div>",
+            footer:
+              UI.button("Cancel", "ghost", { sm: true, action: "close-modal" }) +
+              UI.button("Confirm", "primary", { sm: true, action: "st:confirm-start-paper" }),
+            onMount: function (backdrop) {
+              var confirmBtn = backdrop.querySelector('[data-action="st:confirm-start-paper"]');
+              if (confirmBtn) {
+                confirmBtn.addEventListener("click", function () {
+                  UI.closeModal();
+                  showToast("Starting Paper Trading for " + s.name + "…", "info");
+                  var runBtn = detailHost.querySelector('[data-action="st:start-paper"]');
+                  if (runBtn) { runBtn.disabled = true; runBtn.textContent = "Starting…"; runBtn.classList.add("disabled"); }
+                  setTimeout(function () {
+                    showToast("Paper Trading started / 模拟已启动 (UI state only)", "ok");
+                    if (runBtn) { runBtn.disabled = false; runBtn.textContent = "Running"; }
+                  }, 900);
+                });
+              }
+            },
+          });
+        } else if (action === "st:pause") {
+          if (!confirm("Pause paper trading for " + s.name + "? / 确认暂停模拟交易？")) return;
+          showToast("Paper trading paused / 模拟已暂停 (UI state only)", "info");
+          btn.textContent = "Paused";
+        }
+      });
+    }
+
+    // "New Strategy" button (page header) — placeholder
+    var newBtn = document.querySelector('[data-action="st:new"]');
+    if (newBtn) {
+      newBtn.addEventListener("click", function () {
+        showToast("New strategy — coming in UI V1 / 新建策略待后续 UI 版本", "info");
+      });
+    }
+  }
+
+  // ── Strategy page (Commit 012) ─────────────────────────────────
   PAGE_FRAMEWORK["research/strategies"] = function () {
     return (
-      UI.pageHeader("Strategies", "Strategy management and lifecycle",
-        UI.button("New Strategy", "primary", { sm: true })) +
-      UI.table({
-        columns: [
-          { key: "name", label: "Strategy" },
-          { key: "status", label: "Status" },
-          { key: "type", label: "Type" },
-          { key: "sharpe", label: "Sharpe", numeric: true },
-          { key: "return", label: "Return", numeric: true,
-            format: function (v) { return v >= 0 ? "+" : ""; } },
-          { key: "mdd", label: "Max DD", numeric: true },
-        ],
-        rows: [
-          { name: "Alpha021", status: "Active", type: "Factor", sharpe: 1.31, return: "+18.4%", mdd: "-7.8%" },
-          { name: "Momentum-Q", status: "Active", type: "Momentum", sharpe: 0.92, return: "+12.1%", mdd: "-9.2%" },
-          { name: "MeanRevert", status: "Paused", type: "MeanRev", sharpe: 0.71, return: "+5.3%", mdd: "-4.1%" },
-        ],
-      })
+      UI.pageHeader("Strategy", "Strategy lifecycle management · Research → Validation → Paper → Shadow → Live",
+        UI.button("New Strategy", "primary", { sm: true, action: "st:new" })) +
+      renderStKpis() +
+      UI.panel("Strategies", renderStList()) +
+      '<div id="st-detail">' + renderStDetail() + "</div>"
     );
   };
 
-  PAGE_FRAMEWORK["research/backtest"] = function () {
-    var kpis = UI.metricCard("Return", "+18.42%", "", "pos") +
-      UI.metricCard("Sharpe", "1.31", "", "pos") +
-      UI.metricCard("Max DD", "-7.82%", "", "neg") +
-      UI.metricCard("Win Rate", "64.2%", "", "pos");
-    var configForm =
-      UI.field("Strategy", UI.select({ options: ["Alpha021", "Momentum-Q", "MeanRevert"] })) +
-      UI.field("Universe", UI.input({ value: "NVDA QQQ SPY" })) +
-      UI.field("Timeframe", UI.select({ options: ["Daily", "1H", "15M", "5M"] })) +
-      UI.field("Start Date", UI.input({ type: "date", value: "2023-01-01" })) +
-      UI.field("End Date", UI.input({ type: "date", value: "2026-08-24" })) +
-      UI.field("Initial Capital", UI.input({ type: "number", value: "1000000" }));
+  /* ==================================================================
+   * Backtest module — Commit 011
+   * Professional backtest workbench: config → KPIs → equity/drawdown/
+   * monthly returns → trades → summary. Mock data designed for future
+   * real-API swap. State machine: idle | running | done | error.
+   * Display-only — does NOT invoke the backtest engine, Factor Discovery,
+   * Alpha021, paper trading, or any trading API.
+   * ================================================================== */
+  function btPad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  // Equity curve (44 monthly points, 2023-01 → 2026-08).
+  // Local peak at month 6 (1,045,000), trough at month 12 (987,725) → -5.5%
+  // max drawdown; final 1,081,200 = +8.12% total return.
+  var BT_EQUITY = [
+    1000000, 1010000, 1020000, 1030000, 1040000, 1045000,
+    1035000, 1025000, 1015000, 1005000, 995000, 987725,
+    1000000, 1010000, 1018000, 1024000, 1030000, 1035000,
+    1040000, 1042000, 1045000, 1048000, 1050000, 1052000,
+    1054000, 1056000, 1058000, 1060000, 1061000, 1062000,
+    1063000, 1064000, 1065000, 1066000, 1067000, 1068000,
+    1069000, 1071000, 1072000, 1074000, 1075000, 1077000,
+    1079000, 1081200,
+  ];
+  var BT_START = { year: 2023, month: 1 };
+
+  var BT_KPI = {
+    totalReturn: 0.0812,
+    cagr: 0.124,
+    sharpe: 1.38,
+    maxDD: -0.055,
+    winRate: 0.68,
+    turnover: 1.24,
+  };
+
+  var BT_TRADES = [
+    { date: "2023-02-14", symbol: "NVDA", side: "BUY", qty: 100, price: 230.50, pnl: null },
+    { date: "2023-03-10", symbol: "NVDA", side: "SELL", qty: 100, price: 248.20, pnl: 1770.00 },
+    { date: "2023-04-05", symbol: "QQQ", side: "BUY", qty: 200, price: 320.10, pnl: null },
+    { date: "2023-05-12", symbol: "QQQ", side: "SELL", qty: 200, price: 312.40, pnl: -1540.00 },
+    { date: "2023-06-20", symbol: "SPY", side: "BUY", qty: 150, price: 440.30, pnl: null },
+    { date: "2023-08-15", symbol: "SPY", side: "SELL", qty: 150, price: 430.80, pnl: -1425.00 },
+    { date: "2023-09-02", symbol: "NVDA", side: "BUY", qty: 120, price: 410.25, pnl: null },
+    { date: "2023-11-30", symbol: "NVDA", side: "SELL", qty: 120, price: 460.50, pnl: 6030.00 },
+    { date: "2024-01-18", symbol: "QQQ", side: "BUY", qty: 180, price: 380.50, pnl: null },
+    { date: "2024-03-22", symbol: "QQQ", side: "SELL", qty: 180, price: 410.20, pnl: 5346.00 },
+    { date: "2024-05-10", symbol: "SPY", side: "BUY", qty: 130, price: 480.60, pnl: null },
+    { date: "2024-07-15", symbol: "SPY", side: "SELL", qty: 130, price: 495.10, pnl: 1885.00 },
+    { date: "2025-02-14", symbol: "NVDA", side: "BUY", qty: 90, price: 720.30, pnl: null },
+    { date: "2025-04-20", symbol: "NVDA", side: "SELL", qty: 90, price: 738.90, pnl: 1674.00 },
+  ];
+
+  // ── Derived series ────────────────────────────────────────────
+  function buildBtEquityPoints(eq, start) {
+    var pts = [];
+    var y = start.year, m = start.month;
+    for (var i = 0; i < eq.length; i++) {
+      pts.push({ value: eq[i], label: y + "-" + btPad2(m), year: y, month: m });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return pts;
+  }
+  function buildBtDrawdownPoints(eqPts) {
+    var pts = [], max = eqPts[0].value;
+    for (var i = 0; i < eqPts.length; i++) {
+      var v = eqPts[i].value;
+      if (v > max) max = v;
+      pts.push({ value: (v - max) / max, label: eqPts[i].label, year: eqPts[i].year, month: eqPts[i].month });
+    }
+    return pts;
+  }
+  function buildBtMonthlyReturns(eqPts) {
+    var cells = {};
+    for (var i = 0; i < eqPts.length; i++) {
+      var p = eqPts[i];
+      var r = i === 0 ? 0 : p.value / eqPts[i - 1].value - 1;
+      if (!cells[p.year]) cells[p.year] = {};
+      cells[p.year][p.month] = r;
+    }
+    return { years: Object.keys(cells).map(Number).sort(function (a, b) { return a - b; }), cells: cells };
+  }
+
+  var BT_EQUITY_PTS = buildBtEquityPoints(BT_EQUITY, BT_START);
+  var BT_DRAWDOWN_PTS = buildBtDrawdownPoints(BT_EQUITY_PTS);
+  var BT_MONTHLY = buildBtMonthlyReturns(BT_EQUITY_PTS);
+  var BT_STATE = "done"; // "idle" | "running" | "done" | "error"
+
+  function btPct(x) { return (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%"; }
+  function btFmtPct(r) { return (r >= 0 ? "+" : "") + (r * 100).toFixed(2) + "%"; }
+  function btMonthlyReturnClass(r) {
+    var a = Math.abs(r);
+    if (r >= 0) {
+      if (a < 0.005) return "bt-m-pos-1";
+      if (a < 0.015) return "bt-m-pos-2";
+      return "bt-m-pos-3";
+    }
+    if (a < 0.005) return "bt-m-neg-1";
+    if (a < 0.015) return "bt-m-neg-2";
+    return "bt-m-neg-3";
+  }
+  function btSideBadge(side) {
+    var cls = side === "BUY" ? "bt-side-buy" : "bt-side-sell";
+    return '<span class="bt-side ' + cls + '">' + esc(side) + "</span>";
+  }
+  function btFmtMoney(v) {
+    return (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderBtConfig() {
+    var form =
+      UI.field("Strategy", UI.select({ id: "bt-strategy", value: "Alpha021", options: [
+        { value: "Alpha021", label: "Alpha021" },
+        { value: "Momentum-Q", label: "Momentum-Q" },
+        { value: "MeanRevert", label: "Mean Reversion" },
+        { value: "factor-v1", label: "factor-v1 (Synthetic)" },
+      ] })) +
+      UI.field("Factor", UI.select({ id: "bt-factor", value: "Alpha021", options: [
+        { value: "Alpha021", label: "Alpha021" },
+        { value: "Alpha008", label: "Alpha008" },
+        { value: "Alpha060", label: "Alpha060" },
+        { value: "Alpha047", label: "Alpha047" },
+      ] })) +
+      UI.field("Universe", UI.input({ id: "bt-universe", value: "NVDA QQQ SPY" })) +
+      UI.field("Timeframe", UI.select({ id: "bt-tf", value: "1D", options: [
+        { value: "1D", label: "1D" }, { value: "1H", label: "1H" },
+        { value: "15m", label: "15m" }, { value: "5m", label: "5m" },
+      ] })) +
+      UI.field("Start", UI.input({ id: "bt-start", type: "date", value: "2023-01-01" })) +
+      UI.field("End", UI.input({ id: "bt-end", type: "date", value: "2026-08-24" })) +
+      UI.field("Initial Capital", UI.input({ id: "bt-capital", type: "number", value: "1000000", step: "1000" })) +
+      UI.field("Commission (%)", UI.input({ id: "bt-commission", type: "number", value: "0.00", step: "0.01" })) +
+      UI.field("Slippage (bps)", UI.input({ id: "bt-slippage", type: "number", value: "3", step: "1" }));
+    return '<div class="bt-config-grid">' + form + "</div>";
+  }
+
+  function renderBtKpis() {
     return (
-      UI.pageHeader("Backtest", "Strategy backtesting workspace",
-        UI.button("Run Backtest", "primary", { sm: true })) +
-      UI.panel("Configuration", configForm) +
+      UI.metricCard("Total Return", btPct(BT_KPI.totalReturn), "", "pos") +
+      UI.metricCard("CAGR", btPct(BT_KPI.cagr), "", "pos") +
+      UI.metricCard("Sharpe", BT_KPI.sharpe.toFixed(2), "", "pos") +
+      UI.metricCard("Max Drawdown", btPct(BT_KPI.maxDD), "", "neg") +
+      UI.metricCard("Win Rate", btPct(BT_KPI.winRate), "", "pos") +
+      UI.metricCard("Turnover", BT_KPI.turnover.toFixed(2) + "x", "", "")
+    );
+  }
+
+  function renderBtEquity() {
+    var xLabels = BT_EQUITY_PTS.map(function (p) { return p.month === 1 ? String(p.year) : ""; });
+    return UI.equityCurve(BT_EQUITY_PTS, {
+      height: 300,
+      color: "var(--ds-profit)",
+      yFormat: function (v) { return UI.money(v, 0); },
+      xLabels: xLabels,
+    });
+  }
+
+  // Custom drawdown chart: fill from zero baseline (top) down to the line.
+  function renderBtDrawdown() {
+    var dd = BT_DRAWDOWN_PTS;
+    var W = 880, H = 220, pad = { top: 16, right: 16, bottom: 28, left: 64 };
+    var w = W - pad.left - pad.right, h = H - pad.top - pad.bottom;
+    var vals = dd.map(function (d) { return d.value; });
+    var minDD = Math.min.apply(null, vals);
+    var yMin = minDD < 0 ? minDD * 1.12 : 0;
+    var span = (0 - yMin) || 1;
+    function yOf(v) { return pad.top + ((0 - v) / span) * h; }
+    var xStep = dd.length > 1 ? w / (dd.length - 1) : 0;
+    var pts = dd.map(function (d, i) { return { x: pad.left + i * xStep, y: yOf(d.value) }; });
+    var lineD = "M " + pts.map(function (p) { return p.x.toFixed(1) + " " + p.y.toFixed(1); }).join(" L ");
+    var areaD = lineD + " L " + pts[pts.length - 1].x.toFixed(1) + " " + pad.top.toFixed(1) +
+      " L " + pts[0].x.toFixed(1) + " " + pad.top.toFixed(1) + " Z";
+    var ticks = [0, minDD / 2, minDD];
+    var yTickHtml = ticks.map(function (t) {
+      var y = yOf(t);
+      var lbl = (t * 100).toFixed(2) + "%";
+      return '<line x1="' + pad.left + '" y1="' + y.toFixed(1) + '" x2="' + (pad.left + w) + '" y2="' + y.toFixed(1) + '" stroke="var(--ds-border-soft)" stroke-width="1" stroke-dasharray="2 4" />' +
+        '<text x="' + (pad.left - 8) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" class="eqc-axis-label">' + esc(lbl) + "</text>";
+    }).join("");
+    var zeroLine = '<line x1="' + pad.left + '" y1="' + pad.top.toFixed(1) + '" x2="' + (pad.left + w) + '" y2="' + pad.top.toFixed(1) + '" stroke="var(--ds-border-default)" stroke-width="1" />';
+    var xTickHtml = "";
+    dd.forEach(function (d, i) {
+      if (d.month === 1) {
+        var x = pad.left + i * xStep;
+        xTickHtml += '<text x="' + x.toFixed(1) + '" y="' + (pad.top + h + 18) + '" text-anchor="middle" class="eqc-axis-label">' + esc(String(d.year)) + "</text>";
+      }
+    });
+    var last = pts[pts.length - 1];
+    var marker = '<circle cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="4" fill="var(--ds-loss)" />' +
+      '<circle cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="8" fill="var(--ds-loss)" opacity="0.2" />';
+    return '<div class="bt-dd-wrap eqc-wrap"><svg class="eqc-svg" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Drawdown">' +
+      '<path d="' + areaD + '" fill="var(--ds-loss)" fill-opacity="0.18" />' +
+      '<path d="' + lineD + '" fill="none" stroke="var(--ds-loss)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />' +
+      zeroLine + yTickHtml + xTickHtml + marker +
+      "</svg></div>";
+  }
+
+  function renderBtMonthly() {
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var header = '<tr><th class="bt-m-year">Year</th>' +
+      months.map(function (mo) { return '<th class="bt-m-month">' + mo + "</th>"; }).join("") +
+      '<th class="bt-m-ytd">YTD</th></tr>';
+    var rows = BT_MONTHLY.years.map(function (y) {
+      var yearProduct = 1;
+      var tds = "";
+      for (var mo = 1; mo <= 12; mo++) {
+        var r = BT_MONTHLY.cells[y][mo];
+        if (r == null) {
+          tds += '<td class="bt-m-cell bt-m-empty">—</td>';
+        } else {
+          yearProduct *= (1 + r);
+          tds += '<td class="bt-m-cell ' + btMonthlyReturnClass(r) + '" title="' + y + "-" + btPad2(mo) + '">' + btFmtPct(r) + "</td>";
+        }
+      }
+      var ytd = yearProduct - 1;
+      var ytdCls = ytd >= 0 ? "bt-m-ytd-pos" : "bt-m-ytd-neg";
+      return '<tr><td class="bt-m-year">' + y + "</td>" + tds +
+        '<td class="bt-m-ytd ' + ytdCls + '">' + btFmtPct(ytd) + "</td></tr>";
+    }).join("");
+    return '<table class="bt-monthly-table">' + header + rows + "</table>";
+  }
+
+  function renderBtTrades() {
+    return UI.table({
+      columns: [
+        { key: "date", label: "Date", sortable: false },
+        { key: "symbol", label: "Symbol", sortable: false },
+        { key: "side", label: "Side", sortable: false, format: function (v) { return btSideBadge(v); } },
+        { key: "qty", label: "Qty", numeric: true, format: function (v) { return v.toLocaleString(); } },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return v == null ? "—" : btFmtMoney(v); }, color: function (v) { return v == null ? "" : v >= 0 ? "pos" : "neg"; } },
+      ],
+      rows: BT_TRADES,
+      emptyDesc: "No trades recorded for this backtest.",
+    });
+  }
+
+  function renderBtSummary() {
+    var cells =
+      btSummaryCell("Strategy", "Alpha021") +
+      btSummaryCell("Universe", "NVDA QQQ SPY") +
+      btSummaryCell("Timeframe", "1D") +
+      btSummaryCell("Period", "2023-01 → 2026-08") +
+      btSummaryCell("Initial Capital", "$1,000,000") +
+      btSummaryCell("Commission", "0.00%") +
+      btSummaryCell("Slippage", "3 bps") +
+      btSummaryCell("Trades", String(BT_TRADES.length)) +
+      btSummaryCell("Total Return", btPct(BT_KPI.totalReturn), "pos") +
+      btSummaryCell("Sharpe", BT_KPI.sharpe.toFixed(2)) +
+      btSummaryCell("Max Drawdown", btPct(BT_KPI.maxDD), "neg") +
+      btSummaryCell("Win Rate", btPct(BT_KPI.winRate), "pos");
+    return '<div class="bt-summary-grid">' + cells + "</div>";
+  }
+  function btSummaryCell(label, value, cls) {
+    return '<div class="bt-summary-cell"><div class="bt-summary-label">' + esc(label) + "</div>" +
+      '<div class="bt-summary-value' + (cls ? " " + cls : "") + '">' + esc(value) + "</div></div>";
+  }
+
+  function renderBtResultsHtml() {
+    if (BT_STATE === "running") return UI.loading("Running backtest…");
+    if (BT_STATE === "error") return UI.empty("Backtest failed", "Check parameters and retry. / 请检查参数后重试。", "⚠");
+    if (BT_STATE === "idle") return UI.empty("No backtest results", "Configure parameters and click Run Backtest to see results.", "⌖");
+    var range = BT_EQUITY_PTS[0].label + " → " + BT_EQUITY_PTS[BT_EQUITY_PTS.length - 1].label;
+    return (
       UI.sectionHeading("Performance") +
-      UI.kpiGrid(kpis) +
-      UI.panel("Equity Curve", '<div class="chart-placeholder">Equity curve chart placeholder</div>')
+      '<div class="bt-kpi-grid">' + renderBtKpis() + "</div>" +
+      UI.panel("Equity Curve", renderBtEquity(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' + esc(range) + "</span>" }) +
+      UI.panel("Drawdown", renderBtDrawdown(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Max DD ' + btPct(BT_KPI.maxDD) + "</span>" }) +
+      UI.panel("Monthly Returns", renderBtMonthly()) +
+      UI.panel("Trades", renderBtTrades(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' + BT_TRADES.length + " trades</span>" }) +
+      UI.panel("Backtest Summary", renderBtSummary())
+    );
+  }
+
+  function updateBtResults() {
+    var host = document.getElementById("bt-results");
+    if (host) host.innerHTML = renderBtResultsHtml();
+  }
+
+  function setBtRunState(running) {
+    document.querySelectorAll('[data-action="bt:run"]').forEach(function (b) {
+      if (!b._btLabel) b._btLabel = b.textContent;
+      b.disabled = running;
+      b.textContent = running ? "Running…" : b._btLabel;
+      if (running) b.classList.add("disabled"); else b.classList.remove("disabled");
+    });
+  }
+
+  function runBacktest() {
+    var uni = document.getElementById("bt-universe");
+    if (uni && !uni.value.trim()) {
+      BT_STATE = "error";
+      updateBtResults();
+      showToast("Universe cannot be empty / 标的池不能为空", "error");
+      return;
+    }
+    BT_STATE = "running";
+    setBtRunState(true);
+    updateBtResults();
+    setTimeout(function () {
+      BT_STATE = "done";
+      setBtRunState(false);
+      updateBtResults();
+      showToast("Backtest complete / 回测完成", "ok");
+    }, 900);
+  }
+
+  function bindBacktestPage() {
+    document.querySelectorAll('[data-action="bt:run"]').forEach(function (b) {
+      b.addEventListener("click", runBacktest);
+    });
+  }
+
+  // ── Backtest (Commit 011 — professional backtest workbench) ──────
+  PAGE_FRAMEWORK["research/backtest"] = function () {
+    var runBtn = UI.button("Run New Backtest", "primary", { sm: true, action: "bt:run" });
+    var configRun = UI.button("Run Backtest", "primary", { sm: true, action: "bt:run" });
+    return (
+      UI.pageHeader("Backtest", "Strategy backtesting workspace · 研究 → 回测 → 验证", runBtn) +
+      UI.panel("Configuration", renderBtConfig(), { actions: configRun }) +
+      '<div id="bt-results" class="bt-results">' + renderBtResultsHtml() + "</div>"
     );
   };
 
@@ -2737,75 +4323,113 @@
   };
 
   // ── Trading ─────────────────────────────────────────────────────
-  // ── Trading / Paper Trading (Commit 006 — full terminal) ───────
-  PAGE_FRAMEWORK["trading/paper"] = function () {
-    // ── Mock data ──────────────────────────────────────────────
-    var watchlist = [
-      { symbol: "NVDA", price: 178.42, changePct: 0.0124 },
-      { symbol: "QQQ", price: 540.20, changePct: 0.0085 },
-      { symbol: "SPY", price: 650.10, changePct: 0.0048 },
-      { symbol: "AAPL", price: 216.28, changePct: -0.0062 },
-      { symbol: "MSFT", price: 448.70, changePct: 0.0150 },
-      { symbol: "TSLA", price: 412.60, changePct: -0.0230 },
-    ];
+  // ── Trading / Paper Trading (Integration 003 — real API data) ───
+  // Module-level state shared between the render function and the
+  // order-ticket event bindings (review / preview / submit flow).
+  var _tradingState = {
+    symbol: "NVDA",
+    quote: null,          // last useQuote() result
+    sessionRunning: false,
+    submitting: false,    // duplicate-submit lock
+  };
 
-    // Mock candlestick data (~32 candles around $178)
-    var candles = [
-      { o: 176.5, h: 177.2, l: 176.1, c: 176.9 },
-      { o: 177.0, h: 177.8, l: 176.8, c: 177.5 },
-      { o: 177.4, h: 178.1, l: 177.0, c: 177.2 },
-      { o: 177.2, h: 178.0, l: 176.9, c: 177.8 },
-      { o: 177.9, h: 178.5, l: 177.6, c: 178.3 },
-      { o: 178.2, h: 178.6, l: 177.5, c: 177.7 },
-      { o: 177.6, h: 178.0, l: 176.8, c: 177.0 },
-      { o: 177.1, h: 177.5, l: 176.4, c: 176.6 },
-      { o: 176.5, h: 177.0, l: 175.8, c: 176.2 },
-      { o: 176.3, h: 176.9, l: 175.9, c: 176.8 },
-      { o: 176.9, h: 177.6, l: 176.5, c: 177.4 },
-      { o: 177.3, h: 178.0, l: 177.0, c: 177.8 },
-      { o: 177.9, h: 178.4, l: 177.5, c: 178.1 },
-      { o: 178.0, h: 178.7, l: 177.7, c: 178.5 },
-      { o: 178.4, h: 179.0, l: 178.0, c: 178.2 },
-      { o: 178.3, h: 178.8, l: 177.6, c: 177.8 },
-      { o: 177.9, h: 178.2, l: 177.2, c: 177.4 },
-      { o: 177.3, h: 177.8, l: 176.9, c: 177.0 },
-      { o: 177.1, h: 177.5, l: 176.5, c: 176.7 },
-      { o: 176.8, h: 177.3, l: 176.4, c: 177.1 },
-      { o: 177.2, h: 177.9, l: 177.0, c: 177.7 },
-      { o: 177.6, h: 178.3, l: 177.4, c: 178.1 },
-      { o: 178.0, h: 178.6, l: 177.7, c: 178.4 },
-      { o: 178.5, h: 179.0, l: 178.2, c: 178.7 },
-      { o: 178.8, h: 179.2, l: 178.4, c: 178.5 },
-      { o: 178.4, h: 178.9, l: 177.8, c: 178.0 },
-      { o: 178.1, h: 178.5, l: 177.6, c: 177.9 },
-      { o: 177.8, h: 178.3, l: 177.5, c: 178.2 },
-      { o: 178.3, h: 178.8, l: 178.0, c: 178.6 },
-      { o: 178.5, h: 179.0, l: 178.2, c: 178.9 },
-      { o: 178.8, h: 179.1, l: 178.3, c: 178.4 },
-      { o: 178.4, h: 178.7, l: 178.0, c: 178.42 },
-    ];
+  PAGE_FRAMEWORK["trading/paper"] = async function () {
+    var symbol = _tradingState.symbol;
 
-    // ── Top row: Watchlist + Chart + Order Ticket ───────────────
-    var watchlistHtml = UI.watchlist(watchlist, "NVDA");
+    // ── Parallel fetch: quote + dashboard + orders + executions ──
+    var fetched = await Promise.all([
+      useQuote(symbol).catch(function () { return null; }),
+      useDashboard().catch(function () { return null; }),
+      api.get("/dashboard/orders").catch(function () { return { orders: [] }; }),
+      api.get("/dashboard/executions").catch(function () { return { executions: [] }; }),
+    ]);
+    var quote = fetched[0] || {
+      symbol: symbol, last_price: 0, bid: 0, ask: 0, spread: 0,
+      change: 0, change_pct: 0, timestamp: null, source: "none", session_running: false,
+    };
+    var dash = fetched[1] || {
+      account: { equity: 0, cash: 0, daily_pnl: 0, daily_return: 0 },
+      positions: { count: 0, market_value: 0, unrealized_pnl: 0, items: [] },
+      orders: { pending: 0, filled_today: 0, rejected_today: 0 },
+      risk: { status: "UNKNOWN", exposure: 0 },
+      execution: { fill_rate: 0, reject_rate: 0, slippage: 0 },
+      meta: { pipeline_attached: false, environment: "PAPER", account_name: "—" },
+    };
+    var ordersList = (fetched[2] && fetched[2].orders) || [];
+    var execsList = (fetched[3] && fetched[3].executions) || [];
 
+    // Persist for the event bindings
+    _tradingState.quote = quote;
+    _tradingState.sessionRunning = !!quote.session_running;
+
+    // ── Watchlist quotes (parallel, best-effort) ────────────────
+    var wlSymbols = ["NVDA", "AAPL", "MSFT", "TSLA"];
+    var wlQuotes = await Promise.all(wlSymbols.map(function (s) {
+      return useQuote(s).catch(function () {
+        return { symbol: s, last_price: 0, change_pct: 0, session_running: false };
+      });
+    }));
+    var watchlist = wlQuotes.map(function (q) {
+      return { symbol: q.symbol, price: q.last_price, changePct: q.change_pct / 100 };
+    });
+
+    // ── Helpers ─────────────────────────────────────────────────
+    function fmtMoney(v) { return UI.money(v, 2); }
+    function fmtSigned(v) { return UI.signedMoney(v); }
+    function fmtPct(v) { return (v >= 0 ? "+" : "") + v.toFixed(2) + "%"; }
+
+    // ── Instrument header from real quote ───────────────────────
+    var ts = quote.timestamp ? new Date(quote.timestamp).toLocaleTimeString() : "—";
     var instHeader = UI.instrumentHeader({
-      symbol: "NVDA", name: "NVIDIA Corp", price: 178.42,
-      change: 2.18, changePct: 0.0124, bid: 178.40, ask: 178.44,
-      spread: "$0.04", status: "Open", time: "16:05:00",
+      symbol: quote.symbol,
+      name: quote.symbol, // backend has no company name; use symbol
+      price: quote.last_price,
+      change: quote.change,
+      changePct: quote.change_pct / 100,
+      bid: quote.bid,
+      ask: quote.ask,
+      spread: "$" + quote.spread.toFixed(2),
+      status: quote.session_running ? "Live" : "No Session",
+      time: ts,
     });
 
+    // ── Chart: illustrative candles (no historical quote API) ────
+    // Per Integration 003 boundary: "不为了 UI 新造行情服务".
+    // Candles are centered around the live quote price so the chart
+    // visually tracks the real last price without a new service.
+    var base = quote.last_price || 178.42;
+    var candles = [];
+    for (var i = 0; i < 32; i++) {
+      var drift = (i - 16) * (base * 0.001);
+      var wave = Math.sin(i * 0.4) * (base * 0.004);
+      var c = base + drift + wave;
+      var o = c - (base * 0.002);
+      candles.push({
+        o: o, h: Math.max(o, c) + (base * 0.001),
+        l: Math.min(o, c) - (base * 0.001), c: c,
+      });
+    }
     var chartHtml = UI.candleChart(candles, { height: 300 });
-    var chartShell = UI.chartShell({
-      chartHtml: chartHtml,
-      showVolume: true,
+    var chartShell = UI.chartShell({ chartHtml: chartHtml, showVolume: true });
+
+    // ── Order Ticket with real quote price ──────────────────────
+    var orderTicket = UI.orderTicket({
+      symbol: quote.symbol, price: quote.last_price, qty: 100,
     });
 
-    var orderTicket = UI.orderTicket({ symbol: "NVDA", price: 178.42, qty: 100 });
+    // ── Session banner (when no session, show a Start prompt) ──
+    var sessionBanner = quote.session_running ? "" :
+      '<div class="ds-callout ds-callout-warning" style="margin-bottom:var(--ds-space-md);">' +
+      '<strong>No paper trading session.</strong> ' +
+      'Start a session from the Topbar or ' +
+      '<a href="#/system" class="ds-link">System → Sessions</a> to enable order submission. ' +
+      'Quotes are showing nominal/last-known prices.' +
+      '</div>';
 
     var topRow =
       '<div class="tr-grid-3">' +
       '<div class="tr-col-left">' +
-      UI.panel("Watchlist", watchlistHtml) +
+      UI.panel("Watchlist", UI.watchlist(watchlist, quote.symbol)) +
       '</div>' +
       '<div class="tr-col-center">' +
       instHeader + chartShell +
@@ -2815,86 +4439,107 @@
       '</div>' +
       '</div>';
 
-    // ── Account Summary ─────────────────────────────────────────
+    // ── Account Summary from real dashboard data ────────────────
     var acctSummary = UI.statRows([
-      { label: "Total Equity", value: "$1,073,181", variant: "default" },
-      { label: "Cash", value: "$806,617", variant: "info" },
-      { label: "Buying Power", value: "$1,613,234", variant: "default" },
-      { label: "Gross Exposure", value: "$266,564", variant: "info" },
-      { label: "Net Exposure", value: "$229,936", variant: "info" },
-      { label: "Unrealized P&L", value: "+$5,488", variant: "pos" },
-      { label: "Realized P&L", value: "+$67,610", variant: "pos" },
+      { label: "Equity", value: fmtMoney(dash.account.equity), variant: dash.account.daily_return >= 0 ? "pos" : "neg" },
+      { label: "Cash", value: fmtMoney(dash.account.cash), variant: "info" },
+      { label: "Exposure", value: fmtMoney(dash.risk.exposure), variant: "info" },
+      { label: "Unrealized P&L", value: fmtSigned(dash.positions.unrealized_pnl), variant: dash.positions.unrealized_pnl >= 0 ? "pos" : "neg" },
+      { label: "Daily P&L", value: fmtSigned(dash.account.daily_pnl), variant: dash.account.daily_pnl >= 0 ? "pos" : "neg" },
+      { label: "Risk Status", value: esc(dash.risk.status), variant: dash.risk.status === "HEALTHY" ? "pos" : dash.risk.status === "NO_PIPELINE" ? "warning" : "neg" },
+      { label: "Fill Rate", value: (dash.execution.fill_rate * 100).toFixed(1) + "%", variant: dash.execution.fill_rate >= 0.5 ? "pos" : "warning" },
     ]);
 
-    // ── Positions table ─────────────────────────────────────────
-    var posTable = UI.table({
+    // ── Positions table from real items ─────────────────────────
+    var posRows = (dash.positions.items || []).map(function (p) {
+      return {
+        symbol: p.symbol || "—",
+        qty: p.quantity || 0,
+        avgPrice: p.avg_price || 0,
+        last: p.last_price || 0,
+        pnl: p.unrealized_pnl || 0,
+        pnlPct: (p.avg_price ? (p.last_price - p.avg_price) / p.avg_price : 0),
+      };
+    });
+    var posTable = posRows.length ? UI.table({
       columns: [
         { key: "symbol", label: "Symbol" },
         { key: "qty", label: "Qty", numeric: true },
-        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "last", label: "Last", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
+        { key: "last", label: "Last", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
         { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
         { key: "pnlPct", label: "P&L %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
       ],
-      rows: [
-        { symbol: "NVDA", qty: 500, avgPrice: 165.20, last: 178.42, pnl: 6610, pnlPct: 0.0800 },
-        { symbol: "QQQ", qty: 200, avgPrice: 520.10, last: 540.20, pnl: 4020, pnlPct: 0.0387 },
-        { symbol: "SPY", qty: 100, avgPrice: 620.20, last: 650.10, pnl: 2990, pnlPct: 0.0482 },
-      ],
-    });
+      rows: posRows,
+    }) : UI.empty("No Open Positions", "No positions in the current pipeline snapshot.");
 
-    // ── Orders table ────────────────────────────────────────────
-    var ordersTable = UI.table({
+    // ── Orders table from real /dashboard/orders ─────────────────
+    var orderRows = ordersList.map(function (o) {
+      var t = o.created_at || o.submitted_at || o.updated_at || "";
+      var time = t ? new Date(t).toLocaleTimeString().slice(0, 8) : "—";
+      return {
+        id: o.order_id || "—",
+        symbol: o.symbol || "—",
+        side: o.side || "—",
+        qty: o.quantity || 0,
+        type: (o.order_type || "MARKET"),
+        price: o.price || o.average_fill_price || 0,
+        status: o.status || "—",
+        time: time,
+      };
+    });
+    var ordersTable = orderRows.length ? UI.table({
       columns: [
-        { key: "id", label: "Order ID", numeric: true },
+        { key: "id", label: "Order ID" },
         { key: "symbol", label: "Symbol" },
-        { key: "side", label: "Side", format: function (v) { return v; }, color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
         { key: "qty", label: "Qty", numeric: true },
         { key: "type", label: "Type" },
-        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
         { key: "status", label: "Status", format: function (v) {
-          var m = { FILLED: "pos", PENDING: "warning", CANCELLED: "neutral", REJECTED: "neg" };
-          return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + v + '</span>';
+          var m = { FILLED: "pos", PENDING: "warning", SUBMITTED: "warning", NEW: "warning", CANCELLED: "neutral", REJECTED: "neg" };
+          return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + esc(v) + '</span>';
         } },
         { key: "time", label: "Time" },
       ],
-      rows: [
-        { id: 1024, symbol: "NVDA", side: "BUY", qty: 100, type: "Limit", price: 182.31, status: "FILLED", time: "10:23:41" },
-        { id: 1023, symbol: "QQQ", side: "BUY", qty: 200, type: "Market", price: 571.20, status: "FILLED", time: "10:25:01" },
-        { id: 1022, symbol: "AAPL", side: "SELL", qty: 100, type: "Limit", price: 224.50, status: "FILLED", time: "10:26:15" },
-        { id: 1021, symbol: "SPY", side: "BUY", qty: 50, type: "Limit", price: 645.13, status: "PENDING", time: "10:28:30" },
-        { id: 1020, symbol: "NVDA", side: "BUY", qty: 200, type: "Limit", price: 180.00, status: "REJECTED", time: "10:15:00" },
-        { id: 1019, symbol: "MSFT", side: "SELL", qty: 150, type: "Market", price: 450.20, status: "CANCELLED", time: "09:58:12" },
-      ],
-    });
+      rows: orderRows,
+    }) : UI.empty("No Orders", "No orders in the current session.");
 
-    // ── Executions table ────────────────────────────────────────
-    var execsTable = UI.table({
+    // ── Executions table from real /dashboard/executions ────────
+    var execRows = execsList.map(function (e) {
+      var t = e.timestamp || e.filled_at || "";
+      var time = t ? new Date(t).toLocaleTimeString().slice(0, 8) : "—";
+      return {
+        id: e.exec_id || e.execution_id || "—",
+        orderId: e.order_id || "—",
+        symbol: e.symbol || "—",
+        side: e.side || "—",
+        qty: e.quantity || e.filled_quantity || 0,
+        price: e.price || 0,
+        fee: e.commission || 0,
+        time: time,
+      };
+    });
+    var execsTable = execRows.length ? UI.table({
       columns: [
-        { key: "id", label: "Exec ID", numeric: true },
-        { key: "orderId", label: "Order ID", numeric: true },
+        { key: "id", label: "Exec ID" },
+        { key: "orderId", label: "Order ID" },
         { key: "symbol", label: "Symbol" },
         { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
         { key: "qty", label: "Filled Qty", numeric: true },
-        { key: "price", label: "Fill Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
-        { key: "fee", label: "Fee", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "price", label: "Fill Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
+        { key: "fee", label: "Fee", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
         { key: "time", label: "Time" },
       ],
-      rows: [
-        { id: 5001, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 100, price: 182.31, fee: 1.82, time: "10:23:41" },
-        { id: 5002, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 200, price: 182.45, fee: 3.65, time: "10:23:42" },
-        { id: 5003, orderId: 1024, symbol: "NVDA", side: "BUY", qty: 300, price: 182.52, fee: 5.48, time: "10:23:43" },
-        { id: 5004, orderId: 1023, symbol: "QQQ", side: "BUY", qty: 200, price: 571.20, fee: 5.71, time: "10:25:01" },
-        { id: 5005, orderId: 1022, symbol: "AAPL", side: "SELL", qty: 100, price: 224.50, fee: 2.25, time: "10:26:15" },
-      ],
-    });
+      rows: execRows,
+    }) : UI.empty("No Executions", "No executions in the current session.");
 
     // ── Bottom tabs: Positions / Orders / Executions ───────────
     var bottomTabs =
       '<div class="ds-tabs" id="tr-bottom-tabs">' +
-      '<button class="ds-tab active" data-tab="positions">Positions</button>' +
-      '<button class="ds-tab" data-tab="orders">Orders</button>' +
-      '<button class="ds-tab" data-tab="executions">Executions</button>' +
+      '<button class="ds-tab active" data-tab="positions">Positions (' + (dash.positions.count || 0) + ')</button>' +
+      '<button class="ds-tab" data-tab="orders">Orders (' + ordersList.length + ')</button>' +
+      '<button class="ds-tab" data-tab="executions">Executions (' + execsList.length + ')</button>' +
       '</div>';
     var bottomContent =
       '<div class="ds-tab-content" id="tr-tab-positions" style="display:block;">' +
@@ -2904,8 +4549,9 @@
       '<div class="ds-tab-content" id="tr-tab-executions" style="display:none;">' + execsTable + '</div>';
 
     return (
-      UI.pageHeader("Trading", "Trading terminal — Paper trading · Alpha021",
+      UI.pageHeader("Trading", "Trading terminal — Paper trading · " + esc(dash.meta.account_name || "—"),
         UI.button("New Order", "primary", { sm: true, action: "tr:focus-order" })) +
+      sessionBanner +
       topRow +
       UI.sectionHeading("Positions · Orders · Executions") +
       bottomTabs + bottomContent
@@ -2913,186 +4559,133 @@
   };
 
   /* ==================================================================
-   * Orders module — Commit 008
-   * Mock order state designed for future real-API swap. Maps to the
-   * Order Engine → Execution Engine → Broker Adapter → Fill lifecycle.
+   * Orders module — Integration 005 (real API)
+   *
+   * Orders page wired to the live Order Engine via three thin hooks:
+   *   - useOrders()           GET   /api/dashboard/orders
+   *   - useOrderDetail(id)     GET   /api/dashboard/orders/{order_id}
+   *   - useOrderCancel(id)     POST  /api/dashboard/orders/{order_id}/cancel
+   *
+   * UI derives nothing about order truth — every status, fill, remaining
+   * qty, rejection reason comes straight from the backend trace. The page
+   * only layers: KPIs, client-side filters, client-side pagination (server
+   * pagination is not yet supported by the backend), lifecycle timeline,
+   * cancel-with-confirmation, refresh, and the standard loading/empty/
+   * error/retry states. No mock data is fabricated.
    * ================================================================== */
-  var ORDERS_DATA = [
-    {
-      id: "ORD-128", time: "10:32:04", symbol: "NVDA", side: "BUY", qty: 100,
-      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Alpha021",
-      filledQty: 100, avgFillPrice: 178.42, slippage: "+0.02bp",
-      timeline: [
-        { time: "10:32:04", type: "SUBMITTED", title: "Order submitted to Order Engine", variant: "info" },
-        { time: "10:32:05", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "10:32:06", type: "FILLED", title: "Filled 100 @ 178.42", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-127", time: "10:18:22", symbol: "QQQ", side: "BUY", qty: 50,
-      type: "Limit", limitPrice: 612.40, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Momentum",
-      filledQty: 50, avgFillPrice: 612.40, slippage: "+0.00bp",
-      timeline: [
-        { time: "10:18:22", type: "SUBMITTED", title: "Limit order submitted @ 612.40", variant: "info" },
-        { time: "10:18:23", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "10:18:31", type: "FILLED", title: "Filled 50 @ 612.40", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-126", time: "09:56:10", symbol: "SPY", side: "SELL", qty: 100,
-      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Mean Reversion",
-      filledQty: 100, avgFillPrice: 650.08, slippage: "-0.02bp",
-      timeline: [
-        { time: "09:56:10", type: "SUBMITTED", title: "Market sell submitted", variant: "info" },
-        { time: "09:56:11", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "09:56:13", type: "FILLED", title: "Filled 100 @ 650.08", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-125", time: "09:41:48", symbol: "NVDA", side: "BUY", qty: 100,
-      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
-      status: "REJECTED", account: "Main Paper", strategy: "Alpha021",
-      filledQty: 0, avgFillPrice: null, slippage: "—",
-      timeline: [
-        { time: "09:41:48", type: "SUBMITTED", title: "Order submitted to Order Engine", variant: "info" },
-        { time: "09:41:49", type: "REJECTED", title: "Rejected by Risk Engine — exceeds daily loss limit", variant: "loss" },
-      ],
-    },
-    {
-      id: "ORD-124", time: "09:30:02", symbol: "AAPL", side: "BUY", qty: 200,
-      type: "Limit", limitPrice: 224.00, stopPrice: null, tif: "GTC",
-      status: "PARTIAL", account: "Main Paper", strategy: "Momentum",
-      filledQty: 120, avgFillPrice: 224.12, slippage: "+0.12bp",
-      timeline: [
-        { time: "09:30:02", type: "SUBMITTED", title: "Limit order submitted @ 224.00", variant: "info" },
-        { time: "09:30:03", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "09:30:15", type: "PARTIAL", title: "Partial fill 120 @ 224.12", variant: "info" },
-        { time: "09:31:00", type: "PARTIAL", title: "Working — 80 remaining", variant: "warning" },
-      ],
-    },
-    {
-      id: "ORD-123", time: "09:15:33", symbol: "MSFT", side: "SELL", qty: 150,
-      type: "Limit", limitPrice: 450.00, stopPrice: null, tif: "DAY",
-      status: "CANCELLED", account: "Main Paper", strategy: "Mean Reversion",
-      filledQty: 0, avgFillPrice: null, slippage: "—",
-      timeline: [
-        { time: "09:15:33", type: "SUBMITTED", title: "Limit order submitted @ 450.00", variant: "info" },
-        { time: "09:15:34", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "09:22:10", type: "CANCELLED", title: "Cancelled by user", variant: "neutral" },
-      ],
-    },
-    {
-      id: "ORD-122", time: "Yesterday 15:48", symbol: "QQQ", side: "SELL", qty: 100,
-      type: "Stop", limitPrice: null, stopPrice: 535.00, tif: "GTC",
-      status: "FILLED", account: "Main Paper", strategy: "Risk-Off",
-      filledQty: 100, avgFillPrice: 534.88, slippage: "-0.12bp",
-      timeline: [
-        { time: "15:48:00", type: "SUBMITTED", title: "Stop order submitted @ 535.00", variant: "info" },
-        { time: "15:48:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "15:52:14", type: "TRIGGERED", title: "Stop triggered @ 535.00", variant: "warning" },
-        { time: "15:52:15", type: "FILLED", title: "Filled 100 @ 534.88", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-121", time: "Yesterday 14:22", symbol: "NVDA", side: "BUY", qty: 300,
-      type: "Limit", limitPrice: 172.00, stopPrice: null, tif: "DAY",
-      status: "EXPIRED", account: "Main Paper", strategy: "Alpha021",
-      filledQty: 0, avgFillPrice: null, slippage: "—",
-      timeline: [
-        { time: "14:22:00", type: "SUBMITTED", title: "Limit order submitted @ 172.00", variant: "info" },
-        { time: "14:22:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "16:00:00", type: "EXPIRED", title: "Order expired (DAY)", variant: "neutral" },
-      ],
-    },
-    {
-      id: "ORD-120", time: "Yesterday 11:05", symbol: "SPY", side: "BUY", qty: 200,
-      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Momentum",
-      filledQty: 200, avgFillPrice: 648.30, slippage: "+0.05bp",
-      timeline: [
-        { time: "11:05:00", type: "SUBMITTED", title: "Market buy submitted", variant: "info" },
-        { time: "11:05:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "11:05:03", type: "FILLED", title: "Filled 200 @ 648.30", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-119", time: "Yesterday 09:50", symbol: "AAPL", side: "SELL", qty: 100,
-      type: "Limit", limitPrice: 228.50, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Mean Reversion",
-      filledQty: 100, avgFillPrice: 228.50, slippage: "+0.00bp",
-      timeline: [
-        { time: "09:50:00", type: "SUBMITTED", title: "Limit order submitted @ 228.50", variant: "info" },
-        { time: "09:50:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "10:12:44", type: "FILLED", title: "Filled 100 @ 228.50", variant: "profit" },
-      ],
-    },
-    {
-      id: "ORD-118", time: "Aug 25 15:30", symbol: "NVDA", side: "SELL", qty: 100,
-      type: "Stop-Limit", limitPrice: 170.00, stopPrice: 172.00, tif: "GTC",
-      status: "CANCELLED", account: "Main Paper", strategy: "Risk-Off",
-      filledQty: 0, avgFillPrice: null, slippage: "—",
-      timeline: [
-        { time: "15:30:00", type: "SUBMITTED", title: "Stop-Limit submitted (stop 172 / limit 170)", variant: "info" },
-        { time: "15:30:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "16:00:00", type: "CANCELLED", title: "Cancelled by user", variant: "neutral" },
-      ],
-    },
-    {
-      id: "ORD-117", time: "Aug 25 10:14", symbol: "QQQ", side: "BUY", qty: 150,
-      type: "Market", limitPrice: null, stopPrice: null, tif: "DAY",
-      status: "FILLED", account: "Main Paper", strategy: "Alpha021",
-      filledQty: 150, avgFillPrice: 605.20, slippage: "+0.03bp",
-      timeline: [
-        { time: "10:14:00", type: "SUBMITTED", title: "Market buy submitted", variant: "info" },
-        { time: "10:14:01", type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" },
-        { time: "10:14:03", type: "FILLED", title: "Filled 150 @ 605.20", variant: "profit" },
-      ],
-    },
-  ];
-
+  var ORDERS_DATA = [];   // populated by useOrders()
   var ORDERS_FILTERS = { status: "ALL", side: "ALL", symbol: "ALL", account: "ALL", search: "" };
-  var ORDERS_SELECTED_ID = "ORD-128";
+  var ORDERS_SELECTED_ID = null;
+  var ORDERS_DETAIL = null;        // trace {order, signal, risk_decision, execution, position, ledger}
+  var ORDERS_LAST_UPDATED = "—";
+  var ORDERS_PAGE = 0;
+  var ORDERS_PAGE_SIZE = 50;
 
+  // ── Small helpers ──────────────────────────────────────────────
+  function _ordNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  function _ordEsc(v) { return esc(v == null ? "" : String(v)); }
+  function _pad2(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
+  function _ordFmtTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    var now = new Date();
+    var hh = _pad2(d.getHours()), mm = _pad2(d.getMinutes()), ss = _pad2(d.getSeconds());
+    if (d.toDateString() === now.toDateString()) return hh + ":" + mm + ":" + ss;
+    return _pad2(d.getMonth() + 1) + "/" + _pad2(d.getDate()) + " " + hh + ":" + mm;
+  }
+
+  // ── Status mapping (backend enum → canonical label) ───────────
+  // Backend OrderStatus: CREATED / SUBMITTED / ACCEPTED / PARTIALLY_FILLED
+  // / FILLED / REJECTED / CANCELLED. Also tolerate workflow-engine
+  // variants (PENDING / RISK_* / FAILED / EXPIRED) without fabricating.
+  function orderStatusCanonical(status) {
+    if (!status) return "NEW";
+    var s = String(status).toUpperCase();
+    if (s === "CREATED" || s === "NEW") return "NEW";
+    if (s === "SUBMITTED" || s === "PENDING" || s === "RISK_CHECKING" || s === "RISK_APPROVED") return "PENDING";
+    if (s === "ACCEPTED") return "ACCEPTED";
+    if (s === "PARTIALLY_FILLED" || s === "PARTIAL") return "PARTIAL_FILLED";
+    if (s === "FILLED") return "FILLED";
+    if (s === "REJECTED" || s === "RISK_REJECTED") return "REJECTED";
+    if (s === "CANCELLED" || s === "CANCELED") return "CANCELLED";
+    if (s === "FAILED") return "FAILED";
+    if (s === "EXPIRED") return "EXPIRED";
+    return s;
+  }
+
+  function orderStatusVariant(status) {
+    var m = {
+      NEW: "info", PENDING: "warning", ACCEPTED: "info",
+      PARTIAL_FILLED: "warning", FILLED: "profit",
+      REJECTED: "loss", CANCELLED: "neutral", FAILED: "loss", EXPIRED: "neutral",
+    };
+    return m[orderStatusCanonical(status)] || "neutral";
+  }
+
+  function ordersStatusPill(status) {
+    return UI.statusPill(orderStatusCanonical(status), orderStatusVariant(status));
+  }
+
+  // ── Client-side filtering (backend has no query params) ────────
   function ordersFiltered() {
     return ORDERS_DATA.filter(function (o) {
-      if (ORDERS_FILTERS.status !== "ALL" && o.status !== ORDERS_FILTERS.status) return false;
-      if (ORDERS_FILTERS.side !== "ALL" && o.side !== ORDERS_FILTERS.side) return false;
-      if (ORDERS_FILTERS.symbol !== "ALL" && o.symbol !== ORDERS_FILTERS.symbol) return false;
-      if (ORDERS_FILTERS.account !== "ALL" && o.account !== ORDERS_FILTERS.account) return false;
+      var cs = orderStatusCanonical(o.status);
+      if (ORDERS_FILTERS.status !== "ALL" && cs !== ORDERS_FILTERS.status) return false;
+      if (ORDERS_FILTERS.side !== "ALL" && String(o.side) !== ORDERS_FILTERS.side) return false;
+      if (ORDERS_FILTERS.symbol !== "ALL" && String(o.symbol) !== ORDERS_FILTERS.symbol) return false;
+      if (ORDERS_FILTERS.account !== "ALL") {
+        var acct = o.account_id || o.broker || "";
+        if (acct !== ORDERS_FILTERS.account) return false;
+      }
       if (ORDERS_FILTERS.search) {
         var q = ORDERS_FILTERS.search.toLowerCase();
-        var hay = (o.id + " " + o.symbol + " " + o.status + " " + o.side).toLowerCase();
+        var hay = (o.order_id + " " + o.symbol + " " + o.status + " " + o.side + " " + (o.strategy_id || "")).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
     });
   }
 
-  function ordersStatusPill(status) {
-    var m = { FILLED: "profit", PARTIAL: "info", PENDING: "warning", CANCELLED: "neutral", REJECTED: "loss", EXPIRED: "neutral" };
-    return '<span class="ds-status-pill ds-status-' + (m[status] || "neutral") + '"><span class="ds-status-dot"></span>' + status + '</span>';
+  function _ordersAccountOptions() {
+    var set = {};
+    ORDERS_DATA.forEach(function (o) { var a = o.account_id || o.broker; if (a) set[a] = true; });
+    return ["ALL"].concat(Object.keys(set));
   }
 
+  function _ordersSymbolOptions() {
+    var set = {};
+    ORDERS_DATA.forEach(function (o) { if (o.symbol) set[o.symbol] = true; });
+    return ["ALL"].concat(Object.keys(set));
+  }
+
+  // ── Table rows (10 columns incl. Filled + Avg Fill) ───────────
   function renderOrdersRows() {
-    var rows = ordersFiltered();
-    if (rows.length === 0) {
-      return '<tr class="ord-empty-row"><td colspan="8">' + UI.empty("No orders", "No orders match the current filters.") + '</td></tr>';
+    var filtered = ordersFiltered();
+    var start = ORDERS_PAGE * ORDERS_PAGE_SIZE;
+    var slice = filtered.slice(start, start + ORDERS_PAGE_SIZE);
+    if (filtered.length === 0) {
+      return '<tr class="ord-empty-row"><td colspan="10">' +
+        UI.empty("No orders", "No orders match the current filters, or no orders have been submitted yet.") +
+        '</td></tr>';
     }
-    return rows.map(function (o) {
-      var sel = o.id === ORDERS_SELECTED_ID ? " ord-row-selected" : "";
-      var price = o.limitPrice != null ? "$" + o.limitPrice.toFixed(2) : "—";
-      var sideCls = o.side === "BUY" ? "pos" : "neg";
-      return '<tr class="ord-row' + sel + '" data-ord-id="' + o.id + '">' +
-        '<td class="ds-text-mono ord-col-id">' + o.id + '</td>' +
-        '<td class="ds-text-mono ord-col-time">' + o.time + '</td>' +
-        '<td class="ord-col-symbol">' + o.symbol + '</td>' +
-        '<td class="' + sideCls + ' ord-col-side">' + o.side + '</td>' +
-        '<td class="num ds-text-mono ord-col-qty">' + o.qty + '</td>' +
-        '<td class="ord-col-type">' + o.type + '</td>' +
+    return slice.map(function (o) {
+      var sel = o.order_id === ORDERS_SELECTED_ID ? " ord-row-selected" : "";
+      var sideCls = String(o.side) === "BUY" ? "pos" : "neg";
+      var price = (o.price != null && Number(o.price) > 0) ? "$" + _ordNum(o.price).toFixed(2) : "—";
+      var filled = _ordNum(o.filled_quantity);
+      var avgFill = (o.average_fill_price != null && Number(o.average_fill_price) > 0)
+        ? "$" + _ordNum(o.average_fill_price).toFixed(2) : "—";
+      return '<tr class="ord-row' + sel + '" data-ord-id="' + _ordEsc(o.order_id) + '">' +
+        '<td class="ds-text-mono ord-col-id">' + _ordEsc(o.order_id) + '</td>' +
+        '<td class="ds-text-mono ord-col-time">' + _ordFmtTime(o.created_at) + '</td>' +
+        '<td class="ord-col-symbol">' + _ordEsc(o.symbol) + '</td>' +
+        '<td class="' + sideCls + ' ord-col-side">' + _ordEsc(o.side) + '</td>' +
+        '<td class="ord-col-type">' + _ordEsc(o.order_type) + '</td>' +
+        '<td class="num ds-text-mono ord-col-qty">' + _ordNum(o.quantity) + '</td>' +
         '<td class="num ds-text-mono ord-col-price">' + price + '</td>' +
+        '<td class="num ds-text-mono ord-col-filled">' + filled + '</td>' +
+        '<td class="num ds-text-mono ord-col-avgfill">' + avgFill + '</td>' +
         '<td class="ord-col-status">' + ordersStatusPill(o.status) + '</td>' +
         '</tr>';
     }).join("");
@@ -3106,9 +4699,11 @@
       '<th>Time</th>' +
       '<th>Symbol</th>' +
       '<th>Side</th>' +
-      '<th class="num">Qty</th>' +
       '<th>Type</th>' +
+      '<th class="num">Qty</th>' +
       '<th class="num">Price</th>' +
+      '<th class="num">Filled</th>' +
+      '<th class="num">Avg Fill</th>' +
       '<th>Status</th>' +
       '</tr></thead>' +
       '<tbody id="ord-tbody">' + renderOrdersRows() + '</tbody>' +
@@ -3116,110 +4711,403 @@
     );
   }
 
-  function renderOrdersDetail() {
-    var o = null;
-    for (var i = 0; i < ORDERS_DATA.length; i++) {
-      if (ORDERS_DATA[i].id === ORDERS_SELECTED_ID) { o = ORDERS_DATA[i]; break; }
-    }
-    if (!o) {
-      return UI.empty("No order selected", "Click an order row to view details and the execution timeline.");
-    }
-    var statusVariant = o.status === "FILLED" ? "profit" : (o.status === "REJECTED" ? "loss" : "info");
-    var sideVariant = o.side === "BUY" ? "profit" : "loss";
-    var detail = UI.statRows([
-      { label: "Order ID", value: o.id },
-      { label: "Strategy", value: o.strategy },
-      { label: "Account", value: o.account },
-      { label: "Symbol", value: o.symbol },
-      { label: "Side", value: o.side, variant: sideVariant },
-      { label: "Quantity", value: String(o.qty) },
-      { label: "Order Type", value: o.type },
-      { label: "Limit Price", value: o.limitPrice != null ? "$" + o.limitPrice.toFixed(2) : "—" },
-      { label: "Stop Price", value: o.stopPrice != null ? "$" + o.stopPrice.toFixed(2) : "—" },
-      { label: "Time in Force", value: o.tif },
-      { label: "Status", value: o.status, variant: statusVariant },
-    ]);
-    var fills = UI.statRows([
-      { label: "Filled Qty", value: String(o.filledQty) + " / " + o.qty },
-      { label: "Avg Fill Price", value: o.avgFillPrice != null ? "$" + o.avgFillPrice.toFixed(2) : "—" },
-      { label: "Slippage", value: o.slippage },
-    ]);
+  // ── Pagination (client-side; backend has no server pagination) ─
+  function _paginationInner() {
+    var total = ordersFiltered().length;
+    var totalPages = Math.max(1, Math.ceil(total / ORDERS_PAGE_SIZE));
+    var page = ORDERS_PAGE + 1;
+    var start = total === 0 ? 0 : ORDERS_PAGE * ORDERS_PAGE_SIZE + 1;
+    var end = Math.min(total, (ORDERS_PAGE + 1) * ORDERS_PAGE_SIZE);
+    var note = total > ORDERS_PAGE_SIZE
+      ? "Showing " + start + "–" + end + " of " + total
+      : "Total " + total + " · server pagination unavailable";
     return (
-      detail +
-      UI.sectionHeading("Execution Timeline") +
-      UI.timeline(o.timeline) +
-      UI.sectionHeading("Fills") +
-      fills
+      '<span class="ord-pagination-info">' + note + '</span>' +
+      '<div class="ord-pagination-controls">' +
+      UI.button("‹ Prev", "ghost", { sm: true, action: "ord:page-prev", disabled: ORDERS_PAGE === 0 }) +
+      '<span class="ord-pagination-page">Page ' + page + ' / ' + totalPages + '</span>' +
+      UI.button("Next ›", "ghost", { sm: true, action: "ord:page-next", disabled: ORDERS_PAGE >= totalPages - 1 }) +
+      '</div>'
     );
   }
 
-  function openNewOrderModal() {
+  function renderOrdersPagination() {
+    return '<div class="ord-pagination" id="ord-pagination">' + _paginationInner() + '</div>';
+  }
+
+  // ── Lifecycle timeline synthesised from order timestamps ──────
+  // Only emits events whose timestamp / condition actually exists on
+  // the order — no fabricated milestones.
+  function _buildOrderTimeline(o, trace) {
+    var ev = [];
+    if (o.created_at) ev.push({ time: _ordFmtTime(o.created_at), type: "CREATED", title: "Order created", variant: "info" });
+    if (o.submitted_at) ev.push({ time: _ordFmtTime(o.submitted_at), type: "SUBMITTED", title: "Submitted to Order Engine", variant: "info" });
+    if (trace && trace.risk_decision) {
+      var rd = trace.risk_decision;
+      var decStr = String(rd.decision || rd.status || rd.outcome || "").toUpperCase();
+      var approved = rd.approved === true || decStr.indexOf("APPROV") >= 0;
+      ev.push({
+        time: _ordFmtTime(o.submitted_at || o.created_at),
+        type: "RISK", title: "Risk check: " + (approved ? "Approved" : "Rejected"),
+        variant: approved ? "profit" : "loss",
+      });
+    }
+    var cs = orderStatusCanonical(o.status);
+    if (cs === "ACCEPTED" || cs === "PARTIAL_FILLED" || cs === "FILLED") {
+      ev.push({ time: _ordFmtTime(o.updated_at || o.submitted_at), type: "ACCEPTED", title: "Accepted by Execution Engine", variant: "info" });
+    }
+    var qty = _ordNum(o.quantity), filled = _ordNum(o.filled_quantity);
+    if ((cs === "PARTIAL_FILLED" || (filled > 0 && filled < qty)) && o.average_fill_price) {
+      ev.push({ time: _ordFmtTime(o.updated_at), type: "PARTIAL", title: "Partial fill " + filled + " / " + qty + " @ $" + _ordNum(o.average_fill_price).toFixed(2), variant: "warning" });
+    }
+    if (cs === "FILLED" && o.filled_at) {
+      ev.push({ time: _ordFmtTime(o.filled_at), type: "FILLED", title: "Filled " + filled + (o.average_fill_price ? " @ $" + _ordNum(o.average_fill_price).toFixed(2) : ""), variant: "profit" });
+    }
+    if (cs === "CANCELLED" && o.cancelled_at) {
+      ev.push({ time: _ordFmtTime(o.cancelled_at), type: "CANCELLED", title: "Cancelled" + (o.notes ? " — " + o.notes : ""), variant: "neutral" });
+    }
+    if (cs === "REJECTED" || (cs !== "CANCELLED" && o.rejection_reason)) {
+      ev.push({ time: _ordFmtTime(o.updated_at || o.submitted_at), type: "REJECTED", title: "Rejected" + (o.rejection_reason ? " — " + o.rejection_reason : ""), variant: "loss" });
+    }
+    if (cs === "FAILED") {
+      ev.push({ time: _ordFmtTime(o.updated_at), type: "FAILED", title: "Order failed" + (o.rejection_reason ? " — " + o.rejection_reason : ""), variant: "loss" });
+    }
+    if (cs === "EXPIRED") {
+      ev.push({ time: _ordFmtTime(o.updated_at), type: "EXPIRED", title: "Order expired", variant: "neutral" });
+    }
+    return ev;
+  }
+
+  // ── Order detail (from real trace, falls back to list row) ─────
+  function renderOrdersDetail() {
+    var trace = ORDERS_DETAIL;
+    var o = trace ? trace.order : null;
+    if (!o && ORDERS_SELECTED_ID) {
+      for (var i = 0; i < ORDERS_DATA.length; i++) {
+        if (ORDERS_DATA[i].order_id === ORDERS_SELECTED_ID) { o = ORDERS_DATA[i]; break; }
+      }
+    }
+    if (!o) {
+      return UI.empty("No order selected", "Click an order row to view details and the execution lifecycle.");
+    }
+    var cs = orderStatusCanonical(o.status);
+    var statusVariant = orderStatusVariant(o.status);
+    var sideVariant = String(o.side) === "BUY" ? "profit" : "loss";
+    var qty = _ordNum(o.quantity);
+    var filled = _ordNum(o.filled_quantity);
+    var remaining = _ordNum(o.remaining_quantity != null ? o.remaining_quantity : (qty - filled));
+    var avgFill = (o.average_fill_price != null && Number(o.average_fill_price) > 0)
+      ? "$" + _ordNum(o.average_fill_price).toFixed(2) : "—";
+    var limitPrice = (o.price != null && Number(o.price) > 0) ? "$" + _ordNum(o.price).toFixed(2) : "—";
+
+    var detail = UI.statRows([
+      { label: "Order ID", value: _ordEsc(o.order_id) },
+      { label: "Strategy", value: _ordEsc(o.strategy_id || "—") },
+      { label: "Account", value: _ordEsc(o.account_id || o.broker || "—") },
+      { label: "Symbol", value: _ordEsc(o.symbol) },
+      { label: "Side", value: _ordEsc(o.side), variant: sideVariant },
+      { label: "Quantity", value: String(qty) },
+      { label: "Order Type", value: _ordEsc(o.order_type || "—") },
+      { label: "Limit Price", value: limitPrice },
+      { label: "Time in Force", value: _ordEsc(o.time_in_force || "—") },
+      { label: "Status", value: cs, variant: statusVariant },
+    ]);
+
+    var fills = UI.statRows([
+      { label: "Filled Qty", value: filled + " / " + qty },
+      { label: "Remaining Qty", value: String(remaining) },
+      { label: "Avg Fill Price", value: avgFill },
+    ]);
+
+    // Execution info (from trace.execution, only when present)
+    var execBlock = "";
+    if (trace && trace.execution) {
+      var ex = trace.execution;
+      execBlock = UI.sectionHeading("Execution") + UI.statRows([
+        { label: "Fill Qty", value: String(_ordNum(ex.quantity)) },
+        { label: "Average Fill", value: (ex.price != null ? "$" + _ordNum(ex.price).toFixed(2) : "—") },
+        { label: "Fill Time", value: _ordFmtTime(ex.timestamp) },
+        { label: "Execution Status", value: cs },
+      ]);
+    }
+
+    // Reject reason callout (when rejected / failed)
+    var rejectBlock = "";
+    if (cs === "REJECTED" || cs === "FAILED" || o.rejection_reason) {
+      rejectBlock = '<div class="ds-callout ds-callout-loss" style="margin:var(--ds-space-sm) 0;">' +
+        '<div class="ds-text-muted" style="font-size:var(--ds-text-xs);">REJECT REASON</div>' +
+        '<div class="ds-text-mono" style="margin-top:var(--ds-space-xs);">' +
+        _ordEsc(o.rejection_reason || "Not specified") + '</div>' +
+        '</div>';
+    }
+
+    // Lifecycle timeline (synthesised from timestamps)
+    var timeline = _buildOrderTimeline(o, trace);
+    var timelineHtml = timeline.length > 0
+      ? UI.timeline(timeline)
+      : UI.empty("No lifecycle events", "This order has no recorded events.");
+
+    // Cancel button — only for active (non-terminal) orders
+    var cancelBtn = "";
+    var terminal = cs === "CANCELLED" || cs === "FILLED" || cs === "REJECTED" || cs === "FAILED" || cs === "EXPIRED";
+    if (o.is_active === true && !terminal) {
+      cancelBtn = '<div style="margin-top:var(--ds-space-md);">' +
+        UI.button("Cancel Order", "danger", { sm: true, action: "ord:cancel" }) +
+        '</div>';
+    }
+
+    return (
+      detail +
+      rejectBlock +
+      UI.sectionHeading("Fills") +
+      fills +
+      execBlock +
+      UI.sectionHeading("Lifecycle") +
+      timelineHtml +
+      cancelBtn
+    );
+  }
+
+  // ── KPIs + Filters ─────────────────────────────────────────────
+  function renderOrdersKPIs() {
+    var total = ORDERS_DATA.length;
+    var open = ORDERS_DATA.filter(function (o) {
+      var cs = orderStatusCanonical(o.status);
+      return cs === "NEW" || cs === "PENDING" || cs === "ACCEPTED" || cs === "PARTIAL_FILLED";
+    }).length;
+    var filled = ORDERS_DATA.filter(function (o) { return orderStatusCanonical(o.status) === "FILLED"; }).length;
+    var rejected = ORDERS_DATA.filter(function (o) {
+      var cs = orderStatusCanonical(o.status);
+      return cs === "REJECTED" || cs === "FAILED";
+    }).length;
+    return UI.metricCard("Total Orders", String(total), "All statuses", "info") +
+      UI.metricCard("Open Orders", String(open), "New / Pending / Partial", "warning") +
+      UI.metricCard("Filled", String(filled), "Complete fills", "pos") +
+      UI.metricCard("Rejected", String(rejected), "Risk / Engine rejects", "neg");
+  }
+
+  function renderOrdersFilters() {
+    var symbolOpts = _ordersSymbolOptions().map(function (s) {
+      return { value: s, label: s === "ALL" ? "All Symbols" : s };
+    });
+    var accountOpts = _ordersAccountOptions().map(function (a) {
+      return { value: a, label: a === "ALL" ? "All Accounts" : a };
+    });
+    return (
+      '<div class="ord-filters">' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Account</label>' +
+      UI.select({ id: "ord-filter-account", options: accountOpts }) + '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Symbol</label>' +
+      UI.select({ id: "ord-filter-symbol", options: symbolOpts }) + '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Side</label>' +
+      UI.select({ id: "ord-filter-side", options: [
+        { value: "ALL", label: "All Sides" },
+        { value: "BUY", label: "BUY" },
+        { value: "SELL", label: "SELL" },
+      ] }) + '</div>' +
+      '<div class="ord-filter-field"><label class="ord-filter-label">Status</label>' +
+      UI.select({ id: "ord-filter-status", options: [
+        { value: "ALL", label: "All Status" },
+        { value: "NEW", label: "New" },
+        { value: "PENDING", label: "Pending" },
+        { value: "ACCEPTED", label: "Accepted" },
+        { value: "PARTIAL_FILLED", label: "Partially Filled" },
+        { value: "FILLED", label: "Filled" },
+        { value: "REJECTED", label: "Rejected" },
+        { value: "CANCELLED", label: "Cancelled" },
+        { value: "FAILED", label: "Failed" },
+        { value: "EXPIRED", label: "Expired" },
+      ] }) + '</div>' +
+      '<div class="ord-filter-field ord-filter-search-wrap">' +
+      UI.search("Search ID / symbol…", "ord-filter-search") + '</div>' +
+      '</div>'
+    );
+  }
+
+  function _renderOrdersRefreshAction() {
+    return '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Total: <span id="ord-total">' +
+      ORDERS_DATA.length + '</span> · Updated: <span class="ds-text-mono" id="ord-last-updated">' +
+      _ordEsc(ORDERS_LAST_UPDATED) + '</span></span> ' +
+      '<button class="btn btn-ghost btn-sm" data-action="ord:refresh" type="button">↻ Refresh</button>';
+  }
+
+  // ── Cancel modal (with duplicate-action protection) ────────────
+  function openCancelOrderModal(orderId, order) {
+    var sideVariant = String(order.side) === "BUY" ? "profit" : "loss";
     UI.openModal({
-      title: "New Order",
+      title: "Cancel Order?",
       body:
-        '<div class="ord-ticket">' +
-        UI.field("Account", UI.select({ id: "ord-new-account", options: ["Main Paper", "Shadow", "Live"] })) +
-        UI.field("Symbol", UI.input({ id: "ord-new-symbol", placeholder: "NVDA" })) +
-        UI.field("Side", UI.segToggle([
-          { value: "BUY", label: "BUY", variant: "profit" },
-          { value: "SELL", label: "SELL", variant: "loss" },
-        ], 0, "ord-new-side")) +
-        UI.field("Quantity", UI.input({ id: "ord-new-qty", type: "number", value: "100" })) +
-        UI.field("Order Type", UI.select({ id: "ord-new-type", options: [
-          { value: "Market", label: "Market" },
-          { value: "Limit", label: "Limit" },
-          { value: "Stop", label: "Stop" },
-          { value: "Stop-Limit", label: "Stop-Limit" },
-        ] })) +
-        UI.field("Limit Price", UI.input({ id: "ord-new-limit", type: "number", step: "0.01", placeholder: "0.00" })) +
-        UI.field("Stop Price", UI.input({ id: "ord-new-stop", type: "number", step: "0.01", placeholder: "0.00" })) +
-        UI.field("Time in Force", UI.select({ id: "ord-new-tif", options: ["DAY", "GTC", "IOC", "FOK"] })) +
-        '<div class="ord-ticket-est"><span class="ord-ticket-est-label">Estimated Value</span><span class="ord-ticket-est-val ds-text-mono" id="ord-new-est">$17,842</span></div>' +
-        '<div class="ord-ticket-disclaimer">Paper trading only · No real execution / 仅模拟，不真实下单</div>' +
+        '<div class="ord-cancel-summary">' +
+        '<div class="ord-cancel-symbol">' + _ordEsc(order.symbol) + '</div>' +
+        '<div class="ord-cancel-desc">' +
+        ordersStatusPill(order.status) + ' ' +
+        '<span class="ds-text-' + sideVariant + '">' + _ordEsc(order.side) + '</span> ' +
+        '<span class="ds-text-mono">' + _ordNum(order.quantity) + '</span>' +
+        (order.order_type ? ' · <span>' + _ordEsc(order.order_type) + '</span>' : '') +
+        (order.price && Number(order.price) > 0 ? ' @ <span class="ds-text-mono">$' + _ordNum(order.price).toFixed(2) + '</span>' : '') +
+        '</div>' +
+        '<div class="ds-text-muted" style="margin-top:var(--ds-space-sm);font-size:var(--ds-text-xs);">' +
+        'Order ID: <span class="ds-text-mono">' + _ordEsc(orderId) + '</span>' +
+        '</div>' +
         '</div>',
       footer:
-        UI.button("Cancel", "ghost", { action: "close-modal" }) +
-        UI.button("Review Order", "primary", { action: "ord:submit" }),
+        UI.button("Keep Order", "ghost", { action: "close-modal" }) +
+        UI.button("Cancel Order", "danger", { action: "ord:cancel-confirm" }),
       onMount: function (backdrop) {
-        var submitBtn = backdrop.querySelector('[data-action="ord:submit"]');
-        if (submitBtn) {
-          submitBtn.addEventListener("click", function () {
-            var symEl = backdrop.querySelector("#ord-new-symbol");
-            var qtyEl = backdrop.querySelector("#ord-new-qty");
-            var symVal = symEl && symEl.value ? symEl.value.toUpperCase() : "NVDA";
-            var qtyVal = qtyEl && qtyEl.value ? qtyEl.value : "100";
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Submitting…";
-            setTimeout(function () {
-              UI.closeModal();
-              showToast(symVal + " " + qtyVal + " · Order submitted (mock) / 订单已提交（模拟）", "ok");
-            }, 600);
-          });
-        }
+        var btn = backdrop.querySelector('[data-action="ord:cancel-confirm"]');
+        if (!btn) return;
+        btn.addEventListener("click", async function () {
+          // Duplicate-action protection — ignore repeated clicks while pending
+          if (btn.getAttribute("data-pending") === "1") return;
+          btn.setAttribute("data-pending", "1");
+          btn.disabled = true;
+          btn.textContent = "Cancelling…";
+          try {
+            var updated = await useOrderCancel(orderId);
+            if (updated) {
+              for (var i = 0; i < ORDERS_DATA.length; i++) {
+                if (ORDERS_DATA[i].order_id === orderId) { ORDERS_DATA[i] = updated; break; }
+              }
+            }
+            if (ORDERS_DETAIL && ORDERS_DETAIL.order && ORDERS_DETAIL.order.order_id === orderId) {
+              ORDERS_DETAIL = Object.assign({}, ORDERS_DETAIL, { order: updated || ORDERS_DETAIL.order });
+            }
+            UI.closeModal();
+            refreshOrdersUI();
+            if (ORDERS_SELECTED_ID === orderId) loadOrderDetailAsync(orderId);
+            showToast("Order cancelled / 订单已取消", "ok");
+          } catch (err) {
+            btn.disabled = false;
+            btn.removeAttribute("data-pending");
+            btn.textContent = "Cancel Order";
+            showToast("Cancel failed / 取消失败: " + (err && err.message ? err.message : String(err)), "err");
+          }
+        });
       },
     });
   }
 
-  function bindOrdersPage() {
-    // Row selection via event delegation on the tbody (survives re-renders)
+  // ── Refresh + Detail loaders (async, fault-tolerant) ───────────
+  function refreshOrdersUI() {
     var tbody = document.getElementById("ord-tbody");
-    if (tbody) {
-      tbody.addEventListener("click", function (e) {
-        var row = e.target.closest("tr[data-ord-id]");
-        if (!row) return;
-        ORDERS_SELECTED_ID = row.getAttribute("data-ord-id");
-        tbody.innerHTML = renderOrdersRows();
-        var detail = document.getElementById("ord-detail");
-        if (detail) detail.innerHTML = renderOrdersDetail();
-      });
-    }
+    if (tbody) tbody.innerHTML = renderOrdersRows();
+    var pag = document.getElementById("ord-pagination");
+    if (pag) pag.innerHTML = _paginationInner();
+    var kpisEl = document.getElementById("ord-kpis");
+    if (kpisEl) kpisEl.innerHTML = renderOrdersKPIs();
+    var totalEl = document.getElementById("ord-total");
+    if (totalEl) totalEl.textContent = String(ORDERS_DATA.length);
+    var lastUpd = document.getElementById("ord-last-updated");
+    if (lastUpd) lastUpd.textContent = ORDERS_LAST_UPDATED;
+  }
 
-    // Filter: status / side / symbol / account selects
+  async function loadOrdersAsync() {
+    var refreshBtn = document.querySelector('[data-action="ord:refresh"]');
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = "Refreshing…"; }
+    try {
+      ORDERS_DATA = await useOrders();
+      ORDERS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
+      ORDERS_PAGE = 0;
+      // Re-select first if the previously selected order is gone
+      var stillExists = ORDERS_DATA.some(function (o) { return o.order_id === ORDERS_SELECTED_ID; });
+      if (!stillExists) {
+        ORDERS_SELECTED_ID = ORDERS_DATA[0] ? ORDERS_DATA[0].order_id : null;
+        ORDERS_DETAIL = null;
+        if (ORDERS_SELECTED_ID) loadOrderDetailAsync(ORDERS_SELECTED_ID);
+        else {
+          var d = document.getElementById("ord-detail");
+          if (d) d.innerHTML = renderOrdersDetail();
+        }
+      }
+      refreshOrdersUI();
+      showToast("Orders refreshed / 订单已刷新", "ok");
+    } catch (err) {
+      showToast("Refresh failed / 刷新失败: " + (err && err.message ? err.message : String(err)), "err");
+    } finally {
+      if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = "↻ Refresh"; }
+    }
+  }
+
+  async function loadOrderDetailAsync(orderId) {
+    var detailEl = document.getElementById("ord-detail");
+    if (detailEl) detailEl.innerHTML = UI.stateLoading("Loading order…", "Fetching detail and lifecycle trace.");
+    try {
+      ORDERS_DETAIL = await useOrderDetail(orderId);
+      if (detailEl) detailEl.innerHTML = renderOrdersDetail();
+    } catch (err) {
+      if (err && err.status === 404) {
+        ORDERS_DETAIL = null;
+        if (detailEl) detailEl.innerHTML = UI.empty("Order not found", "This order may have been removed.");
+      } else {
+        if (detailEl) detailEl.innerHTML = UI.stateError(
+          "Failed to load order detail",
+          (err && err.message ? err.message : String(err)),
+          "Retry", "ord:detail-retry"
+        );
+      }
+    }
+  }
+
+  // ── Bind: delegated handlers on #ord-root (survive innerHTML) ──
+  function bindOrdersPage() {
+    var root = document.getElementById("ord-root");
+    if (!root) return;
+    // Lazy-load detail for pre-selected order
+    if (ORDERS_SELECTED_ID && !ORDERS_DETAIL) loadOrderDetailAsync(ORDERS_SELECTED_ID);
+
+    // Single delegated click handler — catches all ord:* buttons + rows
+    root.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (btn) {
+        var action = btn.getAttribute("data-action");
+        if (action === "ord:page-prev") {
+          if (ORDERS_PAGE > 0) { ORDERS_PAGE--; refreshOrdersUI(); }
+          return;
+        }
+        if (action === "ord:page-next") {
+          var maxPage = Math.max(0, Math.ceil(ordersFiltered().length / ORDERS_PAGE_SIZE) - 1);
+          if (ORDERS_PAGE < maxPage) { ORDERS_PAGE++; refreshOrdersUI(); }
+          return;
+        }
+        if (action === "ord:refresh") { loadOrdersAsync(); return; }
+        if (action === "ord:detail-retry" && ORDERS_SELECTED_ID) {
+          loadOrderDetailAsync(ORDERS_SELECTED_ID); return;
+        }
+        if (action === "ord:cancel") {
+          var oid = ORDERS_SELECTED_ID;
+          if (!oid) return;
+          var o = (ORDERS_DETAIL && ORDERS_DETAIL.order && ORDERS_DETAIL.order.order_id === oid)
+            ? ORDERS_DETAIL.order : null;
+          if (!o) {
+            for (var i = 0; i < ORDERS_DATA.length; i++) {
+              if (ORDERS_DATA[i].order_id === oid) { o = ORDERS_DATA[i]; break; }
+            }
+          }
+          if (o) openCancelOrderModal(oid, o);
+          return;
+        }
+        return;
+      }
+      // Row selection (delegated on tbody rows)
+      var row = e.target.closest("tr[data-ord-id]");
+      if (row) {
+        var rid = row.getAttribute("data-ord-id");
+        if (rid === ORDERS_SELECTED_ID) return;
+        ORDERS_SELECTED_ID = rid;
+        var tbody = document.getElementById("ord-tbody");
+        if (tbody) tbody.querySelectorAll("tr").forEach(function (tr) { tr.classList.remove("ord-row-selected"); });
+        row.classList.add("ord-row-selected");
+        loadOrderDetailAsync(rid);
+      }
+    });
+
+    // Filter selects
     function bindFilter(id, key) {
       var sel = document.getElementById(id);
       if (sel) sel.addEventListener("change", function () {
         ORDERS_FILTERS[key] = sel.value;
-        if (tbody) tbody.innerHTML = renderOrdersRows();
+        ORDERS_PAGE = 0;
+        refreshOrdersUI();
       });
     }
     bindFilter("ord-filter-status", "status");
@@ -3231,63 +5119,27 @@
     var search = document.getElementById("ord-filter-search");
     if (search) search.addEventListener("input", function () {
       ORDERS_FILTERS.search = search.value;
-      if (tbody) tbody.innerHTML = renderOrdersRows();
+      ORDERS_PAGE = 0;
+      refreshOrdersUI();
     });
-
-    // New Order button → open ticket modal
-    var newBtn = document.querySelector('[data-action="ord:new-order"]');
-    if (newBtn) newBtn.addEventListener("click", openNewOrderModal);
   }
 
-  PAGE_FRAMEWORK["trading/orders"] = function () {
-    // ── Mock KPIs ──────────────────────────────────────────────────
-    var total = ORDERS_DATA.length;
-    var open = ORDERS_DATA.filter(function (o) { return o.status === "PARTIAL" || o.status === "PENDING"; }).length;
-    var filled = ORDERS_DATA.filter(function (o) { return o.status === "FILLED"; }).length;
-    var rejected = ORDERS_DATA.filter(function (o) { return o.status === "REJECTED"; }).length;
-    var kpis = UI.metricCard("Total Orders", String(total), "", "") +
-      UI.metricCard("Open Orders", String(open), "", "warning") +
-      UI.metricCard("Filled", String(filled), "", "pos") +
-      UI.metricCard("Rejected", String(rejected), "", "neg");
+  PAGE_FRAMEWORK["trading/orders"] = async function () {
+    // Initial load — throws on failure → render() catch → stateError + Retry
+    ORDERS_DATA = await useOrders();
+    ORDERS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
+    ORDERS_FILTERS = { status: "ALL", side: "ALL", symbol: "ALL", account: "ALL", search: "" };
+    ORDERS_PAGE = 0;
+    ORDERS_DETAIL = null;
+    // Pre-select first order (if any)
+    var exists = ORDERS_DATA.some(function (o) { return o.order_id === ORDERS_SELECTED_ID; });
+    if (!exists) ORDERS_SELECTED_ID = ORDERS_DATA[0] ? ORDERS_DATA[0].order_id : null;
 
-    // ── Filters row ────────────────────────────────────────────────
-    var symbols = ["ALL"].concat(Array.from(new Set(ORDERS_DATA.map(function (o) { return o.symbol; }))));
-    var symbolOpts = symbols.map(function (s) { return { value: s, label: s === "ALL" ? "All Symbols" : s }; });
-    var filters =
-      '<div class="ord-filters">' +
-      '<div class="ord-filter-field"><label class="ord-filter-label">Account</label>' +
-      UI.select({ id: "ord-filter-account", options: [{ value: "ALL", label: "All Accounts" }, { value: "Main Paper", label: "Main Paper" }, { value: "Shadow", label: "Shadow" }, { value: "Live", label: "Live" }] }) +
-      '</div>' +
-      '<div class="ord-filter-field"><label class="ord-filter-label">Symbol</label>' +
-      UI.select({ id: "ord-filter-symbol", options: symbolOpts }) +
-      '</div>' +
-      '<div class="ord-filter-field"><label class="ord-filter-label">Side</label>' +
-      UI.select({ id: "ord-filter-side", options: [
-        { value: "ALL", label: "All Sides" },
-        { value: "BUY", label: "BUY" },
-        { value: "SELL", label: "SELL" },
-      ] }) +
-      '</div>' +
-      '<div class="ord-filter-field"><label class="ord-filter-label">Status</label>' +
-      UI.select({ id: "ord-filter-status", options: [
-        { value: "ALL", label: "All Status" },
-        { value: "FILLED", label: "Filled" },
-        { value: "PARTIAL", label: "Partially Filled" },
-        { value: "PENDING", label: "Pending" },
-        { value: "CANCELLED", label: "Cancelled" },
-        { value: "REJECTED", label: "Rejected" },
-        { value: "EXPIRED", label: "Expired" },
-      ] }) +
-      '</div>' +
-      '<div class="ord-filter-field ord-filter-search-wrap">' + UI.search("Search ID / symbol…", "ord-filter-search") + '</div>' +
-      '</div>';
-
-    // ── Two-column layout: table (left) + detail (right) ───────────
     var layout =
-      '<div class="ord-layout">' +
+      '<div class="ord-layout" id="ord-root">' +
       '<div class="ord-layout-main">' +
-      UI.panel("Orders", renderOrdersTable(), {
-        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
+      UI.panel("Open Orders", renderOrdersTable() + renderOrdersPagination(), {
+        actions: _renderOrdersRefreshAction(),
       }) +
       '</div>' +
       '<div class="ord-layout-side">' +
@@ -3297,160 +5149,195 @@
 
     return (
       UI.pageHeader("Orders", "Order management and lifecycle tracking · 订单管理",
-        UI.button("+ New Order", "primary", { sm: true, action: "ord:new-order" })) +
-      UI.kpiGrid(kpis, 4) +
+        UI.button("Place Order", "primary", { sm: true, action: "nav:trading" })) +
+      '<div id="ord-kpis">' + UI.kpiGrid(renderOrdersKPIs(), 4) + '</div>' +
       UI.sectionHeading("Filters") +
-      filters +
+      renderOrdersFilters() +
       UI.sectionHeading("Orders") +
       layout
     );
   };
 
   /* ==================================================================
-   * Positions module — Commit 009
-   * Mock position state designed for future real-API swap. Maps to the
-   * Execution → Position → Ledger fact chain (ORDER_FILLED dispatches
-   * to both Position and Ledger, sharing Execution Facts).
+   * Positions module — Integration 006 (real API)
+   *
+   * Positions page wired to the live Position Ledger via two thin hooks:
+   *   - usePositions()              GET  /api/dashboard/positions
+   *   - usePositionDetail(symbol)   GET  /api/dashboard/positions/{symbol}
+   *
+   * The Position Ledger is the single source of truth for quantity / side
+   * / avg price. The UI derives nothing about position truth — every qty,
+   * side, P&L, exposure comes straight from the backend. The page only
+   * layers: KPIs (from summary), client-side filters, exposure breakdown,
+   * detail with ledger fill history (Orders → Fills → Position), refresh,
+   * and the standard loading/empty/error/retry states. No mock data.
    * ================================================================== */
-  var POSITIONS_DATA = [
-    {
-      symbol: "NVDA", account: "Main Paper", side: "LONG", quantity: 600,
-      avgPrice: 170.33, markPrice: 178.42, marketValue: 107052,
-      realizedPnl: 2340, unrealizedPnl: 4854, totalPnl: 7194,
-      returnPct: 0.0475, weight: 0.482, updatedAt: "10:32:06",
-      timeline: [
-        { time: "Aug 20 09:30", type: "SIGNAL", title: "Alpha021 triggered LONG signal @ 165.20", variant: "info" },
-        { time: "Aug 20 09:31", type: "ORDER", title: "ORD-097 — BUY 200 Market", variant: "info" },
-        { time: "Aug 20 09:31", type: "FILL", title: "Filled 200 @ 165.20", variant: "profit" },
-        { time: "Aug 20 09:31", type: "POSITION", title: "Position opened +200 (LONG 200)", variant: "info" },
-        { time: "Aug 22 14:15", type: "SIGNAL", title: "Alpha021 add-on signal", variant: "info" },
-        { time: "Aug 22 14:16", type: "ORDER", title: "ORD-110 — BUY 200 Limit @ 172.00", variant: "info" },
-        { time: "Aug 22 14:22", type: "FILL", title: "Filled 200 @ 172.00", variant: "profit" },
-        { time: "Aug 22 14:22", type: "POSITION", title: "Position added +200 (LONG 400)", variant: "info" },
-        { time: "Aug 25 10:14", type: "ORDER", title: "ORD-117 — BUY 200 Market", variant: "info" },
-        { time: "Aug 25 10:14", type: "FILL", title: "Filled 200 @ 174.50", variant: "profit" },
-        { time: "Aug 25 10:14", type: "POSITION", title: "Position added +200 (LONG 600)", variant: "info" },
-        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 178.42", variant: "neutral" },
-      ],
-    },
-    {
-      symbol: "QQQ", account: "Main Paper", side: "LONG", quantity: 200,
-      avgPrice: 525.15, markPrice: 540.20, marketValue: 108040,
-      realizedPnl: 0, unrealizedPnl: 3010, totalPnl: 3010,
-      returnPct: 0.0287, weight: 0.314, updatedAt: "10:32:06",
-      timeline: [
-        { time: "Aug 23 09:35", type: "SIGNAL", title: "Momentum strategy triggered LONG", variant: "info" },
-        { time: "Aug 23 09:36", type: "ORDER", title: "ORD-119 — BUY 50 Limit @ 522.00", variant: "info" },
-        { time: "Aug 23 09:42", type: "FILL", title: "Filled 50 @ 522.00", variant: "profit" },
-        { time: "Aug 23 09:42", type: "POSITION", title: "Position opened +50 (LONG 50)", variant: "info" },
-        { time: "Aug 24 10:05", type: "ORDER", title: "ORD-121 — BUY 150 Limit @ 528.00", variant: "info" },
-        { time: "Aug 24 10:12", type: "FILL", title: "Filled 150 @ 528.00", variant: "profit" },
-        { time: "Aug 24 10:12", type: "POSITION", title: "Position added +150 (LONG 200)", variant: "info" },
-        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 540.20", variant: "neutral" },
-      ],
-    },
-    {
-      symbol: "SPY", account: "Main Paper", side: "SHORT", quantity: 100,
-      avgPrice: 652.00, markPrice: 650.10, marketValue: 65010,
-      realizedPnl: 0, unrealizedPnl: 190, totalPnl: 190,
-      returnPct: 0.0029, weight: 0.098, updatedAt: "10:32:06",
-      timeline: [
-        { time: "Aug 24 15:00", type: "SIGNAL", title: "Mean Reversion triggered SHORT @ 652.00", variant: "info" },
-        { time: "Aug 24 15:01", type: "ORDER", title: "ORD-118 — SELL 100 Market", variant: "info" },
-        { time: "Aug 24 15:01", type: "FILL", title: "Filled 100 @ 652.00", variant: "profit" },
-        { time: "Aug 24 15:01", type: "POSITION", title: "Position opened -100 (SHORT 100)", variant: "info" },
-        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 650.10", variant: "neutral" },
-      ],
-    },
-    {
-      symbol: "AAPL", account: "Main Paper", side: "FLAT", quantity: 0,
-      avgPrice: 0, markPrice: 226.50, marketValue: 0,
-      realizedPnl: 1280, unrealizedPnl: 0, totalPnl: 1280,
-      returnPct: 0, weight: 0, updatedAt: "Yesterday 15:30",
-      timeline: [
-        { time: "Aug 21 10:00", type: "SIGNAL", title: "Momentum triggered LONG @ 224.00", variant: "info" },
-        { time: "Aug 21 10:01", type: "ORDER", title: "ORD-124 — BUY 200 Limit @ 224.00", variant: "info" },
-        { time: "Aug 21 10:12", type: "FILL", title: "Filled 200 @ 224.00", variant: "profit" },
-        { time: "Aug 21 10:12", type: "POSITION", title: "Position opened +200 (LONG 200)", variant: "info" },
-        { time: "Aug 23 09:50", type: "ORDER", title: "ORD-119 — SELL 200 Limit @ 228.50", variant: "info" },
-        { time: "Aug 23 10:12", type: "FILL", title: "Filled 200 @ 228.50", variant: "profit" },
-        { time: "Aug 23 10:12", type: "POSITION", title: "Position reduced -200 (FLAT)", variant: "neutral" },
-      ],
-    },
-    {
-      symbol: "MSFT", account: "Main Paper", side: "LONG", quantity: 150,
-      avgPrice: 448.50, markPrice: 442.10, marketValue: 66315,
-      realizedPnl: 0, unrealizedPnl: -960, totalPnl: -960,
-      returnPct: -0.0143, weight: 0.106, updatedAt: "10:32:06",
-      timeline: [
-        { time: "Aug 22 09:30", type: "SIGNAL", title: "Alpha021 triggered LONG @ 450.00", variant: "info" },
-        { time: "Aug 22 09:31", type: "ORDER", title: "ORD-120 — BUY 150 Limit @ 450.00", variant: "info" },
-        { time: "Aug 22 09:35", type: "FILL", title: "Filled 150 @ 450.00", variant: "profit" },
-        { time: "Aug 22 09:35", type: "POSITION", title: "Position opened +150 (LONG 150)", variant: "info" },
-        { time: "Aug 22 09:50", type: "ORDER", title: "ORD-123 — SELL 150 Limit @ 448.50 (reduce)", variant: "info" },
-        { time: "Aug 22 09:55", type: "FILL", title: "Filled 150 @ 448.50", variant: "profit" },
-        { time: "Aug 22 09:55", type: "POSITION", title: "Position reduced -150 (FLAT)", variant: "neutral" },
-        { time: "Aug 25 09:30", type: "SIGNAL", title: "Alpha021 re-entry LONG @ 448.50", variant: "info" },
-        { time: "Aug 25 09:31", type: "ORDER", title: "ORD-125 — BUY 150 Market", variant: "info" },
-        { time: "Aug 25 09:31", type: "FILL", title: "Filled 150 @ 448.50", variant: "profit" },
-        { time: "Aug 25 09:31", type: "POSITION", title: "Position re-opened +150 (LONG 150)", variant: "info" },
-        { time: "Today 10:32", type: "MARK", title: "Mark updated @ 442.10", variant: "neutral" },
-      ],
-    },
-  ];
+  var POSITIONS_PAYLOAD = { summary: {}, positions: [] };
+  var POSITIONS_SELECTED_SYMBOL = null;
+  var POSITIONS_DETAIL = null;        // {position, ledger_events}
+  var POSITIONS_LAST_UPDATED = "—";
+  var POSITIONS_FILTERS = { account: "ALL", symbol: "ALL", side: "ALL", visibility: "OPEN" };
 
-  var POSITIONS_SELECTED_SYMBOL = "NVDA";
+  // ── Small helpers ──────────────────────────────────────────────
+  function _posNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  function _posEsc(v) { return esc(v == null ? "" : String(v)); }
+  function _pad2p(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
+  function _posFmtTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    var now = new Date();
+    var hh = _pad2p(d.getHours()), mm = _pad2p(d.getMinutes()), ss = _pad2p(d.getSeconds());
+    if (d.toDateString() === now.toDateString()) return hh + ":" + mm + ":" + ss;
+    return _pad2p(d.getMonth() + 1) + "/" + _pad2p(d.getDate()) + " " + hh + ":" + mm;
+  }
+  function _posMoney(n) {
+    return "$" + _posNum(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function _posSignedMoney(n) {
+    var v = _posNum(n);
+    return (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ── Side canonicalisation (backend already LONG/SHORT/FLAT) ───
+  // Tolerate variant spellings without fabricating values. The UI does
+  // NOT simulate Short — whether a Short may exist is decided by the
+  // Ledger / Risk, the UI only reflects what the backend returns.
+  function positionSideCanonical(side) {
+    if (!side) return "FLAT";
+    var s = String(side).toUpperCase();
+    if (s === "LONG" || s === "BUY") return "LONG";
+    if (s === "SHORT" || s === "SELL") return "SHORT";
+    if (s === "FLAT" || s === "NONE" || s === "CASH") return "FLAT";
+    return s;
+  }
+
+  function positionSideVariant(side) {
+    var m = { LONG: "profit", SHORT: "loss", FLAT: "neutral" };
+    return m[positionSideCanonical(side)] || "neutral";
+  }
 
   function positionSidePill(side) {
-    var m = { LONG: "profit", SHORT: "loss", FLAT: "neutral" };
-    return '<span class="ds-status-pill ds-status-' + (m[side] || "neutral") + '"><span class="ds-status-dot"></span>' + side + '</span>';
+    return UI.statusPill(positionSideCanonical(side), positionSideVariant(side));
   }
 
-  function positionsOpen() {
-    return POSITIONS_DATA.filter(function (p) { return p.side !== "FLAT"; });
+  // ── Portfolio equity (for weight calc) ────────────────────────
+  function _positionsEquity() { return _posNum(POSITIONS_PAYLOAD.summary.total_equity); }
+
+  function _positionWeightPct(p) {
+    var eq = _positionsEquity();
+    var mv = _posNum(p.market_value);
+    return eq > 0 ? (mv / eq) * 100 : 0;
   }
 
-  function renderExposureBars() {
-    var open = positionsOpen();
+  // ── Client-side filters (backend has no query params) ────────
+  // visibility: OPEN (default) hides FLAT; ALL shows everything; FLAT only flat.
+  function positionsFiltered() {
+    return POSITIONS_PAYLOAD.positions.filter(function (p) {
+      var cs = positionSideCanonical(p.side);
+      if (POSITIONS_FILTERS.visibility === "OPEN" && cs === "FLAT") return false;
+      if (POSITIONS_FILTERS.visibility === "FLAT" && cs !== "FLAT") return false;
+      if (POSITIONS_FILTERS.side !== "ALL" && cs !== POSITIONS_FILTERS.side) return false;
+      if (POSITIONS_FILTERS.symbol !== "ALL" && String(p.symbol) !== POSITIONS_FILTERS.symbol) return false;
+      if (POSITIONS_FILTERS.account !== "ALL") {
+        var acct = p.account_id || p.account || "";
+        if (acct !== POSITIONS_FILTERS.account) return false;
+      }
+      return true;
+    });
+  }
+
+  function _positionsAccountOptions() {
+    var set = {};
+    POSITIONS_PAYLOAD.positions.forEach(function (p) { var a = p.account_id || p.account; if (a) set[a] = true; });
+    return ["ALL"].concat(Object.keys(set));
+  }
+
+  function _positionsSymbolOptions() {
+    var set = {};
+    POSITIONS_PAYLOAD.positions.forEach(function (p) { if (p.symbol) set[p.symbol] = true; });
+    return ["ALL"].concat(Object.keys(set));
+  }
+
+  // ── Exposure breakdown (from summary, with client-side split) ─
+  function _positionsExposure() {
+    var positions = POSITIONS_PAYLOAD.positions;
+    var longExp = 0, shortExp = 0, grossExp = 0, netExp = 0;
+    positions.forEach(function (p) {
+      var cs = positionSideCanonical(p.side);
+      var mv = _posNum(p.market_value);
+      var signed = cs === "SHORT" ? -mv : mv;
+      grossExp += Math.abs(mv);
+      netExp += signed;
+      if (cs === "LONG") longExp += mv;
+      else if (cs === "SHORT") shortExp += mv;
+    });
+    var summary = POSITIONS_PAYLOAD.summary || {};
+    return {
+      gross: _posNum(summary.gross_exposure) || grossExp,
+      net: _posNum(summary.net_exposure) || netExp,
+      long: longExp,
+      short: shortExp,
+      cash: _posNum(summary.cash),
+    };
+  }
+
+  function renderPositionExposureBars() {
+    var open = POSITIONS_PAYLOAD.positions.filter(function (p) { return positionSideCanonical(p.side) !== "FLAT"; });
     if (open.length === 0) {
-      return UI.empty("No open positions", "All positions are flat.");
+      return UI.empty("No open positions", "All positions are flat — no risk exposure.");
     }
-    var maxVal = Math.max.apply(null, open.map(function (p) { return p.marketValue; })) || 1;
+    var maxVal = Math.max.apply(null, open.map(function (p) { return _posNum(p.market_value); })) || 1;
     return open.map(function (p) {
-      var pct = Math.round((p.marketValue / maxVal) * 100);
-      var barClass = p.side === "LONG" ? "pos-bar" : "neg-bar";
+      var mv = _posNum(p.market_value);
+      var pct = Math.round((mv / maxVal) * 100);
+      var barClass = positionSideCanonical(p.side) === "SHORT" ? "neg-bar" : "pos-bar";
       return (
         '<div class="pos-exp-row">' +
-        '<span class="pos-exp-sym">' + p.symbol + '</span>' +
+        '<span class="pos-exp-sym">' + _posEsc(p.symbol) + '</span>' +
         '<div class="pos-exp-track">' +
         '<div class="pos-exp-fill ' + barClass + '" style="width:' + pct + '%"></div>' +
         '</div>' +
-        '<span class="pos-exp-qty ds-text-mono">' + p.quantity + ' shares</span>' +
-        '<span class="pos-exp-val ds-text-mono">$' + p.marketValue.toLocaleString("en-US") + '</span>' +
+        '<span class="pos-exp-qty ds-text-mono">' + _posNum(p.quantity) + ' shares</span>' +
+        '<span class="pos-exp-val ds-text-mono">' + _posMoney(mv) + '</span>' +
         '</div>'
       );
     }).join("");
   }
 
+  // ── Table rows (11 columns incl. Realized P&L + Weight + Updated) ─
   function renderPositionsRows() {
-    return POSITIONS_DATA.map(function (p) {
+    var filtered = positionsFiltered();
+    if (filtered.length === 0) {
+      return '<tr class="pos-empty-row"><td colspan="11">' +
+        UI.empty("No positions", "No positions match the current filters, or no positions have been opened yet.") +
+        '</td></tr>';
+    }
+    return filtered.map(function (p) {
       var sel = p.symbol === POSITIONS_SELECTED_SYMBOL ? " pos-row-selected" : "";
-      var sideCls = p.side === "LONG" ? "pos" : (p.side === "SHORT" ? "neg" : "");
-      var pnlCls = p.unrealizedPnl >= 0 ? "pos" : "neg";
-      var qtyText = p.side === "FLAT" ? "0" : String(p.quantity);
-      var avgText = p.side === "FLAT" ? "—" : "$" + p.avgPrice.toFixed(2);
-      var mvText = p.side === "FLAT" ? "—" : "$" + p.marketValue.toLocaleString("en-US");
-      var uPnlText = p.side === "FLAT" ? "—" : UI.signedMoney(p.unrealizedPnl);
-      var retText = p.side === "FLAT" ? "—" : (p.returnPct >= 0 ? "+" : "") + (p.returnPct * 100).toFixed(2) + "%";
-      return '<tr class="pos-row' + sel + '" data-pos-symbol="' + p.symbol + '">' +
-        '<td class="pos-col-symbol">' + p.symbol + '</td>' +
+      var cs = positionSideCanonical(p.side);
+      var sideCls = cs === "LONG" ? "pos" : (cs === "SHORT" ? "neg" : "");
+      var pnlCls = _posNum(p.unrealized_pnl) >= 0 ? "pos" : "neg";
+      var realCls = _posNum(p.realized_pnl) >= 0 ? "pos" : "neg";
+      var qtyText = cs === "FLAT" ? "0" : String(_posNum(p.quantity));
+      var avgText = cs === "FLAT" ? "—" : _posMoney(p.avg_price);
+      var lastText = _posMoney(p.last_price);
+      var mvText = cs === "FLAT" ? "—" : _posMoney(p.market_value);
+      var uPnlText = cs === "FLAT" ? "—" : _posSignedMoney(p.unrealized_pnl);
+      var rPnlText = _posSignedMoney(p.realized_pnl);
+      var weightText = _positionWeightPct(p).toFixed(1) + "%";
+      return '<tr class="pos-row' + sel + '" data-pos-symbol="' + _posEsc(p.symbol) + '">' +
+        '<td class="pos-col-symbol">' + _posEsc(p.symbol) + '</td>' +
+        '<td class="pos-col-account">' + _posEsc(p.account_id || p.account || "—") + '</td>' +
         '<td>' + positionSidePill(p.side) + '</td>' +
         '<td class="num ds-text-mono ' + sideCls + '">' + qtyText + '</td>' +
         '<td class="num ds-text-mono">' + avgText + '</td>' +
-        '<td class="num ds-text-mono">$' + p.markPrice.toFixed(2) + '</td>' +
+        '<td class="num ds-text-mono">' + lastText + '</td>' +
         '<td class="num ds-text-mono">' + mvText + '</td>' +
         '<td class="num ds-text-mono ' + pnlCls + '">' + uPnlText + '</td>' +
-        '<td class="num ds-text-mono ' + pnlCls + '">' + retText + '</td>' +
+        '<td class="num ds-text-mono ' + realCls + '">' + rPnlText + '</td>' +
+        '<td class="num ds-text-mono">' + weightText + '</td>' +
+        '<td class="num ds-text-mono pos-col-updated">' + _posFmtTime(p.updated_at) + '</td>' +
         '</tr>';
     }).join("");
   }
@@ -3460,104 +5347,309 @@
       '<table class="ds-table pos-table">' +
       '<thead><tr>' +
       '<th>Symbol</th>' +
+      '<th>Account</th>' +
       '<th>Side</th>' +
       '<th class="num">Qty</th>' +
       '<th class="num">Avg Price</th>' +
-      '<th class="num">Mark</th>' +
+      '<th class="num">Last Price</th>' +
       '<th class="num">Market Value</th>' +
       '<th class="num">Unreal P&L</th>' +
-      '<th class="num">Return</th>' +
+      '<th class="num">Real P&L</th>' +
+      '<th class="num">Weight</th>' +
+      '<th class="num">Updated</th>' +
       '</tr></thead>' +
       '<tbody id="pos-tbody">' + renderPositionsRows() + '</tbody>' +
       '</table>'
     );
   }
 
+  // ── Position detail (from real ledger trace) ──────────────────
+  // Timeline = ORDER_FILLED ledger events for this symbol (Orders → Fills
+  // → Position). Only real events are shown — nothing is fabricated.
+  function _buildPositionTimeline(detail) {
+    var events = (detail && detail.ledger_events) || [];
+    if (events.length === 0) return [];
+    var sorted = events.slice().sort(function (a, b) {
+      var ta = new Date(a.timestamp || 0).getTime();
+      var tb = new Date(b.timestamp || 0).getTime();
+      return ta - tb;
+    });
+    return sorted.map(function (e) {
+      var pload = e.payload || {};
+      var side = String(pload.side || "").toUpperCase();
+      var qty = _posNum(pload.quantity);
+      var price = _posNum(pload.price);
+      var oid = pload.order_id || "—";
+      var etype = String(e.event_type || "").toUpperCase();
+      var title;
+      if (etype.indexOf("FILLED") >= 0 || etype.indexOf("EXEC") >= 0) {
+        title = "Fill " + side + " " + qty + " @ " + _posMoney(price) + " · " + oid;
+      } else {
+        title = etype + " · " + oid;
+      }
+      return {
+        time: _posFmtTime(e.timestamp),
+        type: etype,
+        title: title,
+        variant: side === "SELL" ? "loss" : "profit",
+      };
+    });
+  }
+
   function renderPositionDetail() {
     var p = null;
-    for (var i = 0; i < POSITIONS_DATA.length; i++) {
-      if (POSITIONS_DATA[i].symbol === POSITIONS_SELECTED_SYMBOL) { p = POSITIONS_DATA[i]; break; }
+    var detail = POSITIONS_DETAIL;
+    if (detail && detail.position) {
+      p = detail.position;
+    } else if (POSITIONS_SELECTED_SYMBOL) {
+      for (var i = 0; i < POSITIONS_PAYLOAD.positions.length; i++) {
+        if (POSITIONS_PAYLOAD.positions[i].symbol === POSITIONS_SELECTED_SYMBOL) { p = POSITIONS_PAYLOAD.positions[i]; break; }
+      }
     }
     if (!p) {
-      return UI.empty("No position selected", "Click a position row to view details and timeline.");
+      return UI.empty("No position selected", "Click a position row to view details and the fill lifecycle.");
     }
-    var pnlVariant = p.totalPnl >= 0 ? "profit" : "loss";
+    var cs = positionSideCanonical(p.side);
+    var qty = _posNum(p.quantity);
+    var avgPrice = _posNum(p.avg_price);
+    var lastPrice = _posNum(p.last_price);
+    var mv = _posNum(p.market_value);
+    var uPnl = _posNum(p.unrealized_pnl);
+    var rPnl = _posNum(p.realized_pnl);
+    var tPnl = uPnl + rPnl;
+    var weight = _positionWeightPct(p);
+
     var grid =
       '<div class="pos-detail-grid">' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Symbol</div><div class="pos-detail-value ds-text-mono">' + _posEsc(p.symbol) + '</div></div>' +
       '<div class="pos-detail-cell"><div class="pos-detail-label">Side</div><div class="pos-detail-value">' + positionSidePill(p.side) + '</div></div>' +
-      '<div class="pos-detail-cell"><div class="pos-detail-label">Quantity</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "0" : String(p.quantity)) + '</div></div>' +
-      '<div class="pos-detail-cell"><div class="pos-detail-label">Avg Price</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "—" : "$" + p.avgPrice.toFixed(2)) + '</div></div>' +
-      '<div class="pos-detail-cell"><div class="pos-detail-label">Mark Price</div><div class="pos-detail-value ds-text-mono">$' + p.markPrice.toFixed(2) + '</div></div>' +
-      '<div class="pos-detail-cell"><div class="pos-detail-label">Market Value</div><div class="pos-detail-value ds-text-mono">' + (p.side === "FLAT" ? "—" : "$" + p.marketValue.toLocaleString("en-US")) + '</div></div>' +
-      '<div class="pos-detail-cell"><div class="pos-detail-label">Weight</div><div class="pos-detail-value ds-text-mono">' + (p.weight * 100).toFixed(1) + '%</div></div>' +
-      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Unrealized P&L</div><div class="pos-detail-value ds-text-mono ' + (p.unrealizedPnl >= 0 ? "pos" : "neg") + '">' + (p.side === "FLAT" ? "—" : UI.signedMoney(p.unrealizedPnl)) + '</div></div>' +
-      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Realized P&L</div><div class="pos-detail-value ds-text-mono ' + (p.realizedPnl >= 0 ? "pos" : "neg") + '">' + UI.signedMoney(p.realizedPnl) + '</div></div>' +
-      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Total P&L</div><div class="pos-detail-value ds-text-mono ' + (p.totalPnl >= 0 ? "pos" : "neg") + '">' + UI.signedMoney(p.totalPnl) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Account</div><div class="pos-detail-value ds-text-mono">' + _posEsc(p.account_id || p.account || "—") + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Quantity</div><div class="pos-detail-value ds-text-mono">' + (cs === "FLAT" ? "0" : String(qty)) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Average Price</div><div class="pos-detail-value ds-text-mono">' + (cs === "FLAT" ? "—" : _posMoney(avgPrice)) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Last Price</div><div class="pos-detail-value ds-text-mono">' + _posMoney(lastPrice) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Market Value</div><div class="pos-detail-value ds-text-mono">' + (cs === "FLAT" ? "—" : _posMoney(mv)) + '</div></div>' +
+      '<div class="pos-detail-cell"><div class="pos-detail-label">Portfolio Weight</div><div class="pos-detail-value ds-text-mono">' + weight.toFixed(2) + '%</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Unrealized P&L</div><div class="pos-detail-value ds-text-mono ' + (uPnl >= 0 ? "pos" : "neg") + '">' + (cs === "FLAT" ? "—" : _posSignedMoney(uPnl)) + '</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Realized P&L</div><div class="pos-detail-value ds-text-mono ' + (rPnl >= 0 ? "pos" : "neg") + '">' + _posSignedMoney(rPnl) + '</div></div>' +
+      '<div class="pos-detail-cell pos-detail-pnl"><div class="pos-detail-label">Total P&L</div><div class="pos-detail-value ds-text-mono ' + (tPnl >= 0 ? "pos" : "neg") + '">' + _posSignedMoney(tPnl) + '</div></div>' +
       '</div>';
-    return grid + UI.sectionHeading("Position Timeline") + UI.timeline(p.timeline);
+
+    var timeline = _buildPositionTimeline(detail);
+    var timelineHtml = timeline.length > 0
+      ? UI.timeline(timeline)
+      : UI.empty("No fill history", "This position has no recorded ledger fills yet.");
+
+    return grid + UI.sectionHeading("Position History · Orders → Fills → Position") + timelineHtml;
   }
 
-  function bindPositionsPage() {
-    // Row selection via event delegation
+  // ── KPIs + Filters ─────────────────────────────────────────────
+  function renderPositionsKPIs() {
+    var all = POSITIONS_PAYLOAD.positions;
+    var open = all.filter(function (p) { return positionSideCanonical(p.side) !== "FLAT"; });
+    var exp = _positionsExposure();
+    var uPnl = all.reduce(function (s, p) { return s + _posNum(p.unrealized_pnl); }, 0);
+    var rPnl = all.reduce(function (s, p) { return s + _posNum(p.realized_pnl); }, 0);
+    return UI.metricCard("Total Positions", String(all.length), String(open.length) + " open", "info") +
+      UI.metricCard("Gross Exposure", _posMoney(exp.gross), "Long + Short", "info") +
+      UI.metricCard("Net Exposure", _posMoney(exp.net), "Long − Short", exp.net >= 0 ? "pos" : "neg") +
+      UI.metricCard("Unrealized P&L", _posSignedMoney(uPnl), "Realized " + _posSignedMoney(rPnl), uPnl >= 0 ? "pos" : "neg");
+  }
+
+  function renderPositionsFilters() {
+    var symbolOpts = _positionsSymbolOptions().map(function (s) {
+      return { value: s, label: s === "ALL" ? "All Symbols" : s };
+    });
+    var accountOpts = _positionsAccountOptions().map(function (a) {
+      return { value: a, label: a === "ALL" ? "All Accounts" : a };
+    });
+    return (
+      '<div class="pos-filters">' +
+      '<div class="pos-filter-field"><label class="pos-filter-label">View</label>' +
+      UI.select({ id: "pos-filter-visibility", options: [
+        { value: "OPEN", label: "Open Positions" },
+        { value: "ALL", label: "All Positions" },
+        { value: "FLAT", label: "Flat Positions" },
+      ] }) + '</div>' +
+      '<div class="pos-filter-field"><label class="pos-filter-label">Account</label>' +
+      UI.select({ id: "pos-filter-account", options: accountOpts }) + '</div>' +
+      '<div class="pos-filter-field"><label class="pos-filter-label">Symbol</label>' +
+      UI.select({ id: "pos-filter-symbol", options: symbolOpts }) + '</div>' +
+      '<div class="pos-filter-field"><label class="pos-filter-label">Side</label>' +
+      UI.select({ id: "pos-filter-side", options: [
+        { value: "ALL", label: "All Sides" },
+        { value: "LONG", label: "LONG" },
+        { value: "SHORT", label: "SHORT" },
+        { value: "FLAT", label: "FLAT" },
+      ] }) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function _renderPositionsRefreshAction() {
+    return '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Total: <span id="pos-total">' +
+      POSITIONS_PAYLOAD.positions.length + '</span> · Updated: <span class="ds-text-mono" id="pos-last-updated">' +
+      _posEsc(POSITIONS_LAST_UPDATED) + '</span></span> ' +
+      '<button class="btn btn-ghost btn-sm" data-action="pos:refresh" type="button">↻ Refresh</button>';
+  }
+
+  // ── Refresh + Detail loaders (async, fault-tolerant) ───────────
+  function refreshPositionsUI() {
     var tbody = document.getElementById("pos-tbody");
-    if (tbody) {
-      tbody.addEventListener("click", function (e) {
-        var row = e.target.closest("tr[data-pos-symbol]");
-        if (!row) return;
-        POSITIONS_SELECTED_SYMBOL = row.getAttribute("data-pos-symbol");
-        tbody.innerHTML = renderPositionsRows();
-        var detail = document.getElementById("pos-detail");
-        if (detail) detail.innerHTML = renderPositionDetail();
-      });
-    }
-    // Refresh button (mock visual feedback)
+    if (tbody) tbody.innerHTML = renderPositionsRows();
+    var kpisEl = document.getElementById("pos-kpis");
+    if (kpisEl) kpisEl.innerHTML = renderPositionsKPIs();
+    var expBars = document.getElementById("pos-exp-bars");
+    if (expBars) expBars.innerHTML = renderPositionExposureBars();
+    var totalEl = document.getElementById("pos-total");
+    if (totalEl) totalEl.textContent = String(POSITIONS_PAYLOAD.positions.length);
+    var lastUpd = document.getElementById("pos-last-updated");
+    if (lastUpd) lastUpd.textContent = POSITIONS_LAST_UPDATED;
+    // Exposure summary cards
+    var exp = _positionsExposure();
+    var ge = document.getElementById("pos-exp-gross"); if (ge) ge.textContent = _posMoney(exp.gross);
+    var ne = document.getElementById("pos-exp-net"); if (ne) ne.textContent = _posMoney(exp.net);
+    var le = document.getElementById("pos-exp-long"); if (le) le.textContent = _posMoney(exp.long);
+    var se = document.getElementById("pos-exp-short"); if (se) se.textContent = _posMoney(exp.short);
+    var ce = document.getElementById("pos-exp-cash"); if (ce) ce.textContent = _posMoney(exp.cash);
+  }
+
+  async function loadPositionsAsync() {
     var refreshBtn = document.querySelector('[data-action="pos:refresh"]');
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", function () {
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = "Refreshing…";
-        setTimeout(function () {
-          refreshBtn.disabled = false;
-          refreshBtn.textContent = "Refresh";
-          showToast("Positions refreshed (mock) / 持仓已刷新", "ok");
-        }, 700);
-      });
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = "Refreshing…"; }
+    try {
+      POSITIONS_PAYLOAD = await usePositions();
+      POSITIONS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
+      // Re-select if previously selected position is gone
+      var stillExists = POSITIONS_PAYLOAD.positions.some(function (p) { return p.symbol === POSITIONS_SELECTED_SYMBOL; });
+      if (!stillExists) {
+        var open = POSITIONS_PAYLOAD.positions.filter(function (p) { return positionSideCanonical(p.side) !== "FLAT"; });
+        POSITIONS_SELECTED_SYMBOL = (open[0] || POSITIONS_PAYLOAD.positions[0] || {}).symbol || null;
+        POSITIONS_DETAIL = null;
+        if (POSITIONS_SELECTED_SYMBOL) loadPositionDetailAsync(POSITIONS_SELECTED_SYMBOL);
+        else {
+          var d = document.getElementById("pos-detail");
+          if (d) d.innerHTML = renderPositionDetail();
+        }
+      }
+      refreshPositionsUI();
+      showToast("Positions refreshed / 持仓已刷新", "ok");
+    } catch (err) {
+      showToast("Refresh failed / 刷新失败: " + (err && err.message ? err.message : String(err)), "err");
+    } finally {
+      if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = "↻ Refresh"; }
     }
   }
 
-  PAGE_FRAMEWORK["trading/positions"] = function () {
-    // ── Mock KPIs ──────────────────────────────────────────────────
-    var open = positionsOpen();
-    var longExp = open.filter(function (p) { return p.side === "LONG"; })
-      .reduce(function (s, p) { return s + p.marketValue; }, 0);
-    var shortExp = open.filter(function (p) { return p.side === "SHORT"; })
-      .reduce(function (s, p) { return s + p.marketValue; }, 0);
-    var unrealPnl = POSITIONS_DATA
-      .reduce(function (s, p) { return s + p.unrealizedPnl; }, 0);
-    var kpis = UI.metricCard("Total Positions", String(POSITIONS_DATA.length), String(open.length) + " open", "") +
-      UI.metricCard("Long Exposure", "$" + longExp.toLocaleString("en-US"), "", "pos") +
-      UI.metricCard("Short Exposure", "$" + shortExp.toLocaleString("en-US"), "", "neg") +
-      UI.metricCard("Unrealized P&L", UI.signedMoney(unrealPnl), "", unrealPnl >= 0 ? "pos" : "neg");
+  async function loadPositionDetailAsync(symbol) {
+    var detailEl = document.getElementById("pos-detail");
+    if (detailEl) detailEl.innerHTML = UI.stateLoading("Loading position…", "Fetching detail and ledger fill history.");
+    try {
+      POSITIONS_DETAIL = await usePositionDetail(symbol);
+      if (detailEl) detailEl.innerHTML = renderPositionDetail();
+    } catch (err) {
+      if (err && err.status === 404) {
+        POSITIONS_DETAIL = null;
+        if (detailEl) detailEl.innerHTML = UI.empty("Position not found", "This position may have been closed or removed.");
+      } else {
+        if (detailEl) detailEl.innerHTML = UI.stateError(
+          "Failed to load position detail",
+          (err && err.message ? err.message : String(err)),
+          "Retry", "pos:detail-retry"
+        );
+      }
+    }
+  }
+
+  // ── Bind: delegated handlers on #pos-root (survive innerHTML) ──
+  function bindPositionsPage() {
+    var root = document.getElementById("pos-root");
+    if (!root) return;
+    // Lazy-load detail for pre-selected position
+    if (POSITIONS_SELECTED_SYMBOL && !POSITIONS_DETAIL) loadPositionDetailAsync(POSITIONS_SELECTED_SYMBOL);
+
+    // Single delegated click handler — catches pos:* buttons + rows
+    root.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (btn) {
+        var action = btn.getAttribute("data-action");
+        if (action === "pos:refresh") { loadPositionsAsync(); return; }
+        if (action === "pos:detail-retry" && POSITIONS_SELECTED_SYMBOL) {
+          loadPositionDetailAsync(POSITIONS_SELECTED_SYMBOL); return;
+        }
+        return;
+      }
+      // Row selection (delegated on tbody rows)
+      var row = e.target.closest("tr[data-pos-symbol]");
+      if (row) {
+        var sym = row.getAttribute("data-pos-symbol");
+        if (sym === POSITIONS_SELECTED_SYMBOL) return;
+        POSITIONS_SELECTED_SYMBOL = sym;
+        var tbody = document.getElementById("pos-tbody");
+        if (tbody) tbody.querySelectorAll("tr").forEach(function (tr) { tr.classList.remove("pos-row-selected"); });
+        row.classList.add("pos-row-selected");
+        loadPositionDetailAsync(sym);
+      }
+    });
+
+    // Filter selects
+    function bindFilter(id, key) {
+      var sel = document.getElementById(id);
+      if (sel) sel.addEventListener("change", function () {
+        POSITIONS_FILTERS[key] = sel.value;
+        refreshPositionsUI();
+      });
+    }
+    bindFilter("pos-filter-visibility", "visibility");
+    bindFilter("pos-filter-side", "side");
+    bindFilter("pos-filter-symbol", "symbol");
+    bindFilter("pos-filter-account", "account");
+  }
+
+  PAGE_FRAMEWORK["trading/positions"] = async function () {
+    // Initial load — throws on failure → render() catch → stateError + Retry
+    POSITIONS_PAYLOAD = await usePositions();
+    POSITIONS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
+    POSITIONS_FILTERS = { account: "ALL", symbol: "ALL", side: "ALL", visibility: "OPEN" };
+    POSITIONS_DETAIL = null;
+    // Pre-select first open position (if any), else first position
+    var exists = POSITIONS_PAYLOAD.positions.some(function (p) { return p.symbol === POSITIONS_SELECTED_SYMBOL; });
+    if (!exists) {
+      var open = POSITIONS_PAYLOAD.positions.filter(function (p) { return positionSideCanonical(p.side) !== "FLAT"; });
+      POSITIONS_SELECTED_SYMBOL = (open[0] || POSITIONS_PAYLOAD.positions[0] || {}).symbol || null;
+    }
+
+    var exp = _positionsExposure();
+    var expCards =
+      UI.metricCard("Gross Exposure", _posMoney(exp.gross), "Long + Short", "info") +
+      UI.metricCard("Net Exposure", _posMoney(exp.net), "Long − Short", exp.net >= 0 ? "pos" : "neg") +
+      UI.metricCard("Long Exposure", _posMoney(exp.long), "", "pos") +
+      UI.metricCard("Short Exposure", _posMoney(exp.short), "", "neg") +
+      UI.metricCard("Cash", _posMoney(exp.cash), "", "info");
 
     // ── Two-column layout ──────────────────────────────────────────
     var layout =
-      '<div class="pos-layout">' +
+      '<div class="pos-layout" id="pos-root">' +
       '<div class="pos-layout-main">' +
-      UI.panel("Open Positions", renderPositionsTable(), {
-        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
+      UI.panel("Positions", renderPositionsTable(), {
+        actions: _renderPositionsRefreshAction(),
       }) +
       '</div>' +
       '<div class="pos-layout-side">' +
-      UI.panel(POSITIONS_SELECTED_SYMBOL, '<div id="pos-detail">' + renderPositionDetail() + '</div>') +
+      UI.panel("Position Detail", '<div id="pos-detail">' + renderPositionDetail() + '</div>') +
       '</div>' +
       '</div>';
 
     return (
-      UI.pageHeader("Positions", "Position management, exposure and P&L · 持仓管理",
+      UI.pageHeader("Positions", "Position ledger, exposure and P&L · 持仓管理",
         UI.button("Refresh", "ghost", { sm: true, action: "pos:refresh" })) +
-      UI.kpiGrid(kpis, 4) +
+      '<div id="pos-kpis">' + UI.kpiGrid(renderPositionsKPIs(), 4) + '</div>' +
+      UI.sectionHeading("Exposure") +
+      '<div id="pos-exp-cards">' + UI.kpiGrid(expCards, 5) + '</div>' +
+      UI.sectionHeading("Filters") +
+      renderPositionsFilters() +
       UI.sectionHeading("Position Exposure") +
-      UI.panel("Exposure by Symbol", '<div class="pos-exp">' + renderExposureBars() + '</div>') +
+      UI.panel("Exposure by Symbol", '<div class="pos-exp" id="pos-exp-bars">' + renderPositionExposureBars() + '</div>') +
+      UI.sectionHeading("Positions") +
       layout
     );
   };
@@ -3594,110 +5686,801 @@
     );
   };
 
-  // ── Risk ────────────────────────────────────────────────────────
+  /* ==================================================================
+   * Risk module — Commit 013
+   * Risk Control Center: engine status → KPI table → exposure → limits
+   * → risk events. UI-only mock data; does NOT modify the Risk Engine,
+   * strategy runtime, order engine, position ledger, or risk rules.
+   * ================================================================== */
+
+  // ── Risk data ──────────────────────────────────────────────────
+  var RK_ENGINE = { status: "ONLINE", lastUpdate: "09:08:32" };
+
+  var RK_KPI = [
+    { metric: "Net Exposure",       value: "26.4%",  status: "NORMAL" },
+    { metric: "Gross Exposure",     value: "42.8%",  status: "NORMAL" },
+    { metric: "Margin Usage",       value: "18.7%",  status: "NORMAL" },
+    { metric: "Daily P&L",          value: "+0.42%", status: "NORMAL" },
+    { metric: "Max Drawdown",       value: "-5.5%",  status: "WATCH" },
+    { metric: "Portfolio Volatility", value: "12.4%", status: "NORMAL" },
+    { metric: "VaR (95%)",          value: "-1.8%",  status: "NORMAL" },
+    { metric: "Risk Budget",        value: "64.0%",  status: "NORMAL" },
+  ];
+
+  var RK_OVERVIEW = {
+    totalExposure: 428000, netExposure: 264000, grossExposure: 428000,
+    cash: 572000, marginUsage: 0.187,
+  };
+
+  // equity = $1,000,000 · Long $346k · Short $82k · Gross $428k · Net $264k
+  var RK_ASSET_EXPOSURE = [
+    { symbol: "NVDA", exposure: 128000, weight: 0.299, side: "Long" },
+    { symbol: "QQQ",  exposure: 118000, weight: 0.276, side: "Long" },
+    { symbol: "SPY",  exposure: 100000, weight: 0.234, side: "Long" },
+    { symbol: "AAPL", exposure: 42000,  weight: 0.098, side: "Short" },
+    { symbol: "TSLA", exposure: 40000,  weight: 0.093, side: "Short" },
+  ];
+
+  var RK_SECTOR_EXPOSURE = [
+    { sector: "Technology", exposure: 288000, weight: 0.673 },
+    { sector: "Broad Market", exposure: 100000, weight: 0.234 },
+    { sector: "Consumer Discretionary", exposure: 40000, weight: 0.093 },
+  ];
+
+  var RK_STRATEGY_EXPOSURE = [
+    { strategy: "Alpha021",        exposure: 228000, weight: 0.533 },
+    { strategy: "Momentum S001",   exposure: 109380, weight: 0.256 },
+    { strategy: "Cross-Section Q", exposure: 90620,  weight: 0.212 },
+  ];
+
+  var RK_CONCENTRATION = {
+    hhi: 2386,
+    holdings: [
+      { symbol: "QQQ",  weight: 0.276 },
+      { symbol: "NVDA", weight: 0.299 },
+      { symbol: "SPY",  weight: 0.234 },
+    ],
+  };
+
+  var RK_LIMITS = [
+    { name: "Position Limit",   current: 3,    limit: 1000,  fmt: "count" },
+    { name: "Daily Loss Limit", current: 720,   limit: 4000,  fmt: "money" },
+    { name: "Drawdown Limit",   current: 5.5,  limit: 10.0,  fmt: "pct" },
+    { name: "Leverage Limit",    current: 1.43, limit: 2.00,  fmt: "x" },
+    { name: "Order Rate Limit",  current: 12,   limit: 100,   fmt: "count" },
+  ];
+
+  var RK_EVENTS = [
+    { time: "09:08:32",  severity: "INFO",    title: "Risk engine snapshot", detail: "All metrics within budget" },
+    { time: "08:42:00",  severity: "WARNING",  title: "Leverage above target", detail: "1.43x / 2.00x (71%)" },
+    { time: "08:15:00",  severity: "INFO",    title: "Paper session started", detail: "Alpha021 paper trading active" },
+    { time: "07:58:30",  severity: "WARNING",  title: "Drawdown approaching limit", detail: "-5.5% / -10.0% (55%)" },
+    { time: "06:00:00",  severity: "INFO",    title: "Risk engine started", detail: "Engine ONLINE, all limits loaded" },
+    { time: "Yesterday", severity: "BREACH",  title: "Daily loss limit breached", detail: "-$4,200 > -$4,000 (auto-halt triggered)" },
+  ];
+
+  function rkStatusBadge(status) {
+    var key = (status || "").toLowerCase();
+    return '<span class="rk-status-badge rk-status-' + key + '">' + esc(status) + "</span>";
+  }
+  function rkLimitZone(pct) {
+    if (pct >= 0.8) return "danger";
+    if (pct >= 0.6) return "warn";
+    return "safe";
+  }
+  function rkLimitStatus(pct) {
+    if (pct >= 0.8) return "BREACH";
+    if (pct >= 0.6) return "WATCH";
+    return "NORMAL";
+  }
+  function rkLimitDisplay(limit) {
+    var f = limit.fmt;
+    if (f === "money") return "-$" + limit.current.toLocaleString() + " / -$" + limit.limit.toLocaleString();
+    if (f === "pct") return "-" + limit.current.toFixed(1) + "% / -" + limit.limit.toFixed(1) + "%";
+    if (f === "x") return limit.current.toFixed(2) + "x / " + limit.limit.toFixed(2) + "x";
+    return limit.current + " / " + limit.limit.toLocaleString();
+  }
+
+  // ── Engine status bar ─────────────────────────────────────────
+  function renderRkStatusBar() {
+    var eng = RK_ENGINE.status.toLowerCase();
+    return (
+      '<div class="rk-status-bar">' +
+      '<div class="rk-engine-status rk-engine-' + eng + '">' +
+      '<span class="rk-engine-dot"></span>' +
+      '<span>Risk Engine: </span>' +
+      '<span class="rk-engine-text ' + eng + '">' + esc(RK_ENGINE.status) + "</span>" +
+      "</div>" +
+      '<div class="rk-last-update">Last Update: ' + esc(RK_ENGINE.lastUpdate) + "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Overview KPI cards ────────────────────────────────────────
+  function renderRkOverview() {
+    var o = RK_OVERVIEW;
+    return UI.kpiGrid(
+      UI.metricCard("Total Exposure", UI.money(o.totalExposure, 0), "42.8%", "info") +
+      UI.metricCard("Net Exposure", UI.money(o.netExposure, 0), "26.4%", "info") +
+      UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "42.8%", "info") +
+      UI.metricCard("Cash", UI.money(o.cash, 0), "57.2%", "") +
+      UI.metricCard("Margin Usage", (o.marginUsage * 100).toFixed(1) + "%", "", "")
+    );
+  }
+
+  // ── KPI status table ──────────────────────────────────────────
+  function renderRkKpiTable() {
+    var rows = RK_KPI.map(function (k) {
+      return "<tr>" +
+        '<td class="rk-metric">' + esc(k.metric) + "</td>" +
+        '<td class="rk-value">' + esc(k.value) + "</td>" +
+        "<td>" + rkStatusBadge(k.status) + "</td>" +
+        "</tr>";
+    }).join("");
+    return (
+      '<table class="ds-table rk-kpi-table">' +
+      "<thead><tr><th>Metric</th><th style=\"text-align:right;\">Value</th><th>Status</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  // ── Exposure bars ─────────────────────────────────────────────
+  function renderRkExposureBars(items, labelKey, expKey) {
+    return items.map(function (it) {
+      var side = it.side || "";
+      var fillCls = side === "Short" ? "short" : side === "Long" ? "long" : "neutral";
+      var w = (it.weight * 100).toFixed(1);
+      var expVal = typeof it[expKey] === "number" ? UI.money(it[expKey], 0) : "—";
+      return (
+        '<div class="rk-exp-row">' +
+        '<span class="rk-exp-label">' + esc(it[labelKey]) + (side && side !== "—" ? " · " + esc(side) : "") + "</span>" +
+        '<div class="rk-exp-track"><div class="rk-exp-fill ' + fillCls + '" style="width:' + w + '%;"></div></div>' +
+        '<span class="rk-exp-value">' + expVal + " · " + w + "%</span>" +
+        "</div>"
+      );
+    }).join("");
+  }
+
+  // ── Limits with progress bars ─────────────────────────────────
+  function renderRkLimits() {
+    return RK_LIMITS.map(function (l) {
+      var pct = l.current / l.limit;
+      var zone = rkLimitZone(pct);
+      var status = rkLimitStatus(pct);
+      var w = (pct * 100).toFixed(1);
+      return (
+        '<div class="rk-limit-row">' +
+        '<div class="rk-limit-head">' +
+        '<span class="rk-limit-label">' + esc(l.name) + "</span>" +
+        '<span class="rk-limit-value">' + rkLimitDisplay(l) + " · " + w + "%</span>" +
+        "</div>" +
+        '<div class="rk-limit-track"><div class="rk-limit-fill ' + zone + '" style="width:' + w + '%;"></div></div>' +
+        '<div class="rk-limit-foot"><span>0</span><span>' + rkStatusBadge(status) + "</span></div>" +
+        "</div>"
+      );
+    }).join("");
+  }
+
+  // ── Risk events log ───────────────────────────────────────────
+  function renderRkEvents() {
+    return RK_EVENTS.map(function (e) {
+      var sevCls = "rk-sev-" + e.severity.toLowerCase();
+      return (
+        '<div class="rk-event-item ' + sevCls + '">' +
+        '<span class="rk-event-time">' + esc(e.time) + "</span>" +
+        '<span class="rk-sev-badge ' + sevCls + '">' + esc(e.severity) + "</span>" +
+        '<span class="rk-event-detail"><strong>' + esc(e.title) + "</strong> · " + esc(e.detail) + "</span>" +
+        "</div>"
+      );
+    }).join("");
+  }
+
+  function renderRkConcentration() {
+    var rows = RK_CONCENTRATION.holdings.map(function (h) {
+      return "<tr><td>" + esc(h.symbol) + "</td>" +
+        '<td class="num">' + (h.weight * 100).toFixed(1) + "%</td></tr>";
+    }).join("");
+    return (
+      '<table class="ds-table rk-kpi-table">' +
+      "<thead><tr><th>Top Holding</th><th style=\"text-align:right;\">Weight</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table>" +
+      '<div style="margin-top:var(--ds-space-3);display:flex;justify-content:space-between;align-items:center;">' +
+      '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);text-transform:uppercase;letter-spacing:var(--ds-tracking-wider);">HHI Concentration</span>' +
+      '<span class="ds-num-font" style="font-weight:var(--ds-font-bold);font-family:var(--ds-num-font);">' + RK_CONCENTRATION.hhi + "</span>" +
+      "</div>"
+    );
+  }
+
+  // ── Bindings (refresh button, event row detail) ───────────────
+  function bindRiskPage() {
+    var refreshBtn = document.querySelector('[data-action="rk:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        setTimeout(function () {
+          var now = new Date();
+          var hh = (now.getHours() < 10 ? "0" : "") + now.getHours();
+          var mm = (now.getMinutes() < 10 ? "0" : "") + now.getMinutes();
+          var ss = (now.getSeconds() < 10 ? "0" : "") + now.getSeconds();
+          RK_ENGINE.lastUpdate = hh + ":" + mm + ":" + ss;
+          var bar = document.querySelector(".rk-status-bar");
+          if (bar) bar.outerHTML = renderRkStatusBar();
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+          showToast("Risk snapshot updated / 风控快照已更新 (UI only)", "ok");
+        }, 800);
+      });
+    }
+    var reportBtn = document.querySelector('[data-action="rk:report"]');
+    if (reportBtn) {
+      reportBtn.addEventListener("click", function () {
+        showToast("Risk report — coming in UI V1 / 风控报告待后续 UI 版本", "info");
+      });
+    }
+    document.querySelectorAll(".rk-event-item").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var detail = el.querySelector(".rk-event-detail");
+        showToast(detail ? detail.textContent : "Risk event", "info");
+      });
+    });
+  }
+
+  // ── Risk Control Center (Commit 013) ──────────────────────────
   PAGE_FRAMEWORK["risk"] = function () {
     return (
-      UI.pageHeader("Risk Overview", "Risk monitoring and limits",
-        UI.button("Risk Report", "ghost", { sm: true })) +
-      UI.kpiGrid(
-        UI.metricCard("Daily Loss", "-$720", "-0.07%", "neg") +
-        UI.metricCard("Max Daily Loss", "$4,000", "limit", "warning") +
-        UI.metricCard("Exposure", "26.6%", "", "info") +
-        UI.metricCard("Open Positions", "3", "", "")
-      ) +
-      UI.sectionHeading("Risk Limits") +
-      UI.panel("Daily Loss Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
-        '<div class="progress-bar" style="flex:1;"><div class="progress-fill warning" style="width:18%"></div></div>' +
-        '<span class="ds-text-mono">-$720 / $4,000</span>' +
-        "</div>") +
-      UI.panel("Max Drawdown Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
-        '<div class="progress-bar" style="flex:1;"><div class="progress-fill loss" style="width:55%"></div></div>' +
-        '<span class="ds-text-mono">-5.50% / -10.00%</span>' +
-        "</div>") +
-      UI.panel("Position Limit", '<div style="display:flex;align-items:center;gap:var(--ds-space-4);">' +
-        '<div class="progress-bar" style="flex:1;"><div class="progress-fill info" style="width:3%"></div></div>' +
-        '<span class="ds-text-mono">3 / 1,000</span>' +
-        "</div>")
+      UI.pageHeader("Risk Control Center", "Risk monitoring, exposure, and limits · 风控中心",
+        UI.button("Refresh", "ghost", { sm: true, action: "rk:refresh" }) +
+        UI.button("Risk Report", "secondary", { sm: true, action: "rk:report" })) +
+      renderRkStatusBar() +
+      UI.sectionHeading("Risk Overview") +
+      renderRkOverview() +
+      UI.sectionHeading("Risk Metrics") +
+      UI.panel("KPI Status", renderRkKpiTable()) +
+      UI.sectionHeading("Exposure") +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ds-space-4);">' +
+      UI.panel("Asset Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_ASSET_EXPOSURE, "symbol", "exposure") + "</div>") +
+      UI.panel("Sector Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_SECTOR_EXPOSURE, "sector", "exposure") + "</div>") +
+      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_STRATEGY_EXPOSURE, "strategy", "exposure") + "</div>") +
+      UI.panel("Concentration", renderRkConcentration()) +
+      "</div>" +
+      UI.sectionHeading("Limits") +
+      UI.panel("Risk Limits", '<div class="rk-limit-list">' + renderRkLimits() + "</div>") +
+      UI.sectionHeading("Risk Events") +
+      UI.panel("Event Log", '<div class="rk-event-list">' + renderRkEvents() + "</div>")
     );
   };
 
+  // ── Exposure page (Commit 013 — enhanced) ────────────────────
   PAGE_FRAMEWORK["risk/exposure"] = function () {
+    var o = RK_OVERVIEW;
     return (
-      UI.pageHeader("Exposure", "Exposure breakdown and analysis") +
+      UI.pageHeader("Exposure", "Exposure breakdown and analysis · 敞口分析",
+        UI.button("Refresh", "ghost", { sm: true, action: "rk:refresh" })) +
+      renderRkStatusBar() +
       UI.kpiGrid(
-        UI.metricCard("Gross Exposure", "$266,181", "26.6%", "info") +
-        UI.metricCard("Net Exposure", "$186,181", "18.6%", "info") +
-        UI.metricCard("Long Exposure", "$226,181", "", "pos") +
-        UI.metricCard("Short Exposure", "$40,000", "", "neg")
+        UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "42.8%", "info") +
+        UI.metricCard("Net Exposure", UI.money(o.netExposure, 0), "26.4%", "info") +
+        UI.metricCard("Long Exposure", "$346,000", "34.6%", "pos") +
+        UI.metricCard("Short Exposure", "$82,000", "8.2%", "neg")
       ) +
       UI.sectionHeading("By Asset") +
       UI.panel("Exposure Breakdown", UI.table({
         columns: [
           { key: "symbol", label: "Symbol" },
-          { key: "exposure", label: "Exposure", numeric: true,
-            format: function (v) { return UI.money(v); } },
-          { key: "weight", label: "Weight", numeric: true,
-            format: function (v) { return (v * 100).toFixed(1) + "%"; } },
+          { key: "exposure", label: "Exposure", numeric: true, format: function (v) { return UI.money(v); } },
+          { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
           { key: "side", label: "Side" },
         ],
-        rows: [
-          { symbol: "NVDA", exposure: 109380, weight: 0.41, side: "Long" },
-          { symbol: "QQQ", exposure: 114240, weight: 0.43, side: "Long" },
-          { symbol: "AAPL", exposure: 21630, weight: 0.08, side: "Short" },
-          { symbol: "Cash", exposure: 807000, weight: 0.75, side: "—" },
-        ],
-      }))
+        rows: RK_ASSET_EXPOSURE,
+      })) +
+      UI.sectionHeading("By Sector") +
+      UI.panel("Sector Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_SECTOR_EXPOSURE, "sector", "exposure") + "</div>") +
+      UI.sectionHeading("By Strategy") +
+      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_STRATEGY_EXPOSURE, "strategy", "exposure") + "</div>") +
+      UI.sectionHeading("Concentration") +
+      UI.panel("Top Holdings & HHI", renderRkConcentration())
     );
   };
 
   // ── Operations ───────────────────────────────────────────────────
+  /* ==================================================================
+   * Accounts module — Commit 015
+   * Account & Broker Management Center: overview → list → detail →
+   * permissions → add-account form. UI-only mock data; does NOT save
+   * real secrets, modify the multi-account adapter, or any API/db.
+   * ================================================================== */
+
+  // ── Account data ──────────────────────────────────────────────
+  var ACCOUNTS = [
+    {
+      id: "us-001", name: "US-001", type: "US Stocks",
+      broker: "Interactive Brokers", currency: "USD",
+      equity: 536590, buyingPower: 536590, marginUsed: 0.184,
+      status: "CONNECTED", heartbeat: "10:31:58", latency: 24,
+      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: true },
+    },
+    {
+      id: "fut-001", name: "FUT-001", type: "Futures",
+      broker: "CQG", currency: "CNY",
+      equity: 186590, buyingPower: 373180, marginUsed: 0.221,
+      status: "CONNECTED", heartbeat: "10:31:55", latency: 31,
+      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: false },
+    },
+    {
+      id: "fx-001", name: "FX-001", type: "Forex",
+      broker: "Interactive Brokers", currency: "USD",
+      equity: 261800, buyingPower: 523600, marginUsed: 0.092,
+      status: "CONNECTED", heartbeat: "10:31:59", latency: 18,
+      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: false },
+    },
+    {
+      id: "cn-001", name: "CN-001", type: "A-Share",
+      broker: "XTS", currency: "CNY",
+      equity: 88000, buyingPower: 176000, marginUsed: 0.0,
+      status: "OFFLINE", heartbeat: "—", latency: null,
+      permissions: { marketData: false, trading: false, cancelOrder: false, shortSelling: false },
+    },
+  ];
+
+  var AC_OVERVIEW = {
+    totalEquity: 1073181, availableCash: 806000, grossExposure: 266181,
+    marginUsed: 187200, unrealizedPnL: 6212,
+  };
+  var AC_STATE = { selectedId: "us-001" };
+
+  function acMoney(amount, currency) {
+    if (currency === "CNY") return "¥" + amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return UI.money(amount, 0);
+  }
+  function acConnBadge(status) {
+    var key = status === "CONNECTED" ? "connected" : "offline";
+    return '<span class="ac-conn-badge ac-conn-' + key + '">' + esc(status) + "</span>";
+  }
+  function acFind(id) {
+    for (var i = 0; i < ACCOUNTS.length; i++) {
+      if (ACCOUNTS[i].id === id) return ACCOUNTS[i];
+    }
+    return ACCOUNTS[0];
+  }
+
+  // ── Overview KPI ──────────────────────────────────────────────
+  function renderAcOverview() {
+    var o = AC_OVERVIEW;
+    return UI.kpiGrid(
+      UI.metricCard("Total Equity", UI.money(o.totalEquity, 0), "", "") +
+      UI.metricCard("Available Cash", UI.money(o.availableCash, 0), "", "") +
+      UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "", "info") +
+      UI.metricCard("Margin Used", UI.money(o.marginUsed, 0), "", "") +
+      UI.metricCard("Unrealized P&L", UI.signedMoney(o.unrealizedPnL), "", "pos")
+    , 5);
+  }
+
+  // ── Account list (clickable rows) ────────────────────────────
+  function renderAcRows() {
+    return ACCOUNTS.map(function (a) {
+      var sel = a.id === AC_STATE.selectedId ? " ac-row-selected" : "";
+      return (
+        '<tr class="ac-row' + sel + '" data-ac-id="' + esc(a.id) + '">' +
+        '<td class="ac-col-name">' + esc(a.name) + "</td>" +
+        "<td>" + esc(a.type) + "</td>" +
+        '<td class="num">' + esc(a.currency) + "</td>" +
+        '<td class="num">' + acMoney(a.equity, a.currency) + "</td>" +
+        "<td>" + acConnBadge(a.status) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function renderAcList() {
+    return (
+      '<table class="ds-table ac-list-table">' +
+      "<thead><tr>" +
+      "<th>Account</th><th>Type</th><th>Currency</th>" +
+      '<th class="num">Equity</th><th>Status</th>' +
+      "</tr></thead>" +
+      '<tbody id="ac-list-tbody">' + renderAcRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  // ── Detail panel ──────────────────────────────────────────────
+  function acDetailCell(label, value, cls) {
+    return (
+      '<div class="ac-detail-cell">' +
+      '<div class="ac-detail-label">' + esc(label) + "</div>" +
+      '<div class="ac-detail-value' + (cls ? " " + cls : "") + '">' + esc(value) + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderAcPerms(perms) {
+    var items = [
+      { label: "Market Data", ok: perms.marketData },
+      { label: "Trading", ok: perms.trading },
+      { label: "Cancel Orders", ok: perms.cancelOrder },
+      { label: "Short Selling", ok: perms.shortSelling },
+    ];
+    return items.map(function (p) {
+      var cls = p.ok ? "ac-perm-yes" : "ac-perm-no";
+      var icon = p.ok ? "✓" : "✕";
+      return (
+        '<div class="ac-perm-item ' + cls + '">' +
+        '<span class="ac-perm-icon">' + icon + "</span>" +
+        '<span class="ac-perm-label">' + esc(p.label) + "</span>" +
+        "</div>"
+      );
+    }).join("");
+  }
+
+  function renderAcDetail() {
+    var a = acFind(AC_STATE.selectedId);
+    var latency = a.latency != null ? a.latency + " ms" : "—";
+    var marginPct = (a.marginUsed * 100).toFixed(1) + "%";
+    return (
+      '<div class="ac-detail-grid">' +
+      acDetailCell("Account ID", a.id) +
+      acDetailCell("Broker", a.broker) +
+      acDetailCell("Account Type", a.type) +
+      acDetailCell("Currency", a.currency) +
+      acDetailCell("Equity", acMoney(a.equity, a.currency)) +
+      acDetailCell("Buying Power", acMoney(a.buyingPower, a.currency)) +
+      acDetailCell("Margin Used", marginPct) +
+      acDetailCell("Connection", a.status, a.status === "CONNECTED" ? "pos" : "") +
+      acDetailCell("Last Heartbeat", a.heartbeat) +
+      acDetailCell("Latency", latency) +
+      "</div>" +
+      UI.sectionHeading("Trading Permissions") +
+      '<div class="ac-perm-list">' + renderAcPerms(a.permissions) + "</div>"
+    );
+  }
+
+  function updateAcDetail() {
+    var host = document.getElementById("ac-detail");
+    if (host) host.innerHTML = renderAcDetail();
+  }
+
+  // ── Add account form body ────────────────────────────────────
+  function renderAcFormBody() {
+    return (
+      '<div class="ac-form-grid">' +
+      UI.field("Account Name", UI.input({ placeholder: "US Main Account" })) +
+      '<div class="ac-form-row">' +
+      UI.field("Account Type", UI.select({ options: ["US Stocks", "Futures", "Forex", "A-Share"] })) +
+      UI.field("Broker", UI.select({ options: ["Interactive Brokers", "CQG", "XTS", "Simulation"] })) +
+      "</div>" +
+      UI.field("Account ID", UI.input({ type: "password", placeholder: "Account ID", value: "••••••••••••••" })) +
+      '<div class="ac-form-row">' +
+      UI.field("API Key", UI.input({ type: "password", placeholder: "API Key" })) +
+      UI.field("API Secret", UI.input({ type: "password", placeholder: "API Secret" })) +
+      "</div>" +
+      '<div class="ds-field"><label class="ds-field-label">Environment</label>' +
+      '<div class="ac-env-radios">' +
+      '<label class="ac-env-radio"><input type="radio" name="ac-env" value="Paper"> Paper</label>' +
+      '<label class="ac-env-radio"><input type="radio" name="ac-env" value="Live" checked> Live</label>' +
+      "</div></div>" +
+      '<div class="ac-secret-disclaimer">' +
+      "⚠ Secrets are never stored in the browser, database, or Git. " +
+      "Production secrets should be managed via Vault / Secret Manager / Environment Variables. " +
+      "This form is UI-only — no real credentials are saved." +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Bindings (row select, add account, test connection) ──────
+  function bindAccountsPage() {
+    var tbody = document.getElementById("ac-list-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-ac-id]");
+        if (!row) return;
+        AC_STATE.selectedId = row.getAttribute("data-ac-id");
+        tbody.innerHTML = renderAcRows();
+        updateAcDetail();
+      });
+    }
+    var addBtn = document.querySelector('[data-action="ac:add"]');
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        UI.openModal({
+          title: "Add Account",
+          body: renderAcFormBody(),
+          footer:
+            UI.button("Cancel", "ghost", { sm: true, action: "close-modal" }) +
+            UI.button("Test Connection", "secondary", { sm: true, action: "ac:test" }) +
+            UI.button("Save Account", "primary", { sm: true, action: "ac:save" }),
+          onMount: function (backdrop) {
+            var testBtn = backdrop.querySelector('[data-action="ac:test"]');
+            if (testBtn) {
+              testBtn.addEventListener("click", function () {
+                testBtn.disabled = true;
+                testBtn.textContent = "Testing…";
+                setTimeout(function () {
+                  testBtn.disabled = false;
+                  testBtn.textContent = "Test Connection";
+                  showToast("Connection test passed (UI only) / 连接测试通过", "ok");
+                }, 1000);
+              });
+            }
+            var saveBtn = backdrop.querySelector('[data-action="ac:save"]');
+            if (saveBtn) {
+              saveBtn.addEventListener("click", function () {
+                UI.closeModal();
+                showToast("Account saved (UI only) / 账户已保存 — secrets not stored", "ok");
+              });
+            }
+          },
+        });
+      });
+    }
+  }
+
+  // ── Accounts page (Commit 015) ────────────────────────────────
   PAGE_FRAMEWORK["operations/accounts"] = function () {
     return (
-      UI.pageHeader("Accounts", "Trading account management",
-        UI.button("Add Account", "primary", { sm: true, action: "ds-demo-modal" })) +
-      UI.table({
-        columns: [
-          { key: "name", label: "Account Name" },
-          { key: "type", label: "Type" },
-          { key: "broker", label: "Broker" },
-          { key: "equity", label: "Equity", numeric: true,
-            format: function (v) { return UI.money(v); } },
-          { key: "status", label: "Status" },
-        ],
-        rows: [
-          { name: "Paper-Alpha021", type: "Paper", broker: "Simulation", equity: 1073181, status: "Active" },
-          { name: "Paper-Momentum", type: "Paper", broker: "Simulation", equity: 441222, status: "Active" },
-          { name: "Live-US-Equity", type: "Live", broker: "IB", equity: 245300, status: "Connected" },
-          { name: "Live-FX", type: "Live", broker: "CQG", equity: 261800, status: "Connected" },
-        ],
-      })
+      UI.pageHeader("Accounts", "Account & broker management · 多账户管理",
+        UI.button("Add Account", "primary", { sm: true, action: "ac:add" })) +
+      UI.sectionHeading("Account Overview") +
+      renderAcOverview() +
+      UI.sectionHeading("Connected Accounts") +
+      UI.panel("Accounts", renderAcList()) +
+      UI.sectionHeading("Account Details") +
+      '<div id="ac-detail">' + renderAcDetail() + "</div>"
     );
   };
 
+  /* ==================================================================
+   * Execution module — Commit 014
+   * Execution Control Center: engine status → KPI → quality → order flow
+   * → timeline (Signal→Risk→Order→Execution→Fill) → venues.
+   * UI-only mock data; does NOT modify the execution engine, order
+   * engine, risk check, or any API/database.
+   * ================================================================== */
+
+  // ── Execution data ────────────────────────────────────────────
+  var EX_ENGINES = [
+    { name: "Execution Engine", status: "ONLINE" },
+    { name: "Order Engine", status: "ONLINE" },
+    { name: "Risk Check", status: "ONLINE" },
+  ];
+  var EX_LAST_UPDATE = "10:32:18";
+
+  var EX_KPI = {
+    orders: 128, filled: 110, fillRate: "85.94%", rejectRate: "11.72%", slippage: "3.1 bps",
+  };
+
+  var EX_QUALITY = [
+    { label: "Fill Rate", value: "85.94%", fill: 85.94, cls: "good" },
+    { label: "Reject Rate", value: "11.72%", fill: 11.72, cls: "bad" },
+    { label: "Avg Slippage", value: "3.1 bps", fill: 31, cls: "neutral" },
+    { label: "P95 Latency", value: "42 ms", fill: 42, cls: "good" },
+    { label: "Market Impact", value: "1.2 bps", fill: 12, cls: "neutral" },
+  ];
+
+  var EX_FLOW = [
+    { label: "Pending", count: 3, cls: "pending" },
+    { label: "Working", count: 8, cls: "working" },
+    { label: "Partial", count: 7, cls: "partial" },
+    { label: "Filled", count: 110, cls: "filled" },
+    { label: "Rejected", count: 15, cls: "rejected" },
+    { label: "Cancelled", count: 5, cls: "cancelled" },
+  ];
+
+  var EX_TIMELINE = [
+    {
+      time: "09:31:02", symbol: "NVDA", side: "BUY", qty: 100, type: "filled",
+      steps: [
+        { label: "Signal", detail: "Alpha021 BUY 100", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "ACCEPTED", status: "done" },
+        { label: "Execution", detail: "Fill 100 @ 738.90", status: "done" },
+        { label: "Slippage", detail: "+2.1 bps", status: "done" },
+      ],
+    },
+    {
+      time: "09:42:17", symbol: "QQQ", side: "SELL", qty: 100, type: "partial",
+      steps: [
+        { label: "Signal", detail: "Alpha021 SELL 100", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "PARTIAL FILL 60/100", status: "active" },
+        { label: "Remaining", detail: "40 qty", status: "pending" },
+      ],
+    },
+    {
+      time: "09:55:30", symbol: "SPY", side: "BUY", qty: 200, type: "filled",
+      steps: [
+        { label: "Signal", detail: "Alpha021 BUY 200", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "ACCEPTED", status: "done" },
+        { label: "Execution", detail: "Fill 200 @ 410.20", status: "done" },
+        { label: "Slippage", detail: "+1.3 bps", status: "done" },
+      ],
+    },
+    {
+      time: "10:02:15", symbol: "AAPL", side: "SELL", qty: 50, type: "rejected",
+      steps: [
+        { label: "Signal", detail: "MeanRev SELL 50", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "REJECTED — insufficient liquidity", status: "failed" },
+      ],
+    },
+    {
+      time: "10:15:00", symbol: "NVDA", side: "SELL", qty: 100, type: "filled",
+      steps: [
+        { label: "Signal", detail: "Alpha021 SELL 100", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "ACCEPTED", status: "done" },
+        { label: "Execution", detail: "Fill 100 @ 738.85", status: "done" },
+        { label: "Slippage", detail: "-0.5 bps", status: "done" },
+      ],
+    },
+    {
+      time: "10:28:44", symbol: "TSLA", side: "BUY", qty: 75, type: "working",
+      steps: [
+        { label: "Signal", detail: "Momentum BUY 75", status: "done" },
+        { label: "Risk", detail: "PASS", status: "done" },
+        { label: "Order", detail: "ACCEPTED — working", status: "active" },
+        { label: "Execution", detail: "Pending fill", status: "pending" },
+      ],
+    },
+  ];
+
+  var EX_VENUES = [
+    { venue: "US Stocks (IB)", account: "Paper-A", execs: 105, fillRate: "87.6%", latency: "12 ms", status: "ONLINE" },
+    { venue: "Futures (CQG)", account: "Paper-B", execs: 3, fillRate: "66.7%", latency: "31 ms", status: "ONLINE" },
+    { venue: "Forex (IB)", account: "Paper-C", execs: 2, fillRate: "100%", latency: "18 ms", status: "ONLINE" },
+    { venue: "A-Share (XTS)", account: "—", execs: 0, fillRate: "—", latency: "—", status: "OFFLINE" },
+  ];
+
+  function exStepIcon(status) {
+    if (status === "done") return "✓";
+    if (status === "active") return "●";
+    if (status === "pending") return "○";
+    if (status === "failed") return "✕";
+    return "○";
+  }
+
+  // ── Engine status bar ────────────────────────────────────────
+  function renderExEngineBar() {
+    var items = EX_ENGINES.map(function (e) {
+      var st = e.status.toLowerCase();
+      return '<div class="ex-engine-item ex-engine-' + st + '">' +
+        '<span class="ex-engine-dot"></span>' +
+        "<span>" + esc(e.name) + "</span>" +
+        '<span class="ex-engine-label ' + st + '">' + esc(e.status) + "</span>" +
+        "</div>";
+    }).join("");
+    return '<div class="ex-engine-bar">' + items +
+      '<div class="ex-last-update">Last Update: ' + esc(EX_LAST_UPDATE) + "</div>" +
+      "</div>";
+  }
+
+  // ── Overview KPI ──────────────────────────────────────────────
+  function renderExKpis() {
+    var k = EX_KPI;
+    return UI.kpiGrid(
+      UI.metricCard("Orders", String(k.orders), "", "") +
+      UI.metricCard("Filled", String(k.filled), "", "pos") +
+      UI.metricCard("Fill Rate", k.fillRate, "", "pos") +
+      UI.metricCard("Reject Rate", k.rejectRate, "", "neg") +
+      UI.metricCard("Avg Slippage", k.slippage, "", "")
+    , 5);
+  }
+
+  // ── Execution quality bars ───────────────────────────────────
+  function renderExQuality() {
+    var rows = EX_QUALITY.map(function (q) {
+      return '<div class="ex-q-row">' +
+        '<span class="ex-q-label">' + esc(q.label) + "</span>" +
+        '<div class="ex-q-track"><div class="ex-q-fill ' + q.cls + '" style="width:' + q.fill + '%;"></div></div>' +
+        '<span class="ex-q-value">' + esc(q.value) + "</span>" +
+        "</div>";
+    }).join("");
+    return '<div class="ex-q-list">' + rows + "</div>";
+  }
+
+  // ── Order flow grid ───────────────────────────────────────────
+  function renderExFlow() {
+    var cells = EX_FLOW.map(function (f) {
+      return '<div class="ex-flow-cell ex-flow-' + f.cls + '">' +
+        '<span class="ex-flow-count">' + f.count + "</span>" +
+        '<span class="ex-flow-label">' + esc(f.label) + "</span>" +
+        "</div>";
+    }).join("");
+    return '<div class="ex-flow-grid">' + cells + "</div>";
+  }
+
+  // ── Execution timeline (Signal→Risk→Order→Execution→Fill) ───
+  function renderExTimeline() {
+    return EX_TIMELINE.map(function (t) {
+      var sideCls = t.side === "BUY" ? "ex-tl-side-buy" : "ex-tl-side-sell";
+      var steps = t.steps.map(function (s) {
+        return '<div class="ex-tl-step ex-tl-step-' + s.status + '">' +
+          '<span class="ex-tl-step-icon">' + exStepIcon(s.status) + "</span>" +
+          '<span class="ex-tl-step-label">' + esc(s.label) + "</span>" +
+          '<span class="ex-tl-step-detail">' + esc(s.detail) + "</span>" +
+          "</div>";
+      }).join("");
+      return '<div class="ex-tl-item ex-tl-' + t.type + '">' +
+        '<div class="ex-tl-time">' + esc(t.time) + "</div>" +
+        '<div class="ex-tl-body">' +
+        '<div class="ex-tl-head">' +
+        '<span class="ex-tl-side ' + sideCls + '">' + esc(t.side) + "</span>" +
+        '<span class="ex-tl-symbol">' + esc(t.symbol) + "</span>" +
+        '<span class="ex-tl-qty">' + t.qty + "</span>" +
+        "</div>" +
+        '<div class="ex-tl-steps">' + steps + "</div>" +
+        "</div>" +
+        "</div>";
+    }).join("");
+  }
+
+  // ── Venues & accounts ─────────────────────────────────────────
+  function renderExVenues() {
+    return UI.table({
+      columns: [
+        { key: "venue", label: "Venue" },
+        { key: "account", label: "Account" },
+        { key: "execs", label: "Executions", numeric: true },
+        { key: "fillRate", label: "Fill Rate", numeric: true },
+        { key: "latency", label: "Latency", numeric: true },
+        { key: "status", label: "Status", format: function (v) {
+          var st = String(v).toLowerCase();
+          var color = st === "online" ? "var(--ds-profit)" : "var(--ds-loss)";
+          return '<span style="color:' + color + ';font-weight:var(--ds-font-bold);font-family:var(--ds-num-font);font-size:var(--ds-text-xs);">' + esc(v) + "</span>";
+        } },
+      ],
+      rows: EX_VENUES,
+    });
+  }
+
+  // ── Bindings (refresh, timeline click) ───────────────────────
+  function bindExecutionPage() {
+    var refreshBtn = document.querySelector('[data-action="ex:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        setTimeout(function () {
+          var now = new Date();
+          var hh = (now.getHours() < 10 ? "0" : "") + now.getHours();
+          var mm = (now.getMinutes() < 10 ? "0" : "") + now.getMinutes();
+          var ss = (now.getSeconds() < 10 ? "0" : "") + now.getSeconds();
+          EX_LAST_UPDATE = hh + ":" + mm + ":" + ss;
+          var bar = document.querySelector(".ex-engine-bar");
+          if (bar) bar.outerHTML = renderExEngineBar();
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+          showToast("Execution snapshot updated / 执行快照已更新 (UI only)", "ok");
+        }, 800);
+      });
+    }
+    document.querySelectorAll(".ex-tl-item").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var head = el.querySelector(".ex-tl-head");
+        showToast(head ? head.textContent.trim() : "Execution event", "info");
+      });
+    });
+  }
+
+  // ── Execution Control Center (Commit 014) ────────────────────
   PAGE_FRAMEWORK["operations/execution"] = function () {
     return (
-      UI.pageHeader("Execution", "Execution monitoring and routing") +
-      UI.kpiGrid(
-        UI.metricCard("Total Executions", "38", "", "") +
-        UI.metricCard("Fill Rate", "80.9%", "", "pos") +
-        UI.metricCard("Avg Latency", "12ms", "", "pos") +
-        UI.metricCard("Slippage", "+0.03bp", "", "pos")
-      ) +
-      UI.sectionHeading("Execution Venues") +
-      UI.panel("Venues", UI.table({
-        columns: [
-          { key: "venue", label: "Venue" },
-          { key: "execs", label: "Executions", numeric: true },
-          { key: "fillRate", label: "Fill Rate", numeric: true },
-          { key: "latency", label: "Latency", numeric: true },
-          { key: "status", label: "Status" },
-        ],
-        rows: [
-          { venue: "Simulation", execs: 28, fillRate: "100%", latency: "8ms", status: "Online" },
-          { venue: "IB SmartRouter", execs: 7, fillRate: "85.7%", latency: "23ms", status: "Online" },
-          { venue: "CQG", execs: 3, fillRate: "66.7%", latency: "31ms", status: "Online" },
-        ],
-      }))
+      UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心",
+        UI.button("Refresh", "ghost", { sm: true, action: "ex:refresh" })) +
+      renderExEngineBar() +
+      UI.sectionHeading("Execution Overview") +
+      renderExKpis() +
+      UI.sectionHeading("Execution Quality") +
+      UI.panel("Quality Metrics", renderExQuality()) +
+      UI.sectionHeading("Order Flow") +
+      UI.panel("Order Status", renderExFlow()) +
+      UI.sectionHeading("Execution Timeline") +
+      UI.panel("Lifecycle Events", '<div class="ex-timeline">' + renderExTimeline() + "</div>") +
+      UI.sectionHeading("Venues & Accounts") +
+      UI.panel("Execution Venues", renderExVenues())
     );
   };
 
@@ -3728,46 +6511,1150 @@
     );
   };
 
-  // ── System + Settings ───────────────────────────────────────────
-  PAGE_FRAMEWORK["system"] = function () {
-    var services = [
-      ["API Gateway", "Healthy", "profit"],
-      ["Strategy Runtime", "Healthy", "profit"],
-      ["Risk Engine", "Healthy", "profit"],
-      ["Order Engine", "Healthy", "profit"],
-      ["Execution Engine", "Healthy", "profit"],
-      ["Position Ledger", "Healthy", "profit"],
-      ["Reconciliation", "Healthy", "profit"],
-      ["Event Bus", "Healthy", "profit"],
-      ["Database", "Warning", "warning"],
-      ["Cache (Redis)", "Healthy", "profit"],
-      ["Message Bus", "Healthy", "profit"],
-      ["Monitoring", "Healthy", "profit"],
-    ];
-    var cards = services.map(function (s) {
-      return UI.metricCard(s[0], s[1], "", s[2] === "profit" ? "pos" : "warn");
-    }).join("");
+  // ── System (Monitoring) + Settings ────────────────────────────
+
+  /* ==================================================================
+   * Monitoring module — Commit 018
+   * System Monitoring & Observability Center: overview → services →
+   * infrastructure → trading system → events. UI-only; does NOT modify
+   * Prometheus, monitoring service, Docker, health checks, risk engine,
+   * execution engine, or event bus.
+   * ================================================================== */
+
+  // ── System overview ────────────────────────────────────────────
+  var MO_HEALTH = {
+    status: "OPERATIONAL", services: "10 / 10", critical: 0, warning: 0, uptime: "99.98%",
+    lastCheck: "10:32:18", nextCheck: "10:32:28",
+  };
+
+  // ── Services (10 services: API → Monitoring) ──────────────────
+  var MO_SERVICES = [
+    { id: "api",              name: "icyquant-api",    status: "RUNNING",  cpu: 2.1, mem: 184, uptime: "4d 12h 32m", requests: 18421, errors: 3,   p50: 8,  p95: 24, p99: 41, restart: "2026-08-24 03:12" },
+    { id: "database",         name: "database",        status: "RUNNING",  cpu: 3.4, mem: 412, uptime: "4d 12h 32m", requests: 24108, errors: 0,   p50: 2,  p95: 11, p99: 18, restart: "2026-08-24 03:12" },
+    { id: "event-bus",        name: "event-bus",       status: "RUNNING",  cpu: 1.2, mem: 126, uptime: "4d 12h 32m", requests: 41280, errors: 0,   p50: 1,  p95: 3,  p99: 7,  restart: "2026-08-24 03:12" },
+    { id: "order-engine",     name: "order-engine",    status: "RUNNING",  cpu: 1.8, mem: 148, uptime: "4d 12h 32m", requests: 1842,  errors: 1,   p50: 5,  p95: 19, p99: 33, restart: "2026-08-24 03:12" },
+    { id: "execution-engine", name: "execution-engine",status: "DEGRADED", cpu: 2.4, mem: 172, uptime: "4d 12h 32m", requests: 1280,  errors: 2,   p50: 12, p95: 38, p99: 68, restart: "2026-08-24 03:12" },
+    { id: "risk-engine",      name: "risk-engine",     status: "RUNNING",  cpu: 1.5, mem: 139, uptime: "4d 12h 32m", requests: 18421, errors: 3,   p50: 8,  p95: 24, p99: 41, restart: "2026-08-24 03:12" },
+    { id: "position-ledger",  name: "position-ledger", status: "RUNNING",  cpu: 1.1, mem: 121, uptime: "4d 12h 32m", requests: 9842,  errors: 0,   p50: 3,  p95: 9,  p99: 15, restart: "2026-08-24 03:12" },
+    { id: "reconciliation",   name: "reconciliation",  status: "RUNNING",  cpu: 0.8, mem: 115, uptime: "4d 12h 31m", requests: 24,    errors: 0,   p50: 120,p95: 320,p99: 480,restart: "2026-08-24 03:13" },
+    { id: "strategy-runtime", name: "strategy-runtime",status: "RUNNING",  cpu: 1.7, mem: 157, uptime: "4d 12h 31m", requests: 4128,  errors: 1,   p50: 6,  p95: 22, p99: 38, restart: "2026-08-24 03:13" },
+    { id: "monitoring",       name: "monitoring",      status: "RUNNING",  cpu: 0.9, mem: 110, uptime: "4d 12h 31m", requests: 8602,  errors: 0,   p50: 1,  p95: 4,  p99: 9,  restart: "2026-08-24 03:13" },
+  ];
+  var MO_STATE = { selectedId: "api", eventFilter: "ALL" };
+
+  // ── Infrastructure ────────────────────────────────────────────
+  var MO_INFRA = [
+    { name: "CPU",       value: "28%", status: "NORMAL", statusCls: "healthy" },
+    { name: "Memory",    value: "62%", status: "NORMAL", statusCls: "healthy" },
+    { name: "Disk",      value: "41%", status: "NORMAL", statusCls: "healthy" },
+    { name: "Network",   value: "18 MB/s", status: "NORMAL", statusCls: "healthy" },
+  ];
+
+  // ── Trading system monitoring ─────────────────────────────────
+  var MO_TRADE = [
+    { label: "Orders Today",       value: "128",    sub: "" },
+    { label: "Events Today",       value: "1,842",  sub: "" },
+    { label: "Execution Errors",   value: "2",     sub: "· last 1h: 1", neg: true },
+    { label: "Risk Rejects",       value: "15",    sub: "· 1.17% of orders", neg: true },
+    { label: "Reconciliation",     value: "✓",      sub: "All matched", pos: true },
+    { label: "Position Sync",      value: "✓",      sub: "All in sync", pos: true },
+  ];
+
+  // ── System events ─────────────────────────────────────────────
+  var MO_EVENTS = [
+    { time: "10:31:42", sev: "INFO",    text: "Order Engine heartbeat OK" },
+    { time: "10:29:18", sev: "INFO",    text: "NVDA order filled — 100 shares @ $842.30" },
+    { time: "10:24:51", sev: "WARNING", text: "Execution latency above threshold (P95 38ms > 25ms)" },
+    { time: "10:21:33", sev: "INFO",    text: "Risk Engine health check passed" },
+    { time: "10:18:09", sev: "ERROR",   text: "Order rejected: risk limit breach (daily loss exceeded $3,200)" },
+    { time: "10:15:42", sev: "INFO",    text: "Database replication sync OK" },
+    { time: "10:12:08", sev: "WARNING", text: "Data feed minor gap: NVDA D1 missing 3 bars (2026-07-21 → 07-23)" },
+    { time: "10:08:22", sev: "INFO",    text: "Strategy runtime: Alpha021 cycle completed in 124ms" },
+    { time: "10:05:11", sev: "ERROR",   text: "Execution engine: partial fill on order #ORD-2026-12842" },
+    { time: "10:02:47", sev: "INFO",    text: "Event bus: 256 messages processed in queue" },
+  ];
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function moSvcFind(id) {
+    for (var i = 0; i < MO_SERVICES.length; i++) {
+      if (MO_SERVICES[i].id === id) return MO_SERVICES[i];
+    }
+    return MO_SERVICES[0];
+  }
+  function moSvcBadge(status) {
+    var cls = status === "RUNNING" ? "running" : (status === "DEGRADED" ? "degraded" : "down");
+    return '<span class="mo-svc-status mo-svc-' + cls + '">' + esc(status) + "</span>";
+  }
+  function moInfraBadge(status, cls) {
+    return '<span class="mo-infra-status ' + (cls === "healthy" ? "mo-svc-running" : (cls === "degraded" ? "mo-svc-degraded" : "mo-svc-down")) + '">' + esc(status) + "</span>";
+  }
+
+  // ── System health bar ─────────────────────────────────────────
+  function renderMoHealthBar() {
+    var h = MO_HEALTH;
+    var statusCls = h.status === "OPERATIONAL" ? "operational" : (h.status === "DEGRADED" ? "degraded" : "down");
     return (
-      UI.pageHeader("System", "System health and service status") +
-      UI.kpiGrid(cards, 3)
+      '<div class="mo-health-bar">' +
+      '<div>' +
+      '<div class="mo-health-main">' +
+      '<div class="mo-health-status mo-health-' + statusCls + '">' + esc(h.status) + "</div>" +
+      "</div>" +
+      '<div class="mo-health-meta">' +
+      "<span>Services <b>" + esc(h.services) + "</b></span>" +
+      "<span>Critical <b>" + h.critical + "</b></span>" +
+      "<span>Warning <b>" + h.warning + "</b></span>" +
+      "<span>Uptime <b>" + esc(h.uptime) + "</b></span>" +
+      "</div>" +
+      "</div>" +
+      '<div class="mo-health-right">' +
+      '<div class="mo-health-check">Last Check <b>' + esc(h.lastCheck) + "</b></div>" +
+      '<div class="mo-health-check">Next Check <b>' + esc(h.nextCheck) + "</b></div>" +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Service table ─────────────────────────────────────────────
+  function renderMoSvcRows() {
+    return MO_SERVICES.map(function (s) {
+      var sel = s.id === MO_STATE.selectedId ? " mo-svc-row-selected" : "";
+      return (
+        '<tr class="mo-svc-row' + sel + '" data-mo-id="' + esc(s.id) + '">' +
+        '<td style="font-family:var(--ds-num-font);font-weight:var(--ds-font-semibold);">' + esc(s.name) + "</td>" +
+        "<td>" + moSvcBadge(s.status) + "</td>" +
+        '<td class="num">' + s.cpu.toFixed(1) + "%</td>" +
+        '<td class="num">' + s.mem + " MB</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+  function renderMoSvcTable() {
+    return (
+      '<table class="ds-table mo-svc-table">' +
+      "<thead><tr>" +
+      "<th>Service</th><th>Status</th>" +
+      '<th class="num">CPU</th><th class="num">Memory</th>' +
+      "</tr></thead>" +
+      '<tbody id="mo-svc-tbody">' + renderMoSvcRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  // ── Service detail ────────────────────────────────────────────
+  function renderMoSvcDetail() {
+    var s = moSvcFind(MO_STATE.selectedId);
+    function cell(lbl, val) {
+      return '<div class="mo-svc-detail-cell"><div class="mo-svc-detail-label">' + esc(lbl) + '</div><div class="mo-svc-detail-value">' + esc(val) + "</div></div>";
+    }
+    return (
+      '<div class="mo-svc-detail">' +
+      cell("Service", s.name) +
+      cell("Status", s.status) +
+      cell("Uptime", s.uptime) +
+      cell("Requests", s.requests.toLocaleString("en-US")) +
+      cell("Errors", String(s.errors)) +
+      cell("CPU", s.cpu.toFixed(1) + "%") +
+      cell("Memory", s.mem + " MB") +
+      cell("Latency P50", s.p50 + " ms") +
+      cell("Latency P95", s.p95 + " ms") +
+      cell("Latency P99", s.p99 + " ms") +
+      cell("Last Restart", s.restart) +
+      cell("", "") +
+      "</div>"
+    );
+  }
+  function updateMoSvcDetail() {
+    var host = document.getElementById("mo-svc-detail");
+    if (host) host.innerHTML = renderMoSvcDetail();
+  }
+
+  // ── Infrastructure cards ──────────────────────────────────────
+  function renderMoInfra() {
+    var cards = MO_INFRA.map(function (m) {
+      return (
+        '<div class="mo-infra-card">' +
+        '<div class="mo-infra-top">' +
+        '<span class="mo-infra-name">' + esc(m.name) + "</span>" +
+        moInfraBadge(m.status, m.statusCls) +
+        "</div>" +
+        '<div class="mo-infra-value">' + esc(m.value) + "</div>" +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="mo-infra-row">' + cards + "</div>";
+  }
+
+  // ── Trading system cards ──────────────────────────────────────
+  function renderMoTrade() {
+    var cards = MO_TRADE.map(function (t) {
+      var valCls = t.neg ? " style='color:var(--ds-loss);'" : (t.pos ? " style='color:var(--ds-profit);'" : "");
+      return (
+        '<div class="mo-trade-card">' +
+        '<span class="mo-trade-label">' + esc(t.label) + "</span>" +
+        '<span class="mo-trade-value"' + valCls + ">" + esc(t.value) + "</span>" +
+        (t.sub ? '<span class="mo-trade-sub">' + esc(t.sub) + "</span>" : "") +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="mo-trade-grid">' + cards + "</div>";
+  }
+
+  // ── Events list (with filter) ──────────────────────────────────
+  function moFilteredEvents() {
+    if (MO_STATE.eventFilter === "ALL") return MO_EVENTS;
+    return MO_EVENTS.filter(function (e) { return e.sev === MO_STATE.eventFilter; });
+  }
+  function renderMoEventFilter() {
+    var filters = ["ALL", "ERROR", "WARNING", "INFO"];
+    return (
+      '<div class="mo-event-filter">' +
+      filters.map(function (f) {
+        var cls = f === MO_STATE.eventFilter ? " mo-event-filter-btn active" : " mo-event-filter-btn";
+        return '<button class="' + cls + '" data-mo-filter="' + esc(f) + '">' + esc(f) + "</button>";
+      }).join("") +
+      "</div>"
+    );
+  }
+  function renderMoEvents() {
+    var list = moFilteredEvents().map(function (e) {
+      return (
+        '<div class="mo-event-item">' +
+        '<span class="mo-event-time">' + esc(e.time) + "</span>" +
+        '<span class="mo-event-sev ' + esc(e.sev) + '">' + esc(e.sev) + "</span>" +
+        '<span class="mo-event-text">' + esc(e.text) + "</span>" +
+        "</div>"
+      );
+    }).join("");
+    if (list === "") list = '<div class="empty" style="padding:var(--ds-space-4);">No events in this filter / 无相关事件</div>';
+    return renderMoEventFilter() + '<div class="mo-event-list" id="mo-event-list">' + list + "</div>";
+  }
+  function updateMoEvents() {
+    var host = document.getElementById("mo-event-host");
+    if (host) host.innerHTML = renderMoEvents();
+    bindMoEventFilter();
+  }
+  function bindMoEventFilter() {
+    var btns = document.querySelectorAll("[data-mo-filter]");
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        MO_STATE.eventFilter = b.getAttribute("data-mo-filter");
+        updateMoEvents();
+      });
+    });
+  }
+
+  // ── Bindings ──────────────────────────────────────────────────
+  function bindMonitoringPage() {
+    // Service row click → update detail panel
+    var tbody = document.getElementById("mo-svc-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-mo-id]");
+        if (!row) return;
+        MO_STATE.selectedId = row.getAttribute("data-mo-id");
+        tbody.innerHTML = renderMoSvcRows();
+        updateMoSvcDetail();
+      });
+    }
+    bindMoEventFilter();
+  }
+
+  // ── Monitoring page (Commit 018) — uses the system route ──────
+  PAGE_FRAMEWORK["system"] = function () {
+    return (
+      UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
+      UI.sectionHeading("System Health") +
+      renderMoHealthBar() +
+      UI.sectionHeading("Service Status") +
+      UI.panel("10 Services", renderMoSvcTable()) +
+      UI.sectionHeading("Service Details") +
+      '<div id="mo-svc-detail">' + renderMoSvcDetail() + "</div>" +
+      UI.sectionHeading("Infrastructure") +
+      UI.panel("CPU / Memory / Disk / Network", renderMoInfra()) +
+      UI.sectionHeading("Trading System") +
+      UI.panel("Orders · Events · Execution · Risk · Positions", renderMoTrade()) +
+      UI.sectionHeading("System Events") +
+      UI.panel("Event Log", '<div id="mo-event-host">' + renderMoEvents() + "</div>")
     );
   };
 
-  PAGE_FRAMEWORK["settings"] = function () {
+
+  /* ==================================================================
+   * Alerts module — Commit 019
+   * Unified Alert Center: overview → rules → table → detail.
+   * Severity / source / symbol · account / current vs threshold / status.
+   * Row selection shows cause, data before/after, related accounts,
+   * strategies, positions, and Acknowledge / Resolve actions plus deep
+   * links to Orders / Positions / Risk pages.
+   * UI-only; does NOT implement alert engine, push service, webhooks
+   * or any backend engine behaviour.
+   * ================================================================== */
+
+  var AL_OVERVIEW = [
+    { id: "active",   cls: "active",   label: "Active Alerts",      value: 17, delta: "+3 vs yesterday" },
+    { id: "today",    cls: "today",    label: "Triggered Today",    value: 42, delta: "avg 38 last 7d" },
+    { id: "critical", cls: "critical", label: "Critical",           value: 3,  delta: "2 not resolved" },
+    { id: "warning",  cls: "warning",  label: "Warning",            value: 11, delta: "7 open · 4 acked" },
+    { id: "ack",      cls: "ack",      label: "Acknowledged",       value: 28, delta: "8 resolved today" },
+  ];
+
+  var AL_RULES = [
+    { id: "price",    name: "Price Alert",           sub: "Crossing of price / % band",          state: "on",  triggered: 12 },
+    { id: "pnl",      name: "P&L Alert",             sub: "Realized / unrealized P&L shocks",     state: "on",  triggered: 5  },
+    { id: "dd",       name: "Drawdown Alert",        sub: "Peak-to-trough drawdown thresholds",   state: "on",  triggered: 2  },
+    { id: "pos",      name: "Position Alert",        sub: "Size / concentration / delta limits",  state: "on",  triggered: 7  },
+    { id: "risk",     name: "Risk Limit Alert",      sub: "VaR / stress / leverage breaches",     state: "on",  triggered: 4  },
+    { id: "exec",     name: "Execution Alert",       sub: "Slippage / latency / partial fills",   state: "on",  triggered: 6  },
+    { id: "health",   name: "System Health Alert",   sub: "Service / infra health rules",         state: "on",  triggered: 3  },
+    { id: "signal",   name: "Strategy Signal Alert", sub: "Strategy emits / anomaly scores",      state: "off", triggered: 0  },
+  ];
+
+  var AL_ALERTS = [
+    {
+      id: "ALT-2026-0421", time: "10:31:08", sev: "CRITICAL", source: "Risk Engine",
+      symbol: "TSLA",      account: "Main-Paper",   event: "Daily VaR breached",
+      value: "1.92%",      threshold: "1.50%",     status: "TRIGGERED",
+      cause: "99% 1-day VaR crossed 1.50% at 10:30 following a $18.40 gap-down open on TSLA.",
+      before: { pnl: "+$1,280", var: "1.12%", pos: "TSLA 800 @ $241.30" },
+      after:  { pnl: "+$614",   var: "1.92%", pos: "TSLA 800 @ $222.90" },
+      related: { account: "Main-Paper", strategy: "Macro017 — Mean Reversion", position: "TSLA / 800 / unreal –$14,720" },
+      links: ["View Order History", "View Position TSLA", "Open Risk Monitor"],
+    },
+    {
+      id: "ALT-2026-0420", time: "10:24:51", sev: "WARNING", source: "Execution Engine",
+      symbol: "SPY",       account: "Algo-02",      event: "Execution latency spike",
+      value: "68 ms P95",  threshold: "25 ms",     status: "TRIGGERED",
+      cause: "Order router experienced backpressure from IB market-data feed; P95 latency climbed 3× above SLA.",
+      before: { fills: 3, latency_p95: "11 ms", reject_rate: "0.0%" },
+      after:  { fills: 1, latency_p95: "68 ms", reject_rate: "12.5%" },
+      related: { account: "Algo-02", strategy: "Execution — Smart Router", position: "SPY / +1,200" },
+      links: ["View Executions", "View Algo-02 Orders"],
+    },
+    {
+      id: "ALT-2026-0419", time: "10:18:09", sev: "CRITICAL", source: "Risk Engine",
+      symbol: "—",         account: "Main-Paper",   event: "Daily loss limit reached",
+      value: "-$3,284",    threshold: "-$3,000",   status: "ACKNOWLEDGED",
+      cause: "Rejection gate triggered at −$3,200; new orders blocked. Trader acknowledged at 10:18:42.",
+      before: { intraday: "+$1,140", orders_today: 92,  rate_limit: "OK" },
+      after:  { intraday: "−$3,284", orders_today: 128, rate_limit: "BLOCKED" },
+      related: { account: "Main-Paper", strategy: "Multi-strategy composite", position: "Net delta: 1,840 β$" },
+      links: ["View Risk Breach Log", "View Orders 103–128", "View Positions Snapshot"],
+    },
+    {
+      id: "ALT-2026-0418", time: "10:12:08", sev: "WARNING", source: "Data Feed",
+      symbol: "NVDA",      account: "—",            event: "Daily bar gap",
+      value: "3 bars",     threshold: "0 bars",    status: "ACKNOWLEDGED",
+      cause: "Historical D1 feed missing 2026-07-21 → 07-23 for NVDA; downstream factors re-computed on partial set.",
+      before: { completeness: "100.0%", factors: "All OK" },
+      after:  { completeness: "98.7%",  factors: "2 factors flagged" },
+      related: { account: "—", strategy: "Alpha021 / Medium-term", position: "NVDA / 150" },
+      links: ["Open Data Center → NVDA", "Inspect Quality Report"],
+    },
+    {
+      id: "ALT-2026-0417", time: "09:48:33", sev: "WARNING", source: "Position Ledger",
+      symbol: "AAPL",      account: "Main-Paper",   event: "Position concentration",
+      value: "18.4%",      threshold: "15.0%",     status: "TRIGGERED",
+      cause: "AAPL climbed to 18.4% of net liquidation value after strong open; above 15% rule threshold.",
+      before: { weight: "13.8%", qty: "600", nlv: "$1,048,300" },
+      after:  { weight: "18.4%", qty: "900", nlv: "$1,048,300" },
+      related: { account: "Main-Paper", strategy: "Momentum03 / Intraday", position: "AAPL 900 @ $214.10" },
+      links: ["View Portfolio Weights", "View Positions", "Trim Order Suggestion"],
+    },
+    {
+      id: "ALT-2026-0416", time: "09:31:14", sev: "INFO", source: "Strategy Runtime",
+      symbol: "QQQ",       account: "Algo-04",      event: "Strategy signal fire",
+      value: "0.84 score", threshold: "0.75 score", status: "RESOLVED",
+      cause: "Anomaly029 fired cross > 0.75 at open; one trade entered and closed +$240 within 14 minutes.",
+      before: { signal: "0.62", open_pos: "flat",   signal_count: 3 },
+      after:  { signal: "0.84", open_pos: "QQQ -50", signal_count: 4 },
+      related: { account: "Algo-04", strategy: "Anomaly029 / Mean Rev", position: "QQQ flat @ resolved" },
+      links: ["View Strategy Signal", "View Trade → Trades"],
+    },
+    {
+      id: "ALT-2026-0415", time: "09:14:02", sev: "CRITICAL", source: "Monitoring",
+      symbol: "—",         account: "—",            event: "Service DEGRADED",
+      value: "execution-engine", threshold: "RUNNING", status: "RESOLVED",
+      cause: "Execution engine health-check P95 latency elevated to 38ms > 25ms; auto-recovered at 09:22 after thread-pool resize.",
+      before: { svc: "RUNNING", latency_p95: "14 ms", restarts: 0 },
+      after:  { svc: "DEGRADED",latency_p95: "38 ms", restarts: 1 },
+      related: { account: "—", strategy: "—", position: "—" },
+      links: ["Open Monitoring → Service Details", "View Restart Logs"],
+    },
+    {
+      id: "ALT-2026-0414", time: "08:58:47", sev: "INFO", source: "Risk Engine",
+      symbol: "EEM",       account: "Main-Paper",   event: "Drawdown warning cleared",
+      value: "-2.1% → -1.2%", threshold: "-2.0%", status: "RESOLVED",
+      cause: "Macro017 30-day peak drawdown recovered from -2.1% to -1.2%; drawdown warning auto-resolved.",
+      before: { dd_30d: "-2.1%", peak_eq: "$1,073,400", mark: "WARNING" },
+      after:  { dd_30d: "-1.2%", peak_eq: "$1,073,400", mark: "CLEARED" },
+      related: { account: "Main-Paper", strategy: "Macro017", position: "Book net long 0.32 β" },
+      links: ["View Equity Curve", "View Risk Dashboard"],
+    },
+  ];
+  var AL_STATE = { selectedId: AL_ALERTS[0].id };
+
+  function alFind(id) {
+    for (var i = 0; i < AL_ALERTS.length; i++) if (AL_ALERTS[i].id === id) return AL_ALERTS[i];
+    return AL_ALERTS[0];
+  }
+
+  // ── Overview KPI row ────────────────────────────────────────────
+  function renderAlOverview() {
     return (
-      UI.pageHeader("Settings", "System configuration and preferences") +
-      UI.panel("General Settings",
-        UI.field("Default Account", UI.select({ options: ["Paper-Alpha021", "Paper-Momentum", "Live-US-Equity"] })) +
-        UI.field("Base Currency", UI.select({ options: ["USD", "CNY", "EUR"] })) +
-        UI.field("Timezone", UI.select({ options: ["UTC", "Asia/Shanghai", "America/New_York"] })) +
-        UI.field("Risk Profile", UI.select({ options: ["Default", "Conservative", "Aggressive"] })) +
-        "<div style='margin-top:var(--ds-space-4);'>" +
-        UI.button("Save Settings", "primary") + " " +
-        UI.button("Reset", "ghost") +
-        "</div>"
-      )
+      '<div class="al-overview">' +
+      AL_OVERVIEW.map(function (k) {
+        return (
+          '<div class="al-kpi ' + esc(k.cls) + '">' +
+          '<div class="al-kpi-label">' + esc(k.label) + "</div>" +
+          '<div class="al-kpi-value">' + String(k.value) + "</div>" +
+          '<div class="al-kpi-delta">' + esc(k.delta) + "</div>" +
+          "</div>"
+        );
+      }).join("") +
+      "</div>"
+    );
+  }
+
+  // ── Rules grid ──────────────────────────────────────────────────
+  function renderAlRules() {
+    return (
+      '<div class="al-rules">' +
+      AL_RULES.map(function (r) {
+        var cls = r.state === "on" ? "on" : "off";
+        return (
+          '<div class="al-rule">' +
+          '<div class="al-rule-body">' +
+          '<span class="al-rule-name">' + esc(r.name) + "</span>" +
+          '<span class="al-rule-sub">' + esc(r.sub) + " · " + r.triggered + " triggered</span>" +
+          "</div>" +
+          '<span class="al-rule-state ' + cls + '">' + (r.state === "on" ? "● ACTIVE" : "○ PAUSED") + "</span>" +
+          "</div>"
+        );
+      }).join("") +
+      "</div>"
+    );
+  }
+
+  // ── Alert table ─────────────────────────────────────────────────
+  function renderAlRows() {
+    return AL_ALERTS.map(function (a) {
+      var sel = a.id === AL_STATE.selectedId ? " al-row-selected" : "";
+      var showAck = a.status !== "RESOLVED" && a.status !== "ACKNOWLEDGED";
+      var showRes = a.status !== "RESOLVED";
+      return (
+        '<tr data-al-id="' + esc(a.id) + '" class="' + sel + '">' +
+        '<td style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(a.time) + "</td>" +
+        '<td><span class="al-sev ' + esc(a.sev) + '">' + esc(a.sev) + "</span></td>" +
+        '<td style="font-weight:var(--ds-font-semibold);">' + esc(a.source) + "</td>" +
+        '<td style="font-family:var(--ds-num-font);">' + esc(a.symbol) + " · " + esc(a.account) + "</td>" +
+        "<td>" + esc(a.event) + "</td>" +
+        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-primary);">' + esc(a.value) + "</td>" +
+        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(a.threshold) + "</td>" +
+        '<td><span class="al-status ' + esc(a.status) + '">' + esc(a.status) + "</span></td>" +
+        '<td><div class="al-actions">' +
+        (showAck ? '<button class="al-btn primary" data-al-action="ack" data-al-id="' + esc(a.id) + '">Ack</button>' : "") +
+        (showRes ? '<button class="al-btn danger"  data-al-action="resolve" data-al-id="' + esc(a.id) + '">Resolve</button>' : "") +
+        "</div></td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+  function renderAlTable() {
+    return (
+      '<table class="al-table ds-table">' +
+      "<thead><tr>" +
+      "<th>Time</th><th>Severity</th><th>Source</th><th>Symbol / Account</th>" +
+      "<th>Event</th><th class='num'>Current</th><th class='num'>Threshold</th>" +
+      "<th>Status</th><th>Action</th>" +
+      "</tr></thead>" +
+      '<tbody id="al-tbody">' + renderAlRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+  function refreshAlTable() {
+    var tb = document.getElementById("al-tbody");
+    if (tb) tb.innerHTML = renderAlRows();
+  }
+
+  // ── Alert detail panel ──────────────────────────────────────────
+  function renderAlDetail() {
+    var a = alFind(AL_STATE.selectedId);
+    function kv(d, k, v) {
+      return (
+        "<dt>" + esc(k) + "</dt>" +
+        "<dd>" + esc(d ? String(d[k]) : v) + "</dd>"
+      );
+    }
+    var showAck = a.status !== "RESOLVED" && a.status !== "ACKNOWLEDGED";
+    var showRes = a.status !== "RESOLVED";
+    return (
+      '<div class="al-detail">' +
+      // Header
+      '<div class="al-detail-head">' +
+      "<div>" +
+      '<div class="al-detail-title">' +
+      '<span class="al-sev ' + esc(a.sev) + '" style="margin-right:8px;vertical-align:middle;">' + esc(a.sev) + "</span>" +
+      esc(a.event) +
+      '<span class="al-status ' + esc(a.status) + '" style="margin-left:10px;vertical-align:middle;">' + esc(a.status) + "</span>" +
+      "</div>" +
+      '<div class="al-detail-meta">' +
+      esc(a.id) + " · " + esc(a.time) + " · Source " + esc(a.source) + " · Symbol " + esc(a.symbol) + " / Account " + esc(a.account) +
+      "</div>" +
+      "</div>" +
+      '<div class="al-detail-actions">' +
+      (showAck ? '<button class="al-btn primary" data-al-action="ack" data-al-id="' + esc(a.id) + '">Acknowledge</button>' : "") +
+      (showRes ? '<button class="al-btn danger"  data-al-action="resolve" data-al-id="' + esc(a.id) + '">Resolve</button>' : "") +
+      "</div>" +
+      "</div>" +
+
+      // Body grid: left = Cause + Before/After; right = Related + Links
+      '<div class="al-detail-grid">' +
+      // Trigger reason
+      "<div>" +
+      '<div class="al-detail-section-title">Trigger Reason · 触发原因</div>' +
+      '<div style="font-size:var(--ds-text-sm);color:var(--ds-text-primary);line-height:1.6;">' + esc(a.cause) + "</div>" +
+
+      '<div class="al-detail-section-title">Triggered Data · 触发前后数据</div>' +
+      '<dl class="al-detail-kv" style="grid-template-columns: 120px 1fr 1fr;">' +
+      "<dt>Metrics</dt><dd><b>Before</b></dd><dd><b>After</b></dd>" +
+      "<dt>P&L</dt>"       + kv(a.before, "pnl", "—") + kv(a.after, "pnl", "—") +
+      (a.before.var
+        ? "<dt>VaR</dt>"     + kv(a.before, "var", "—") + kv(a.after, "var", "—")
+        : "") +
+      (a.before.weight
+        ? "<dt>Weight</dt>"  + kv(a.before, "weight", "—") + kv(a.after, "weight", "—")
+        : "") +
+      (a.before.latency_p95
+        ? "<dt>Latency P95</dt>" + kv(a.before, "latency_p95", "—") + kv(a.after, "latency_p95", "—")
+        : "") +
+      (a.before.dd_30d
+        ? "<dt>DD 30d</dt>"  + kv(a.before, "dd_30d", "—") + kv(a.after, "dd_30d", "—")
+        : "") +
+      (a.before.svc
+        ? "<dt>Service</dt>" + kv(a.before, "svc", "—") + kv(a.after, "svc", "—")
+        : "") +
+      (a.before.qty
+        ? "<dt>Qty</dt>"     + kv(a.before, "qty", "—") + kv(a.after, "qty", "—")
+        : "") +
+      (a.before.pos
+        ? "<dt>Position</dt>" + kv(a.before, "pos", "—") + kv(a.after, "pos", "—")
+        : "") +
+      (a.before.fills
+        ? "<dt>Fills</dt>"   + kv(a.before, "fills", "—") + kv(a.after, "fills", "—")
+        : "") +
+      (a.before.signal
+        ? "<dt>Signal</dt>"  + kv(a.before, "signal", "—") + kv(a.after, "signal", "—")
+        : "") +
+      (a.before.intraday
+        ? "<dt>Intraday</dt>" + kv(a.before, "intraday", "—") + kv(a.after, "intraday", "—")
+        : "") +
+      "</dl>" +
+      "</div>" +
+
+      // Related scope
+      "<div>" +
+      '<div class="al-detail-section-title">Related · 相关账户 / 策略 / 持仓</div>' +
+      '<dl class="al-detail-kv">' +
+      kv(a.related, "account",  "—") +
+      kv(a.related, "strategy", "—") +
+      kv(a.related, "position", "—") +
+      "<dt>Current</dt><dd style='color:var(--ds-loss);font-weight:var(--ds-font-semibold);'>" + esc(a.value) + "</dd>" +
+      "<dt>Threshold</dt><dd>" + esc(a.threshold) + "</dd>" +
+      "</dl>" +
+
+      '<div class="al-detail-section-title">Deep Links · 跳转关联页面</div>' +
+      '<div class="al-detail-links">' +
+      a.links.map(function (l) {
+        return '<button type="button" class="al-link">' + esc(l) + "</button>";
+      }).join("") +
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      "</div>"
+    );
+  }
+  function refreshAlDetail() {
+    var h = document.getElementById("al-detail");
+    if (h) h.innerHTML = renderAlDetail();
+  }
+
+  // ── Bindings ────────────────────────────────────────────────────
+  function bindAlertsPage() {
+    var tbody = document.getElementById("al-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var actBtn = e.target.closest("[data-al-action]");
+        var row = e.target.closest("tr[data-al-id]");
+        if (actBtn) {
+          e.stopPropagation();
+          var id = actBtn.getAttribute("data-al-id");
+          var action = actBtn.getAttribute("data-al-action");
+          var target = alFind(id);
+          if (target && action === "ack")     target.status = "ACKNOWLEDGED";
+          if (target && action === "resolve") target.status = "RESOLVED";
+          AL_STATE.selectedId = id;
+          refreshAlTable();
+          refreshAlDetail();
+          return;
+        }
+        if (!row) return;
+        AL_STATE.selectedId = row.getAttribute("data-al-id");
+        refreshAlTable();
+        refreshAlDetail();
+      });
+    }
+    // Detail panel action buttons
+    var detail = document.getElementById("al-detail");
+    if (detail) {
+      detail.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-al-action]");
+        if (!b) return;
+        var id = b.getAttribute("data-al-id");
+        var action = b.getAttribute("data-al-action");
+        var target = alFind(id);
+        if (target && action === "ack")     target.status = "ACKNOWLEDGED";
+        if (target && action === "resolve") target.status = "RESOLVED";
+        refreshAlTable();
+        refreshAlDetail();
+      });
+    }
+  }
+
+  // ── Alerts page (Commit 019) — new system page ──────────────────
+  PAGE_FRAMEWORK["alerts"] = function () {
+    return (
+      UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
+      UI.sectionHeading("Alert Overview") +
+      renderAlOverview() +
+      UI.sectionHeading("Alert Rules") +
+      UI.panel("8 Rule Types · Pricing, P&L, Risk, Execution, System, Signal…", renderAlRules()) +
+      UI.sectionHeading("Alert Table") +
+      UI.panel("Events · Severity · Status · Actions", renderAlTable()) +
+      UI.sectionHeading("Alert Detail") +
+      '<div id="al-detail">' + renderAlDetail() + "</div>"
     );
   };
+
+
+  /* ==================================================================
+   * Settings module — Commit 016
+   * System Configuration Center: left nav → right panel
+   * (General / Trading / Risk / Execution / Notifications / Appearance).
+   * UI-only configuration; does NOT modify risk engine, execution engine,
+   * broker config, API key, live permissions, or any API/db.
+   * Secrets are never persisted in the browser/localStorage/Git.
+   * ================================================================== */
+
+  // ── Settings sections + state ──────────────────────────────────
+  var STG_SECTIONS = [
+    { id: "general",        label: "General" },
+    { id: "trading",        label: "Trading" },
+    { id: "risk",           label: "Risk" },
+    { id: "execution",      label: "Execution" },
+    { id: "notifications",  label: "Notifications" },
+    { id: "appearance",     label: "Appearance" },
+  ];
+  var STG_STATE = { section: "general", env: "live", pfill: "allow", theme: "dark", density: "compact" };
+
+  // ── Risk limits (configured + current + status) ────────────────
+  var STG_RISK_LIMITS = [
+    { label: "Daily Loss Limit",      configured: "$4,000",   current: "$820",   status: "NORMAL" },
+    { label: "Maximum Drawdown",       configured: "10%",     current: "4.2%",    status: "NORMAL" },
+    { label: "Maximum Position",       configured: "$100,000", current: "$86,500", status: "WATCH" },
+    { label: "Maximum Gross Exposure", configured: "200%",    current: "166%",    status: "NORMAL" },
+    { label: "Maximum Leverage",       configured: "2.0x",    current: "1.4x",     status: "NORMAL" },
+  ];
+
+  // ── Notifications (label + severity + enabled) ────────────────
+  var STG_NOTIFY = [
+    { label: "Order Filled",            sev: "INFO",     on: true },
+    { label: "Order Rejected",          sev: "INFO",     on: true },
+    { label: "Partial Fill",           sev: "INFO",     on: true },
+    { label: "Risk Limit Breached",    sev: "CRITICAL",  on: true },
+    { label: "Risk Warning",           sev: "CRITICAL",  on: true },
+    { label: "Execution Error",        sev: "CRITICAL",  on: true },
+    { label: "System Offline",         sev: "CRITICAL",  on: true },
+    { label: "Data Feed Disconnected", sev: "CRITICAL",  on: true },
+  ];
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function stgSwitch(on) {
+    return (
+      '<label class="stg-switch">' +
+      '<input type="checkbox"' + (on ? " checked" : "") + ">" +
+      '<span class="stg-switch-slider"></span>' +
+      "</label>"
+    );
+  }
+  // Generic radio builder: name (radio group), val, label, checked (bool)
+  function stgRadio(name, val, label, checked) {
+    var cls = checked ? " checked-" + val : "";
+    return (
+      '<label class="stg-env-radio' + cls + '">' +
+      '<input type="radio" name="' + name + '" value="' + val + '"' + (checked ? " checked" : "") + "> " + esc(label) +
+      "</label>"
+    );
+  }
+  function stgRiskStatusBadge(status) {
+    var key = status === "BREACH" ? "breach" : (status === "WATCH" ? "watch" : "normal");
+    return '<span class="stg-risk-status ' + key + '">' + esc(status) + "</span>";
+  }
+
+  // ── Section: General ──────────────────────────────────────────
+  function renderStgGeneral() {
+    return (
+      '<div class="stg-grid">' +
+      UI.field("Workspace", UI.input({ value: "ICYQuant Workspace" })) +
+      '<div class="stg-row">' +
+      UI.field("Language", UI.select({ value: "English", options: ["English", "中文", "日本語"] })) +
+      UI.field("Timezone", UI.select({ value: "Asia/Taipei", options: ["UTC", "Asia/Shanghai", "Asia/Taipei", "America/New_York", "Europe/London"] })) +
+      "</div>" +
+      '<div class="stg-row">' +
+      UI.field("Base Currency", UI.select({ value: "USD", options: ["USD", "CNY", "EUR", "JPY"] })) +
+      UI.field("Date Format", UI.select({ value: "YYYY-MM-DD", options: ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"] })) +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Section: Trading (Paper / Shadow / Live) ─────────────────
+  function renderStgTrading() {
+    var envHtml =
+      '<div class="ds-field"><label class="ds-field-label">Trading Environment</label>' +
+      '<div class="stg-env-radios">' +
+      stgRadio("stg-env", "paper", "Paper", STG_STATE.env === "paper") +
+      stgRadio("stg-env", "shadow", "Shadow", STG_STATE.env === "shadow") +
+      stgRadio("stg-env", "live", "Live", STG_STATE.env === "live") +
+      "</div></div>";
+    var liveWarn = STG_STATE.env === "live"
+      ? '<div class="stg-live-warn">⚠ LIVE environment — real orders will be sent to the broker. Trade with caution.</div>'
+      : "";
+    return (
+      '<div class="stg-grid">' +
+      envHtml +
+      liveWarn +
+      '<div class="stg-row">' +
+      UI.field("Default Account", UI.select({ value: "US-001", options: ["US-001", "FUT-001", "FX-001", "CN-001"] })) +
+      UI.field("Default Order Size", UI.input({ type: "number", value: "100" })) +
+      "</div>" +
+      '<div class="stg-row">' +
+      UI.field("Slippage Tolerance", UI.input({ value: "3.0 bps" })) +
+      '<div class="ds-field"><label class="ds-field-label">Order Confirmation</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Require confirmation before submitting</label>' +
+      "</div>" +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Section: Risk (limit cards with current/status) ──────────
+  function renderStgRisk() {
+    var cards = STG_RISK_LIMITS.map(function (r) {
+      return (
+        '<div class="stg-risk-card">' +
+        '<div><div class="stg-risk-label">' + esc(r.label) + "</div>" +
+        '<div class="stg-risk-value">' + esc(r.configured) + "</div></div>" +
+        '<div><div class="stg-risk-label">Current</div>' +
+        '<div class="stg-risk-current">' + esc(r.current) + "</div></div>" +
+        '<div><div class="stg-risk-label">Status</div>' + stgRiskStatusBadge(r.status) + "</div>" +
+        UI.input({ value: r.configured }) +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="stg-risk-list">' + cards + "</div>";
+  }
+
+  // ── Section: Execution ────────────────────────────────────────
+  function renderStgExecution() {
+    return (
+      '<div class="stg-grid">' +
+      UI.field("Default Venue", UI.select({ value: "Primary", options: ["Primary", "SOR", "Dark Pool", "Direct"] })) +
+      '<div class="stg-row">' +
+      UI.field("Order Timeout", UI.input({ type: "number", value: "30", step: "1" }) + ' <span style="color:var(--ds-text-muted);font-size:var(--ds-text-sm);">sec</span>') +
+      UI.field("Retry Attempts", UI.input({ type: "number", value: "2" })) +
+      "</div>" +
+      '<div class="ds-field"><label class="ds-field-label">Partial Fill</label>' +
+      '<div class="stg-env-radios">' +
+      stgRadio("stg-pfill", "allow", "Allow", STG_STATE.pfill === "allow") +
+      stgRadio("stg-pfill", "reject", "Reject", STG_STATE.pfill === "reject") +
+      "</div></div>" +
+      UI.field("Slippage Alert Threshold", UI.input({ value: "5.0 bps" })) +
+      "</div>"
+    );
+  }
+
+  // ── Section: Notifications ────────────────────────────────────
+  function renderStgNotifications() {
+    var rows = STG_NOTIFY.map(function (n) {
+      var sevKey = n.sev === "CRITICAL" ? "critical" : "info";
+      return (
+        '<div class="stg-notify-item">' +
+        '<span class="stg-notify-sev ' + sevKey + '">' + esc(n.sev) + "</span>" +
+        '<span class="stg-notify-label">' + esc(n.label) + "</span>" +
+        stgSwitch(n.on) +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="ds-panel"><div class="ds-panel-body">' + rows + "</div></div>";
+  }
+
+  // ── Section: Appearance ──────────────────────────────────────
+  function renderStgAppearance() {
+    return (
+      '<div class="stg-grid">' +
+      '<div class="ds-field"><label class="ds-field-label">Theme</label>' +
+      '<div class="stg-env-radios">' +
+      stgRadio("stg-theme", "dark", "Dark", STG_STATE.theme === "dark") +
+      stgRadio("stg-theme", "light", "Light", STG_STATE.theme === "light") +
+      stgRadio("stg-theme", "system", "System", STG_STATE.theme === "system") +
+      "</div></div>" +
+      '<div class="ds-field"><label class="ds-field-label">Density</label>' +
+      '<div class="stg-env-radios">' +
+      stgRadio("stg-density", "comfortable", "Comfortable", STG_STATE.density === "comfortable") +
+      stgRadio("stg-density", "compact", "Compact", STG_STATE.density === "compact") +
+      "</div></div>" +
+      '<div class="stg-row">' +
+      '<div class="ds-field"><label class="ds-field-label">Charts</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Show Grid</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Show Volume</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Crosshair</label>' +
+      "</div>" +
+      '<div class="ds-field"><label class="ds-field-label">Dashboard</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Compact KPI Cards</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Show P&L</label>' +
+      '<label class="stg-check"><input type="checkbox" checked> Show Risk</label>' +
+      "</div>" +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  // ── Left nav + right content ─────────────────────────────────
+  function renderStgNav() {
+    var items = STG_SECTIONS.map(function (s) {
+      var cls = s.id === STG_STATE.section ? " active" : "";
+      return '<button class="stg-nav-item' + cls + '" data-stg-section="' + esc(s.id) + '">' + esc(s.label) + "</button>";
+    }).join("");
+    return '<div class="stg-nav"><div class="stg-nav-title">Settings</div>' + items + "</div>";
+  }
+
+  function renderStgContent() {
+    var body;
+    switch (STG_STATE.section) {
+      case "trading":       body = renderStgTrading(); break;
+      case "risk":          body = renderStgRisk(); break;
+      case "execution":     body = renderStgExecution(); break;
+      case "notifications": body = renderStgNotifications(); break;
+      case "appearance":    body = renderStgAppearance(); break;
+      default:              body = renderStgGeneral();
+    }
+    var title = (STG_SECTIONS.find(function (s) { return s.id === STG_STATE.section; }) || {}).label || "General";
+    return (
+      '<div id="stg-content">' +
+      UI.panel(title, body) +
+      '<div class="stg-actions">' +
+      UI.button("Save Changes", "primary", { sm: true, action: "stg:save" }) +
+      UI.button("Reset to Defaults", "ghost", { sm: true, action: "stg:reset" }) +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  function updateStgContent() {
+    var host = document.getElementById("stg-content");
+    if (host) {
+      host.outerHTML = renderStgContent();
+      bindStgContent();
+    }
+  }
+
+  // ── Bindings (nav select, env radio, save/reset) ─────────────
+  function bindStgContent() {
+    // Generic radio group handler — maps name → state key
+    var groups = {
+      "stg-env": "env",
+      "stg-pfill": "pfill",
+      "stg-theme": "theme",
+      "stg-density": "density",
+    };
+    Object.keys(groups).forEach(function (name) {
+      var radios = document.querySelectorAll('input[name="' + name + '"]');
+      radios.forEach(function (r) {
+        r.addEventListener("change", function () {
+          STG_STATE[groups[name]] = r.value;
+          updateStgContent();
+        });
+      });
+    });
+    var saveBtn = document.querySelector('[data-action="stg:save"]');
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        showToast("Settings saved (UI only) / 设置已保存 — no backend changes", "ok");
+      });
+    }
+    var resetBtn = document.querySelector('[data-action="stg:reset"]');
+    if (resetBtn) {
+      resetBtn.addEventListener("click", function () {
+        showToast("Settings reset to defaults (UI only) / 已恢复默认", "info");
+        STG_STATE = { section: "general", env: "live", pfill: "allow", theme: "dark", density: "compact" };
+        renderStgShell();
+      });
+    }
+  }
+
+  function renderStgShell() {
+    var host = document.getElementById("stg-shell");
+    if (host) {
+      host.innerHTML = '<div class="stg-layout">' + renderStgNav() + renderStgContent() + "</div>";
+      bindStgShell();
+    }
+  }
+
+  function bindStgShell() {
+    var navItems = document.querySelectorAll(".stg-nav-item");
+    navItems.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        STG_STATE.section = btn.getAttribute("data-stg-section");
+        renderStgShell();
+      });
+    });
+    bindStgContent();
+  }
+
+  function bindSettingsPage() {
+    bindStgShell();
+  }
+
+  // ── Settings page (Commit 016) ────────────────────────────────
+  PAGE_FRAMEWORK["settings"] = function () {
+    return (
+      UI.pageHeader("Settings", "System configuration and preferences · 系统配置") +
+      '<div id="stg-shell"><div class="stg-layout">' + renderStgNav() + renderStgContent() + "</div></div>"
+    );
+  };
+
+  /* ==================================================================
+   * Data module — Commit 017
+   * Market Data & Data Pipeline Center: overview → markets → datasets →
+   * detail → quality → pipeline. UI-only; does NOT implement new data
+   * collectors, modify fetch_real, data providers, CSV/Lakehouse, or
+   * research datasets. No API/db changes.
+   * ================================================================== */
+
+  // ── Data overview ────────────────────────────────────────────
+  var DT_OVERVIEW = {
+    pipeline: "HEALTHY", lastUpdate: "2026-08-28 09:30",
+    assets: 128, records: "4.82M", quality: "99.7%", coverage: "98.6%",
+  };
+
+  // ── Markets ──────────────────────────────────────────────────
+  var DT_MARKETS = [
+    { name: "A-Share", status: "healthy", instruments: "CSI 300 · CSI 500 · STAR 50" },
+    { name: "Futures", status: "healthy", instruments: "Gold · Silver · Index Futures" },
+    { name: "US Stocks", status: "healthy", instruments: "NVDA · QQQ · SPY" },
+    { name: "Forex", status: "healthy", instruments: "EURUSD" },
+    { name: "Commodities", status: "healthy", instruments: "XAUUSD" },
+  ];
+
+  // ── Datasets ─────────────────────────────────────────────────
+  var DT_DATASETS = [
+    { id: "us-eq",   name: "US Equities",   type: "Real",      tf: "D1", assets: 35, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 238421, missing: "0.18%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
+    { id: "a-share", name: "A-Share",       type: "Real",      tf: "D1", assets: 80, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 186200, missing: "0.12%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
+    { id: "futures", name: "Futures",       type: "Real",      tf: "D1", assets: 12, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 58300,  missing: "0.05%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
+    { id: "forex",   name: "Forex",         type: "Real",      tf: "D1", assets: 4,  status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 24100,  missing: "0.02%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
+    { id: "alpha",   name: "Alpha Research", type: "Processed", tf: "1H", assets: 9,  status: "READY", dateRange: "2024-01-01 → 2026-08-28", bars: 42100,  missing: "0.08%", duplicates: 0, lastUpdate: "2026-08-28 09:30" },
+    { id: "paper",   name: "Paper Trading",  type: "Snapshot",  tf: "D1", assets: 3,  status: "READY", dateRange: "2026-08-20 → 2026-08-28", bars: 240,    missing: "0.00%", duplicates: 0, lastUpdate: "2026-08-28 09:30" },
+  ];
+  var DT_STATE = { selectedId: "us-eq" };
+
+  // ── Data quality ─────────────────────────────────────────────
+  var DT_QUALITY = [
+    { label: "Completeness",      value: "99.82%", status: "PASS" },
+    { label: "Duplicates",        value: "0",      status: "PASS" },
+    { label: "OHLC Validation",   value: "100%",   status: "PASS" },
+    { label: "Timestamp Gaps",    value: "3",      status: "WARN" },
+    { label: "Corporate Actions", value: "0",     status: "PASS" },
+  ];
+
+  // ── Pipeline stages ──────────────────────────────────────────
+  var DT_PIPELINE = [
+    { label: "Fetch",     state: "done" },
+    { label: "Normalize", state: "done" },
+    { label: "Validate",  state: "done" },
+    { label: "Store",     state: "done" },
+    { label: "Ready",     state: "done" },
+  ];
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function dtFind(id) {
+    for (var i = 0; i < DT_DATASETS.length; i++) {
+      if (DT_DATASETS[i].id === id) return DT_DATASETS[i];
+    }
+    return DT_DATASETS[0];
+  }
+  function dtMarketStatus(s) {
+    return '<span class="dt-market-status ' + s + '">' + esc(s.toUpperCase()) + "</span>";
+  }
+  function dtDsStatusBadge(s) {
+    var cls = s === "READY" ? "healthy" : (s === "STALE" ? "degraded" : "down");
+    return '<span class="dt-market-status ' + cls + '">' + esc(s) + "</span>";
+  }
+  function dtQualityBadge(s) {
+    var key = s === "PASS" ? "pass" : (s === "WARN" ? "warn" : "fail");
+    return '<span class="dt-quality-status dt-quality-' + key + '">' + esc(s) + "</span>";
+  }
+
+  // ── Overview KPI ─────────────────────────────────────────────
+  function renderDtOverview() {
+    var o = DT_OVERVIEW;
+    return UI.kpiGrid(
+      UI.metricCard("Data Pipeline", o.pipeline, "", "pos") +
+      UI.metricCard("Last Update", o.lastUpdate, "", "") +
+      UI.metricCard("Assets", String(o.assets), "", "") +
+      UI.metricCard("Records", o.records, "", "") +
+      UI.metricCard("Data Quality", o.quality, "", "pos")
+    , 5);
+  }
+
+  // ── Markets ──────────────────────────────────────────────────
+  function renderDtMarkets() {
+    var cards = DT_MARKETS.map(function (m) {
+      return (
+        '<div class="dt-market-card">' +
+        '<div class="dt-market-head">' +
+        '<span class="dt-market-name">' + esc(m.name) + "</span>" +
+        dtMarketStatus(m.status) +
+        "</div>" +
+        '<div class="dt-market-inst">' + esc(m.instruments) + "</div>" +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="dt-market-grid">' + cards + "</div>";
+  }
+
+  // ── Dataset table (clickable rows) ──────────────────────────
+  function renderDtRows() {
+    return DT_DATASETS.map(function (d) {
+      var sel = d.id === DT_STATE.selectedId ? " dt-ds-row-selected" : "";
+      return (
+        '<tr class="dt-ds-row' + sel + '" data-dt-id="' + esc(d.id) + '">' +
+        "<td>" + esc(d.name) + "</td>" +
+        "<td>" + esc(d.type) + "</td>" +
+        "<td>" + esc(d.tf) + "</td>" +
+        '<td class="num">' + d.assets + "</td>" +
+        "<td>" + dtDsStatusBadge(d.status) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+  function renderDtList() {
+    return (
+      '<table class="ds-table dt-ds-table">' +
+      "<thead><tr>" +
+      "<th>Name</th><th>Type</th><th>TF</th>" +
+      '<th class="num">Assets</th><th>Status</th>' +
+      "</tr></thead>" +
+      '<tbody id="dt-ds-tbody">' + renderDtRows() + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  // ── Dataset detail ───────────────────────────────────────────
+  function dtDetailCell(label, value) {
+    return (
+      '<div class="dt-detail-cell">' +
+      '<div class="dt-detail-label">' + esc(label) + "</div>" +
+      '<div class="dt-detail-value">' + esc(value) + "</div>" +
+      "</div>"
+    );
+  }
+  function renderDtDetail() {
+    var d = dtFind(DT_STATE.selectedId);
+    return (
+      '<div class="dt-detail-grid">' +
+      dtDetailCell("Dataset", d.name + " / " + d.tf) +
+      dtDetailCell("Type", d.type) +
+      dtDetailCell("Status", d.status) +
+      dtDetailCell("Date Range", d.dateRange) +
+      dtDetailCell("Assets", String(d.assets)) +
+      dtDetailCell("Bars", d.bars.toLocaleString("en-US")) +
+      dtDetailCell("Missing", d.missing) +
+      dtDetailCell("Duplicates", String(d.duplicates)) +
+      dtDetailCell("Last Update", d.lastUpdate) +
+      "</div>"
+    );
+  }
+  function updateDtDetail() {
+    var host = document.getElementById("dt-detail");
+    if (host) host.innerHTML = renderDtDetail();
+  }
+
+  // ── Data quality ─────────────────────────────────────────────
+  function renderDtQuality() {
+    var rows = DT_QUALITY.map(function (q) {
+      return (
+        '<div class="dt-quality-row">' +
+        '<span class="dt-quality-label">' + esc(q.label) + "</span>" +
+        '<span class="dt-quality-value">' + esc(q.value) + "</span>" +
+        dtQualityBadge(q.status) +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="dt-quality-list">' + rows + "</div>";
+  }
+
+  // ── Pipeline stepper ─────────────────────────────────────────
+  function renderDtPipeline() {
+    var html = '<div class="dt-pipeline">';
+    DT_PIPELINE.forEach(function (p, i) {
+      var icon = p.state === "done" ? "✓" : (p.state === "fail" ? "✕" : "—");
+      html +=
+        '<div class="dt-pipe-step ' + p.state + '">' +
+        '<div class="dt-pipe-icon">' + icon + "</div>" +
+        '<div class="dt-pipe-label">' + esc(p.label) + "</div>" +
+        "</div>";
+      if (i < DT_PIPELINE.length - 1) {
+        html += '<span class="dt-pipe-arrow">→</span>';
+      }
+    });
+    html += "</div>";
+    return html;
+  }
+
+  // ── Bindings (row select) ───────────────────────────────────
+  function bindDataPage() {
+    var tbody = document.getElementById("dt-ds-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        var row = e.target.closest("tr[data-dt-id]");
+        if (!row) return;
+        DT_STATE.selectedId = row.getAttribute("data-dt-id");
+        tbody.innerHTML = renderDtRows();
+        updateDtDetail();
+      });
+    }
+  }
+
+  // ── Data page (Commit 017) ────────────────────────────────────
+  PAGE_FRAMEWORK["system/data"] = function () {
+    return (
+      UI.pageHeader("Data", "Market data & data pipeline center · 市场数据中心") +
+      UI.sectionHeading("Data Overview") +
+      renderDtOverview() +
+      UI.sectionHeading("Markets") +
+      UI.panel("Market Data", renderDtMarkets()) +
+      UI.sectionHeading("Datasets") +
+      UI.panel("Dataset Explorer", renderDtList()) +
+      UI.sectionHeading("Dataset Details") +
+      '<div id="dt-detail">' + renderDtDetail() + "</div>" +
+      UI.sectionHeading("Data Quality") +
+      UI.panel("Quality Checks", renderDtQuality()) +
+      UI.sectionHeading("Data Pipeline") +
+      UI.panel("Pipeline Status", renderDtPipeline())
+    );
+  };
+
+
 
   // Build ROUTES array from NAV config
   const ROUTES = Object.keys(NAV).map(function (hash) {
@@ -3889,22 +7776,159 @@
     loadTopbarState();
 
     const content = document.getElementById("page-content");
-    content.innerHTML = '<div class="empty">Loading… / 加载中…</div>';
+    content.innerHTML = UI.stateLoading("Loading page / 页面加载中", "Fetching latest data…");
     try {
       const html = await route.render(hash.match(route.re));
       content.innerHTML = html;
+      // ── Polish 020: keyboard row navigation on main tables ─────────
+      try { bindTerminalKeyboard(); } catch (e) { /* ignore */ }
       bindActions();
+      // ── Polish 020: welcome toast only on first login ──────────────
+      try { polishFirstHitToast(); } catch (e) { /* ignore */ }
     } catch (err) {
       if (err && err.status === 401) {
         render();
         return;
       }
       content.innerHTML =
-        '<div class="card"><div class="empty">Failed to load data / 数据加载失败.<br><span class="metric-sub">' +
-        esc(err && err.message ? err.message : String(err)) +
-        "</span></div></div>";
+        UI.stateError(
+          "Failed to load page / 页面加载失败",
+          (err && err.message ? err.message : String(err)) + " · Click Retry to re-attempt page render.",
+          "Retry",
+          "page-render-retry"
+        );
+      // Bind the retry button once
+      setTimeout(function () {
+        var b = content.querySelector('[data-action="page-render-retry"]');
+        if (b) b.addEventListener("click", function () { render(); });
+      }, 0);
     }
     updateConnDot();
+  }
+
+  /* ==================================================================
+   * Commit 020 — Terminal keyboard nav + first-hit toast
+   *
+   * Keyboard:
+   *   ?                     show kbd help toast
+   *   Alt+1..9              jump to numbered left-nav group (approx)
+   *   J / ↓                 next row in main table
+   *   K / ↑                 prev row in main table
+   *   Enter / O             click selected row
+   *   N                     toast: "New Order"
+   *   /                     focus global search (if present)
+   *   G then H              go Dashboard, S = Settings, M = Monitoring, A = Alerts
+   *   Esc                   close modal / drawer (already in UI)
+   * ================================================================== */
+  var _kbActiveRowIdx = -1;
+  function mainTableBody() {
+    var ids = ["mo-svc-tbody", "al-tbody", "dt-ds-tbody"];
+    for (var i = 0; i < ids.length; i++) {
+      var tb = document.getElementById(ids[i]);
+      if (tb) return tb;
+    }
+    var t = document.querySelector(".ds-table tbody");
+    return t || null;
+  }
+  function kbMoveRow(dir) {
+    var tb = mainTableBody();
+    if (!tb) return;
+    var rows = tb.querySelectorAll("tr");
+    if (!rows.length) return;
+    if (_kbActiveRowIdx < 0 || _kbActiveRowIdx >= rows.length) _kbActiveRowIdx = 0;
+    _kbActiveRowIdx = (rows.length + _kbActiveRowIdx + dir) % rows.length;
+    UI.setActiveRow(tb, _kbActiveRowIdx);
+    try {
+      rows[_kbActiveRowIdx].scrollIntoView({ block: "nearest" });
+    } catch (e) { /* ignore */ }
+  }
+  function kbOpenRow() {
+    var tb = mainTableBody();
+    if (!tb) return;
+    var rows = tb.querySelectorAll("tr");
+    var r = rows[_kbActiveRowIdx >= 0 ? _kbActiveRowIdx : 0];
+    if (r) r.click();
+  }
+  function kbNavHash(h) {
+    if (!h) return;
+    location.hash = h;
+  }
+  function bindTerminalKeyboard() {
+    // remove existing once (defensive: render() can call bindActions several times)
+    if (window.__polishKbBound) return;
+    window.__polishKbBound = true;
+    var gPending = false;
+    window.addEventListener("keydown", function (e) {
+      // Avoid intercepting when typing in form elements
+      var tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : "";
+      var inForm = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+      if (inForm && e.key !== "Escape" && e.key !== "/" && !(e.altKey)) return;
+
+      // Modifier hotkeys
+      if (e.altKey && /^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        var navLinks = document.querySelectorAll("#nav .nav-link");
+        var idx = Math.min(parseInt(e.key, 10) - 1, navLinks.length - 1);
+        if (navLinks[idx]) navLinks[idx].click();
+        return;
+      }
+
+      if (e.key === "?") {
+        e.preventDefault();
+        UI.toast({ kind: "info", title: "Keyboard Shortcuts",
+          sub: "Alt+1..9 nav · J/K or ↑/↓ rows · Enter open · N New Order · G+H Dashboard · G+M Monitoring · G+A Alerts · G+S Settings · ? help" });
+        return;
+      }
+
+      if (e.key === "/") {
+        // Focus the global search / watchlist search if exists
+        e.preventDefault();
+        var s = document.getElementById("tr-symbol-search") || document.querySelector('.ds-input[type="text"]');
+        if (s) s.focus();
+        return;
+      }
+
+      if (e.key === "j" || e.key === "J" || e.key === "ArrowDown") { kbMoveRow(+1); return; }
+      if (e.key === "k" || e.key === "K" || e.key === "ArrowUp")   { kbMoveRow(-1); return; }
+      if (e.key === "Enter" || e.key === "o" || e.key === "O")     { kbOpenRow(); return; }
+
+      if (e.key === "n" || e.key === "N") {
+        UI.toast({ kind: "success", title: "New Order",
+          sub: "Open Trading tab and submit order (paper only)." });
+        kbNavHash("#/trading");
+        return;
+      }
+
+      // G prefix navigation
+      if (e.key === "g" || e.key === "G") { gPending = true; return; }
+      if (gPending) {
+        gPending = false;
+        switch (e.key.toLowerCase()) {
+          case "h": kbNavHash("#/dashboard"); return;
+          case "d": kbNavHash("#/dashboard"); return;
+          case "t": kbNavHash("#/trading");   return;
+          case "p": kbNavHash("#/portfolio"); return;
+          case "o": kbNavHash("#/orders");    return;
+          case "s": kbNavHash("#/settings");  return;
+          case "m": kbNavHash("#/system");    return;
+          case "a": kbNavHash("#/alerts");    return;
+          case "r": kbNavHash("#/research");  return;
+          case "k": kbNavHash("#/risk");      return;
+          case "e": kbNavHash("#/execution"); return;
+          case "b": kbNavHash("#/backtest");  return;
+          case "c": kbNavHash("#/accounts");  return;
+          case "i": kbNavHash("#/system/data"); return;
+        }
+      }
+    });
+  }
+  function polishFirstHitToast() {
+    try {
+      if (sessionStorage.getItem("icy.polish.shown")) return;
+      sessionStorage.setItem("icy.polish.shown", "1");
+      UI.toast({ kind: "info", title: "ICYQuant UI V1 · Final Polish",
+        sub: "Press ? for keyboard shortcuts. Everything rendered client-side." });
+    } catch (e) { /* sessionStorage blocked in sandbox is fine */ }
   }
 
   /* ==================================================================
@@ -3913,6 +7937,10 @@
   let _topbarLoading = false;
 
   async function loadTopbarState() {
+    // These endpoints require authentication; don't spam 401s on the login
+    // view or when the session is missing.  Backend connectivity is
+    // tracked separately by the anonymous /api/health probe.
+    if (!api.isAuthenticated()) return;
     if (_topbarLoading) return;
     _topbarLoading = true;
     try {
@@ -4101,7 +8129,8 @@
       });
     }
 
-    // Trading: Order Ticket — live notional calculation
+    // Trading: Order Ticket — live notional calculation (Integration 003)
+    // Uses the real quote price from _tradingState instead of a hardcoded 178.42.
     function updateNotional() {
       var qtyEl = document.getElementById("tr-ot-qty");
       var limitEl = document.getElementById("tr-ot-limit");
@@ -4109,9 +8138,10 @@
       var typeEl = document.getElementById("tr-ot-type");
       if (!qtyEl || !notionalEl) return;
       var qty = parseFloat(qtyEl.value) || 0;
-      var price = parseFloat((limitEl && limitEl.value) || 178.42);
+      var livePrice = (_tradingState.quote && _tradingState.quote.last_price) || 0;
+      var limitPrice = parseFloat((limitEl && limitEl.value) || "0") || 0;
       var type = typeEl ? typeEl.value : "market";
-      var effPrice = type === "market" ? 178.42 : (price || 178.42);
+      var effPrice = type === "market" ? livePrice : (limitPrice || livePrice);
       var notional = qty * effPrice;
       notionalEl.textContent = "$" + notional.toLocaleString("en-US", { maximumFractionDigits: 0 });
     }
@@ -4131,47 +8161,136 @@
       });
     }
 
-    // Trading: REVIEW ORDER → modal → mock confirmation
+    // Trading: REVIEW ORDER → Preview → Submit (Integration 003 — real API)
+    // Flow:  Review → useOrderPreview() → modal with risk_check →
+    //        Submit → useOrderSubmit() → result (order_id / status / rejection)
+    //        Duplicate-submit protection via _tradingState.submitting lock.
     var reviewBtn = document.getElementById("tr-ot-review");
     if (reviewBtn) {
-      reviewBtn.addEventListener("click", function () {
+      reviewBtn.addEventListener("click", async function () {
         var side = reviewBtn.getAttribute("data-side") || "BUY";
-        var qty = (document.getElementById("tr-ot-qty") || {}).value || "100";
-        var type = (document.getElementById("tr-ot-type") || {}).value || "market";
+        var qtyVal = (document.getElementById("tr-ot-qty") || {}).value || "100";
+        var typeVal = (document.getElementById("tr-ot-type") || {}).value || "market";
         var limitEl = document.getElementById("tr-ot-limit");
-        var price = type === "market" ? "Market" : "$" + ((limitEl && limitEl.value) || "178.42");
-        var slEl = document.getElementById("tr-ot-sl");
-        var tpEl = document.getElementById("tr-ot-tp");
-        var notional = document.getElementById("tr-ot-notional");
-        var notionalVal = notional ? notional.textContent : "$17,842";
+        var symbol = (_tradingState.quote && _tradingState.quote.symbol) || "NVDA";
 
-        var reviewHtml =
-          '<div class="ds-stat-row"><span class="ds-stat-label">Side</span><span class="ds-stat-value ds-stat-' + (side === "BUY" ? "pos" : "neg") + '">' + side + '</span></div>' +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Symbol</span><span class="ds-stat-value">NVDA</span></div>' +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Type</span><span class="ds-stat-value">' + (type === "market" ? "Market" : "Limit") + '</span></div>' +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Quantity</span><span class="ds-stat-value">' + qty + '</span></div>' +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Price</span><span class="ds-stat-value">' + price + '</span></div>' +
-          (slEl && slEl.value ? '<div class="ds-stat-row"><span class="ds-stat-label">Stop Loss</span><span class="ds-stat-value ds-stat-neg">$' + slEl.value + '</span></div>' : "") +
-          (tpEl && tpEl.value ? '<div class="ds-stat-row"><span class="ds-stat-label">Take Profit</span><span class="ds-stat-value ds-stat-pos">$' + tpEl.value + '</span></div>' : "") +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Notional</span><span class="ds-stat-value ds-stat-info">' + notionalVal + '</span></div>' +
-          '<div class="ds-stat-row"><span class="ds-stat-label">Account</span><span class="ds-stat-value">Paper-Alpha021</span></div>';
+        var ticket = {
+          symbol: symbol,
+          side: side,
+          quantity: parseInt(qtyVal, 10) || 0,
+          order_type: typeVal === "market" ? "MARKET" : "LIMIT",
+          price: typeVal === "limit" ? (parseFloat((limitEl && limitEl.value) || "0") || null) : null,
+        };
 
-        UI.openModal({
-          title: "Review Order",
-          body: reviewHtml,
-          footer:
-            '<button class="ds-btn ds-btn-ghost" data-action="close-modal">Cancel</button>' +
-            '<button class="ds-btn ds-btn-primary" id="tr-confirm-order">CONFIRM (Paper)</button>',
-        });
-        setTimeout(function () {
-          var confirmBtn = document.getElementById("tr-confirm-order");
-          if (confirmBtn) {
-            confirmBtn.addEventListener("click", function () {
-              UI.closeModal();
-              showToast(side + " " + qty + " NVDA · Paper order submitted (mock)", "ok");
+        // Loading state on the review button
+        var origText = reviewBtn.textContent;
+        reviewBtn.disabled = true;
+        reviewBtn.textContent = "Loading preview...";
+
+        try {
+          var preview = await useOrderPreview(ticket);
+          var rc = preview.risk_check || {};
+          var blocked = rc.status === "BLOCKED";
+          var warnings = rc.warnings || [];
+          var livePrice = (_tradingState.quote && _tradingState.quote.last_price) || 0;
+
+          var reviewHtml =
+            '<div class="ds-stat-row"><span class="ds-stat-label">Symbol</span><span class="ds-stat-value ds-text-mono">' + esc(preview.symbol) + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Side</span><span class="ds-stat-value ds-stat-' + (preview.side === "BUY" ? "pos" : "neg") + '">' + preview.side + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Quantity</span><span class="ds-stat-value ds-text-mono">' + preview.quantity + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Order Type</span><span class="ds-stat-value">' + esc(preview.order_type) + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Price</span><span class="ds-stat-value ds-text-mono">$' + (preview.price || 0).toFixed(2) + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Last Price</span><span class="ds-stat-value ds-text-mono">$' + (preview.last_price || livePrice || 0).toFixed(2) + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Estimated Value</span><span class="ds-stat-value ds-stat-info ds-text-mono">' + UI.money(preview.estimated_value, 2) + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Risk Check</span><span class="ds-stat-value ds-stat-' + (blocked ? "neg" : "pos") + '">' + esc(rc.status || "UNKNOWN") + '</span></div>' +
+            (warnings.length ? '<div class="ds-callout ds-callout-' + (blocked ? "danger" : "warning") + '" style="margin-top:var(--ds-space-sm);"><ul style="margin:0;padding-left:1.2em;">' + warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></div>" : "") +
+            '<div class="ds-stat-row" style="margin-top:var(--ds-space-sm);"><span class="ds-stat-label">Session</span><span class="ds-stat-value">' + (rc.session_running ? "Running" : "Not running") + '</span></div>' +
+            '<div class="ds-stat-row"><span class="ds-stat-label">Pipeline</span><span class="ds-stat-value">' + (rc.pipeline_attached ? "Attached" : "Detached") + '</span></div>' +
+            '<div class="ds-text-muted" style="font-size:var(--ds-text-xs);margin-top:var(--ds-space-sm);">Preview only — no order submitted. Click Submit to send through Risk → Order → Execution.</div>';
+
+          UI.openModal({
+            title: "Order Preview — " + preview.side + " " + preview.quantity + " " + esc(preview.symbol),
+            body: reviewHtml,
+            footer:
+              '<button class="ds-btn ds-btn-ghost" data-action="close-modal">Cancel</button>' +
+              '<button class="ds-btn ' + (preview.side === "SELL" ? "ds-btn-danger" : "ds-btn-primary") + '" id="tr-submit-order" ' + (blocked ? "disabled" : "") + '>SUBMIT ORDER</button>',
+          });
+
+          // Bind the submit button (with duplicate-submit protection)
+          setTimeout(function () {
+            var submitBtn = document.getElementById("tr-submit-order");
+            if (!submitBtn) return;
+            submitBtn.addEventListener("click", async function () {
+              if (_tradingState.submitting) return;          // duplicate-submit lock
+              _tradingState.submitting = true;
+              var origSubmitText = submitBtn.textContent;
+              submitBtn.disabled = true;
+              submitBtn.textContent = "Submitting...";
+
+              try {
+                var result = await useOrderSubmit(ticket);
+                UI.closeModal();
+
+                // Build result display based on status
+                var statusVariant = result.status === "FILLED" ? "pos" :
+                  result.status === "REJECTED" ? "neg" :
+                  result.status === "ERROR" ? "neg" : "warning";
+                var order = result.order || {};
+                var rd = result.risk_decision || {};
+
+                var resultHtml =
+                  '<div class="ds-stat-row"><span class="ds-stat-label">Status</span><span class="ds-stat-value ds-stat-' + statusVariant + '">' + esc(result.status) + '</span></div>' +
+                  (order.order_id ? '<div class="ds-stat-row"><span class="ds-stat-label">Order ID</span><span class="ds-stat-value ds-text-mono">' + esc(order.order_id) + '</span></div>' : "") +
+                  '<div class="ds-stat-row"><span class="ds-stat-label">Symbol</span><span class="ds-stat-value ds-text-mono">' + esc(order.symbol || ticket.symbol) + '</span></div>' +
+                  '<div class="ds-stat-row"><span class="ds-stat-label">Side</span><span class="ds-stat-value ds-stat-' + (ticket.side === "BUY" ? "pos" : "neg") + '">' + ticket.side + '</span></div>' +
+                  '<div class="ds-stat-row"><span class="ds-stat-label">Quantity</span><span class="ds-stat-value ds-text-mono">' + (order.quantity || ticket.quantity) + '</span></div>' +
+                  (order.average_fill_price ? '<div class="ds-stat-row"><span class="ds-stat-label">Avg Fill Price</span><span class="ds-stat-value ds-text-mono">$' + order.average_fill_price.toFixed(2) + '</span></div>' : "") +
+                  (order.filled_quantity ? '<div class="ds-stat-row"><span class="ds-stat-label">Filled Qty</span><span class="ds-stat-value ds-text-mono">' + order.filled_quantity + '</span></div>' : "") +
+                  (rd.approved !== undefined ? '<div class="ds-stat-row"><span class="ds-stat-label">Risk Decision</span><span class="ds-stat-value ds-stat-' + (rd.approved ? "pos" : "neg") + '">' + (rd.approved ? "Approved" : "Rejected") + '</span></div>' : "") +
+                  (rd.reason ? '<div class="ds-stat-row"><span class="ds-stat-label">Risk Reason</span><span class="ds-stat-value">' + esc(rd.reason) + '</span></div>' : "") +
+                  (result.rejection_reason ? '<div class="ds-callout ds-callout-danger" style="margin-top:var(--ds-space-sm);"><strong>REJECTED:</strong> ' + esc(result.rejection_reason) + '</div>' : "");
+
+                UI.openModal({
+                  title: "Order Result — " + result.status,
+                  body: resultHtml,
+                  footer: '<button class="ds-btn ds-btn-primary" data-action="close-modal">Close</button>',
+                });
+
+                // Show toast + refresh the page to show the new order
+                var toastType = result.status === "FILLED" ? "ok" : result.status === "REJECTED" ? "err" : "warn";
+                showToast(ticket.side + " " + ticket.quantity + " " + ticket.symbol + " · " + result.status, toastType);
+
+                // Refresh the trading page after a short delay
+                setTimeout(function () { render(); }, 800);
+              } catch (submitErr) {
+                // Error during submit — show error in the modal
+                submitBtn.disabled = false;
+                submitBtn.textContent = origSubmitText;
+                var errBody = '<div class="ds-callout ds-callout-danger">' +
+                  '<strong>Submit failed:</strong> ' + esc((submitErr && submitErr.message) || String(submitErr)) +
+                  '</div>' +
+                  '<div class="ds-text-muted" style="margin-top:var(--ds-space-sm);">The order was not submitted. Click Submit to retry, or Cancel to close.</div>';
+                var modalBody = document.querySelector(".ds-modal-body");
+                if (modalBody) {
+                  var errDiv = document.createElement("div");
+                  errDiv.innerHTML = errBody;
+                  modalBody.appendChild(errDiv);
+                } else {
+                  UI.closeModal();
+                  showToast("Submit failed: " + ((submitErr && submitErr.message) || "unknown error"), "err");
+                }
+              } finally {
+                _tradingState.submitting = false;
+              }
             });
-          }
-        }, 50);
+          }, 50);
+        } catch (previewErr) {
+          // Preview failed — show error toast, keep the ticket editable
+          showToast("Preview failed: " + ((previewErr && previewErr.message) || "unknown error"), "err");
+        } finally {
+          reviewBtn.disabled = false;
+          reviewBtn.textContent = origText;
+        }
       });
     }
 
@@ -4202,14 +8321,66 @@
       });
     }
 
-    // Orders (Commit 008): row selection, filters, search, New Order modal
-    if (document.getElementById("ord-tbody")) {
+    // Orders (Integration 005): delegated row selection, filters, search,
+    // pagination, refresh, cancel — all bound on #ord-root
+    if (document.getElementById("ord-root")) {
       bindOrdersPage();
     }
 
-    // Positions (Commit 009): row selection, refresh
-    if (document.getElementById("pos-tbody")) {
+    // Positions (Integration 006): delegated row selection, filters,
+    // exposure, detail lifecycle, refresh — all bound on #pos-root
+    if (document.getElementById("pos-root")) {
       bindPositionsPage();
+    }
+
+    // Research (Commit 010): factor row selection, experiment rows, refresh
+    if (document.getElementById("rs-factor-tbody")) {
+      bindResearchPage();
+    }
+
+    // Backtest (Commit 011): run button states, validation, loading/error
+    if (document.getElementById("bt-results")) {
+      bindBacktestPage();
+    }
+
+    // Strategy (Commit 012): row select, tabs, lifecycle, config, actions
+    if (document.getElementById("st-detail")) {
+      bindStrategiesPage();
+    }
+
+    // Risk (Commit 013): refresh button, event row detail, report button
+    if (document.querySelector(".rk-status-bar")) {
+      bindRiskPage();
+    }
+
+    // Execution (Commit 014): refresh button, timeline click
+    if (document.querySelector(".ex-engine-bar")) {
+      bindExecutionPage();
+    }
+
+    // Accounts (Commit 015): row select, add account, test connection
+    if (document.getElementById("ac-list-tbody")) {
+      bindAccountsPage();
+    }
+
+    // Settings (Commit 016): section nav, env radios, save/reset
+    if (document.getElementById("stg-shell")) {
+      bindSettingsPage();
+    }
+
+    // Data (Commit 017): dataset row select → detail update
+    if (document.getElementById("dt-ds-tbody")) {
+      bindDataPage();
+    }
+
+    // Monitoring (Commit 018): service row select → detail update + event filter
+    if (document.getElementById("mo-svc-tbody")) {
+      bindMonitoringPage();
+    }
+
+    // Alerts (Commit 019): row select → detail toggle + Ack / Resolve actions
+    if (document.getElementById("al-tbody")) {
+      bindAlertsPage();
     }
 
     // Design System: bind tabs
@@ -4369,12 +8540,23 @@
   function updateConnDot() {
     const dot = document.getElementById("conn-dot");
     const text = document.getElementById("conn-text");
-    if (api.isAuthenticated()) {
+    if (!dot || !text) return;
+    const s = state.backend.status;
+    if (s === "connected") {
       dot.className = "conn-dot up";
-      text.textContent = "API connected / 已连接";
-    } else {
+      text.textContent = "Backend connected / 后端已连接";
+    } else if (s === "degraded") {
+      dot.className = "conn-dot degraded";
+      text.textContent = "Backend degraded / 后端降级";
+    } else if (s === "disconnected") {
       dot.className = "conn-dot down";
-      text.textContent = "not connected / 未连接";
+      text.textContent = "Backend disconnected / 后端未连接";
+    } else if (s === "probe") {
+      dot.className = "conn-dot unknown";
+      text.textContent = "Backend probing / 后端探测中";
+    } else {
+      dot.className = "conn-dot unknown";
+      text.textContent = "Backend unknown / 后端未知";
     }
   }
 
@@ -4426,6 +8608,7 @@
   window.addEventListener("hashchange", render);
 
   setupLogin();
+  startBackendHealthPolling(); // Integration 001: real connectivity probe
   startAutoRefresh();
   if (!location.hash) location.hash = "#/overview";
   render();

@@ -134,6 +134,18 @@ def me(principal: Principal = Depends(require_roles())) -> dict:
 # ===========================================================================
 
 
+@router.get("/dashboard")
+def dashboard(principal: Principal = Depends(require_roles())) -> dict:
+    """Single-call aggregated payload for the Dashboard UI page.
+
+    Returns ``{account, positions, orders, risk, execution, strategies,
+    alerts, meta}`` so the frontend can render every KPI card, position
+    table, and status panel from one request instead of fanning out to
+    six separate endpoints.
+    """
+    return runtime.dashboard_summary()
+
+
 @router.get("/dashboard/overview")
 def overview(principal: Principal = Depends(require_roles())) -> dict:
     return runtime.overview()
@@ -196,9 +208,177 @@ def order_detail(
     return trace
 
 
+# ===========================================================================
+# Integration 003 — Trading API (quote / preview / submit)
+#
+# Three thin endpoints that wrap existing internal capabilities:
+#   - SimulatedMarketFeed.quote()  ->  GET  /dashboard/quote/{symbol}
+#   - read-only pre-check          ->  POST /dashboard/orders/preview
+#   - PaperTradingSession.process  ->  POST /dashboard/orders
+#
+# No new engines, no new market data service, no Order/Risk/Execution
+# Engine core changes. These are pure adaptation-layer endpoints.
+# ===========================================================================
+
+
+class OrderTicketRequest(BaseModel):
+    """Order ticket payload shared by preview + submit."""
+
+    symbol: str
+    side: str  # BUY / SELL
+    quantity: int
+    order_type: str = "MARKET"  # MARKET / LIMIT
+    price: Optional[float] = None  # required for LIMIT, ignored for MARKET
+
+
+@router.get("/dashboard/quote/{symbol}")
+def quote(
+    symbol: str, principal: Principal = Depends(require_roles())
+) -> dict:
+    """Real-time quote for a symbol (observational, from the attached feed).
+
+    Uses the active paper session's ``SimulatedMarketFeed.quote()`` when a
+    session is running, falling back to the runtime's last-known trade
+    prices. Bid/ask are derived from the mid price with an observational
+    spread — this does NOT create a new market data service, it only
+    surfaces what the feed already produces.
+    """
+    from datetime import datetime, timezone
+
+    symbol = symbol.upper()
+    last_price = 0.0
+    base_price = 0.0
+    source = "none"
+
+    # 1) Active session's market feed (preferred)
+    if _session is not None and getattr(_session, "feed", None) is not None:
+        try:
+            last_price = float(_session.feed.quote(symbol))
+            base_prices = getattr(_session.feed, "_prices", {}) or {}
+            base_price = float(base_prices.get(symbol, last_price))
+            source = "paper_feed"
+        except Exception:  # noqa: BLE001
+            pass
+
+    # 2) Fallback to runtime's last-known prices (from order fills)
+    if not last_price:
+        last_price = float(runtime._prices.get(symbol, 0.0))
+        base_price = last_price
+        source = "last_trade"
+
+    # 3) Final fallback (nominal)
+    if not last_price:
+        last_price = 100.0
+        base_price = 100.0
+        source = "nominal"
+
+    # Derive bid/ask from mid (observational half-spread, not a new service)
+    half_spread = max(0.01, last_price * 0.0005)  # 5 bps
+    bid = round(last_price - half_spread, 4)
+    ask = round(last_price + half_spread, 4)
+
+    change = round(last_price - base_price, 4)
+    change_pct = round((change / base_price) * 100.0, 4) if base_price else 0.0
+
+    return {
+        "symbol": symbol,
+        "last_price": round(last_price, 4),
+        "bid": bid,
+        "ask": ask,
+        "spread": round(ask - bid, 4),
+        "change": change,
+        "change_pct": change_pct,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "session_running": _session is not None,
+    }
+
+
+@router.post("/dashboard/orders/preview")
+def order_preview(
+    body: OrderTicketRequest,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Read-only order preview: estimated value + risk/session readiness.
+
+    Does NOT submit the order and does NOT call the Risk Engine. It only
+    reports what the UI needs to render the "Review Order" panel: the
+    current price, estimated notional, and observational readiness flags.
+    """
+    from datetime import datetime, timezone
+
+    symbol = body.symbol.strip().upper()
+    side = body.side.strip().upper()
+    quantity = abs(int(body.quantity))
+    order_type = body.order_type.strip().upper()
+
+    if side not in ("BUY", "SELL"):
+        raise HTTPException(status_code=400, detail="side must be BUY or SELL")
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="quantity must be positive")
+
+    # Reuse the quote logic to get the current price
+    last_price = 0.0
+    if _session is not None and getattr(_session, "feed", None) is not None:
+        try:
+            last_price = float(_session.feed.quote(symbol))
+        except Exception:  # noqa: BLE001
+            pass
+    if not last_price:
+        last_price = float(runtime._prices.get(symbol, 0.0))
+    if not last_price:
+        last_price = 100.0
+
+    # Use the user's limit price if provided, else market price
+    ref_price = (
+        body.price
+        if order_type == "LIMIT" and body.price
+        else last_price
+    )
+    estimated_value = round(quantity * ref_price, 2)
+
+    # Observational readiness flags (NOT a real Risk Engine check)
+    session_running = _session is not None
+    pipeline_attached = runtime.attached()
+    warnings = []
+    if not session_running:
+        warnings.append("No paper trading session running — start a session first")
+    if order_type == "LIMIT" and not body.price:
+        warnings.append("Limit orders require a price")
+
+    return {
+        "symbol": symbol,
+        "side": side,
+        "quantity": quantity,
+        "order_type": order_type,
+        "price": round(ref_price, 4),
+        "last_price": round(last_price, 4),
+        "estimated_value": estimated_value,
+        "risk_check": {
+            "status": "READY" if not warnings else "BLOCKED",
+            "warnings": warnings,
+            "session_running": session_running,
+            "pipeline_attached": pipeline_attached,
+        },
+        "preview_only": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.get("/dashboard/positions")
 def positions(principal: Principal = Depends(require_roles())) -> dict:
     return runtime.portfolio()
+
+
+@router.get("/dashboard/positions/{symbol}")
+def position_detail(
+    symbol: str, principal: Principal = Depends(require_roles())
+) -> dict:
+    """Single position + its ORDER_FILLED ledger history (Positions detail)."""
+    detail = runtime.position_detail(symbol)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return detail
 
 
 @router.get("/dashboard/accounts")
@@ -255,6 +435,28 @@ def reconciliation(principal: Principal = Depends(require_roles())) -> dict:
         "accounts": runtime.multi_reconciliation(),
         "ledger_events": runtime.ledger_events()[-20:],
     }
+
+
+@router.get("/health", include_in_schema=False)
+def api_health(principal: Optional[Principal] = Depends(auth.optional)) -> dict:
+    """Thin wrapper around the root ``GET /health`` endpoint.
+
+    The Integration API client uses a single base URL pointing at ``/api``.
+    Rather than making the client juggle two roots just for one health call,
+    we mirror the public aggregated health under ``/api/health``.  Authentication
+    is intentionally optional so the client can probe backend connectivity
+    before (or without) a dashboard session.
+
+    The returned shape mirrors ``GET /health`` exactly:
+    ``{status, version, timestamp, services, bootstrap}``.
+    """
+    from apps.runtime.health_server import build_registry
+    from core.bootstrap import get_bootstrap
+
+    registry = build_registry()
+    snapshot = registry.snapshot()
+    snapshot["bootstrap"] = get_bootstrap().report()
+    return snapshot
 
 
 @router.get("/dashboard/system")
@@ -573,11 +775,108 @@ def cancel_order(
     return {"order": runtime.serialize_order(order)}
 
 
+@router.post("/dashboard/orders")
+def submit_order(
+    request: Request,
+    body: OrderTicketRequest,
+    principal: Principal = Depends(require_roles("TRADER", "ADMIN")),
+) -> dict:
+    """Submit a manual order through the paper trading session.
+
+    Pushes a ``SignalSpec`` through the official engine chain
+    (Risk → Order → Execution) by reusing ``PaperTradingSession.process()``
+    which internally calls ``pipeline.submit_signal()``. This does NOT
+    bypass or duplicate any engine logic — the same Risk Engine, Order
+    Engine and Execution Engine that govern automated signals govern
+    this manual ticket.
+
+    Returns the created order (when one is produced), the session's
+    metric record, and the linked risk decision so the UI can render
+    Accepted / Rejected / Risk-Rejected / Filled states.
+    """
+    from datetime import datetime, timezone
+
+    symbol = body.symbol.strip().upper()
+    side = body.side.strip().upper()
+    quantity = abs(int(body.quantity))
+    order_type = body.order_type.strip().upper()
+
+    if side not in ("BUY", "SELL"):
+        raise HTTPException(status_code=400, detail="side must be BUY or SELL")
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="quantity must be positive")
+
+    with _session_lock:
+        if _session is None:
+            raise HTTPException(
+                status_code=409,
+                detail="No paper trading session running. Start a session first.",
+            )
+        session = _session
+
+    # Build the signal spec (reuses the official SignalSpec).
+    # ref_price=None lets the session use the live feed quote for MARKET;
+    # for LIMIT the user's price is honoured as the reference.
+    ref_price = body.price if order_type == "LIMIT" and body.price else None
+    spec = SignalSpec(symbol=symbol, side=side, quantity=quantity, ref_price=ref_price)
+
+    # Push through the official chain (Risk → Order → Execution)
+    result = session.process(spec)
+
+    # Locate the most recently created order matching this ticket
+    orders_list = runtime.orders()
+    submitted_order = None
+    for order in reversed(orders_list):
+        if (
+            order.get("symbol") == symbol
+            and order.get("side") == side
+            and int(order.get("quantity", 0) or 0) == quantity
+        ):
+            submitted_order = order
+            break
+
+    if result.get("rejected"):
+        status_label = "REJECTED"
+    elif result.get("error"):
+        status_label = "ERROR"
+    elif submitted_order and submitted_order.get("filled_quantity"):
+        status_label = "FILLED"
+    else:
+        status_label = "SUBMITTED"
+
+    auth.record(
+        AuditAction.TRADE_EXECUTE,
+        principal,
+        target=submitted_order.get("order_id") if submitted_order else symbol,
+        severity=AuditSeverity.MEDIUM,
+        details={
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "order_type": order_type,
+            "price": body.price,
+            "status": status_label,
+            "result": result,
+        },
+        ip_address=_client_ip(request),
+    )
+
+    return {
+        "order": submitted_order,
+        "result": result,
+        "risk_decision": submitted_order.get("risk_decision") if submitted_order else None,
+        "status": status_label,
+        "rejection_reason": result.get("reason") if result.get("rejected") else None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.post("/dashboard/session/start")
 def session_start(
     request: Request,
     principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
 ) -> dict:
+    global _session
     with _session_lock:
         _stop_session()
         session = PaperTradingSession(

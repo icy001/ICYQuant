@@ -837,6 +837,168 @@
   UI.signedMoney = signedMoney;
   UI.esc = esc;
 
+  // ==================================================================
+  // Commit 020 — Final Polish: Terminal helpers (state, toast, confirm)
+  // ==================================================================
+
+  // ── Breadcrumb — ICYQuant / GROUP / Page ─────────────────────────
+  UI.breadcrumb = function (parts) {
+    parts = parts || [];
+    return (
+      '<div class="breadcrumb">' +
+      parts.map(function (p) { return "<span>" + esc(p) + "</span>"; }).join("") +
+      "</div>"
+    );
+  };
+
+  // ── Page chrome: breadcrumb + pageHeader ────────────────────────
+  //   parts[]: breadcrumb; title/desc/actions: pageHeader args
+  UI.pageChrome = function (opts) {
+    return (
+      UI.breadcrumb(opts.crumb || ["ICYQuant"]) +
+      UI.pageHeader(opts.title, opts.desc, opts.actions)
+    );
+  };
+
+  // ── Keyboard Hint Line: shows kbd chips in a toolbar ────────────
+  UI.kbdBar = function (hints) {
+    return (
+      '<div style="display:flex;gap:var(--ds-space-2);flex-wrap:wrap;color:var(--ds-text-muted);font-size:var(--ds-text-xs);">' +
+      hints.map(function (h) {
+        return '<span><span class="kbd">' + esc(h.key) + "</span> " + esc(h.label) + "</span>";
+      }).join("") +
+      "</div>"
+    );
+  };
+
+  // ── Final polish state blocks (empty / loading / error) ─────────
+  UI.stateEmpty = function (title, desc, btn) {
+    return (
+      '<div class="state-empty">' +
+      '<div class="state-icon">◯</div>' +
+      '<div class="state-title">' + esc(title || "No data") + "</div>" +
+      '<div class="state-sub">' + esc(desc || "") + "</div>" +
+      (btn ? '<div class="state-actions">' + btn + "</div>" : "") +
+      "</div>"
+    );
+  };
+  UI.stateLoading = function (title, desc) {
+    return (
+      '<div class="state-loading">' +
+      '<div class="state-icon" aria-label="Loading"></div>' +
+      '<div class="state-title">' + esc(title || "Loading") + "</div>" +
+      '<div class="state-sub">' + esc(desc || "Fetching latest data…") + "</div>" +
+      "</div>"
+    );
+  };
+  UI.stateError = function (title, desc, retryLabel, retryAction) {
+    return (
+      '<div class="state-error">' +
+      '<div class="state-icon" aria-hidden="true">⚠</div>' +
+      '<div class="state-title">' + esc(title || "Error") + "</div>" +
+      '<div class="state-sub">' + esc(desc || "") + "</div>" +
+      (retryLabel
+        ? '<div class="state-actions"><button class="ds-btn primary" data-action="' + esc(retryAction || "retry") + '">' + esc(retryLabel) + "</button></div>"
+        : "") +
+      "</div>"
+    );
+  };
+
+  // ── Toast Center — host mounted once at first toast. ────────────
+  function toastHost() {
+    var h = document.getElementById("ds-toast-host");
+    if (h) return h;
+    h = document.createElement("div");
+    h.id = "ds-toast-host";
+    document.body.appendChild(h);
+    return h;
+  }
+  /**
+   * UI.toast({ kind: info|success|warning|error, title, sub, ttl })
+   *   kind defaults: error => 6s, warning 5s, else 3.5s
+   */
+  UI.toast = function (opts) {
+    opts = opts || {};
+    var kind = opts.kind || "info";
+    var ttl = opts.ttl != null
+      ? opts.ttl
+      : (kind === "error" ? 6000 : kind === "warning" ? 5000 : 3500);
+    var host = toastHost();
+    var t = document.createElement("div");
+    t.className = "ds-toast " + kind;
+    t.innerHTML =
+      (opts.title ? '<div class="ds-toast-title">' + esc(opts.title) + "</div>" : "") +
+      (opts.sub   ? '<div class="ds-toast-sub">'   + esc(opts.sub)   + "</div>" : "");
+    host.appendChild(t);
+    if (ttl > 0) {
+      setTimeout(function () {
+        t.style.transition = "opacity 200ms ease, transform 200ms ease";
+        t.style.opacity = "0";
+        t.style.transform = "translateY(-6px)";
+        setTimeout(function () { t.remove(); }, 220);
+      }, ttl);
+    }
+    return t;
+  };
+
+  // ── Confirm Dialog — promise-style, with Cancel / Primary ───────
+  UI.confirm = function (opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var backdrop = document.createElement("div");
+      backdrop.className = "ds-modal-backdrop";
+      backdrop.innerHTML =
+        '<div class="ds-modal" role="dialog" aria-modal="true">' +
+        '<div class="ds-modal-title">' + esc(opts.title || "Confirm") + "</div>" +
+        '<div class="ds-modal-message">' + esc(opts.message || "") + "</div>" +
+        '<div class="ds-modal-actions">' +
+        '<button class="ds-btn ghost" data-role="cancel">' + esc(opts.cancelLabel || "Cancel") + "</button>" +
+        '<button class="ds-btn ' + (opts.okVariant || "danger") + '" data-role="ok">' + esc(opts.okLabel || "Confirm") + "</button>" +
+        "</div>" +
+        "</div>";
+      function finish(result) {
+        backdrop.remove();
+        document.removeEventListener("keydown", onKey, true);
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        if (e.key === "Enter")  { e.preventDefault(); finish(true);  }
+      }
+      backdrop.addEventListener("click", function (e) {
+        var role = e.target.getAttribute && e.target.getAttribute("data-role");
+        if (role === "cancel" || e.target === backdrop) finish(false);
+        if (role === "ok") finish(true);
+      });
+      document.addEventListener("keydown", onKey, true);
+      document.body.appendChild(backdrop);
+      // Focus primary
+      var ok = backdrop.querySelector('[data-role="ok"]');
+      if (ok) ok.focus({ preventScroll: true });
+    });
+  };
+
+  // ── Tick Flash helper — apply flash-up/dn/info on an element ────
+  UI.flashCell = function (el, direction) {
+    if (!el) return;
+    var cls = direction > 0 ? "flash-profit"
+      : direction < 0 ? "flash-loss"
+      :                 "flash-info";
+    el.classList.remove("flash-profit", "flash-loss", "flash-info");
+    // Restart animation
+    void el.offsetWidth;
+    el.classList.add(cls);
+  };
+
+  // ── Active row helpers (for keyboard navigation) ───────────────
+  UI.setActiveRow = function (tbody, idx) {
+    var rows = tbody.querySelectorAll("tr");
+    rows.forEach(function (r, i) {
+      if (i === idx) r.setAttribute("data-active-row", "1");
+      else           r.removeAttribute("data-active-row");
+    });
+  };
+
   // ── Tab interaction (call after inserting tabs HTML) ────────────
   UI.bindTabs = function (container) {
     var tabs = container.querySelectorAll(".ds-tab");
