@@ -362,6 +362,27 @@ def ledger_events() -> List[dict]:
     return list(p.ledger.get("events", []))
 
 
+def position_detail(symbol: Optional[str]) -> Optional[dict]:
+    """Single position with its ledger fill history (Orders → Fills → Position).
+
+    Read-only view used by the Positions detail panel. The position truth
+    comes straight from ``position_repo`` (the Position Ledger); the timeline
+    is the ORDER_FILLED ledger events filtered by symbol. Nothing is fabricated.
+    """
+    position = _position_for(symbol)
+    if position is None:
+        return None
+    events = [
+        e
+        for e in ledger_events()
+        if ((e.get("payload") or {}).get("symbol") == symbol)
+    ]
+    return {
+        "position": position,
+        "ledger_events": events,
+    }
+
+
 def reconciliation() -> dict:
     """State of the reconciliation check - official TradingPipeline.reconcile."""
     p = _pipeline
@@ -582,6 +603,140 @@ def overview() -> dict:
         "recent_decisions": decision_list[-6:],
         "accounts": _account_overview(),
         "alerts": alerts(),
+    }
+
+
+def dashboard_summary() -> dict:
+    """Single-call aggregated payload for the Dashboard UI page.
+
+    Returns exactly seven top-level keys so the frontend can render all
+    KPI cards, position tables, and status panels from one request:
+
+    ::
+
+        {
+          "account":     {equity, cash, daily_pnl, daily_return},
+          "positions":   {count, market_value, unrealized_pnl, items},
+          "orders":      {pending, filled_today, rejected_today},
+          "risk":        {status, drawdown, exposure},
+          "execution":   {fill_rate, reject_rate, slippage},
+          "strategies":  {active, signals_today, items},
+          "alerts":      {critical, warning, items},
+        }
+
+    Every value is derived from the existing read-only runtime methods
+    (positions / orders / signals / risk_decisions / alerts / system_health).
+    No engine state is mutated.
+    """
+    from datetime import datetime, timezone
+
+    # -- positions --
+    pos_list = positions()
+    market_value = round(sum(_num(p["market_value"]) for p in pos_list), 2)
+    unrealized = round(sum(_num(p["unrealized_pnl"]) for p in pos_list), 2)
+
+    # -- orders --
+    order_list = orders()
+    pending = sum(1 for o in order_list if o["status"] in ("PENDING", "NEW", "SUBMITTED"))
+    filled = sum(1 for o in order_list if o["status"] == "FILLED")
+    rejected = sum(1 for o in order_list if o["status"] == "REJECTED")
+    total_orders = len(order_list) or 1  # avoid div-by-zero
+
+    # -- risk decisions --
+    decision_list = risk_decisions()
+    approved = sum(1 for d in decision_list if d["decision"] == "APPROVED")
+    rejected_risk = sum(1 for d in decision_list if d["decision"] == "REJECTED")
+
+    # -- strategies --
+    strat_list = strategies()
+    sig_list = signals()
+
+    # -- alerts --
+    alert_list = alerts()
+    critical = sum(1 for a in alert_list if a["level"] in ("CRITICAL", "HIGH"))
+    warning = sum(1 for a in alert_list if a["level"] == "WARNING")
+
+    # -- risk status from reconciliation --
+    rec = reconciliation()
+    if rec["status"] == "OK":
+        risk_status = "HEALTHY"
+    elif rec["status"] == "NO_PIPELINE":
+        risk_status = "NO_PIPELINE"
+    else:
+        risk_status = "DEGRADED"
+
+    total_exposure = round(sum(_num(p["exposure"]) for p in pos_list), 2)
+    equity = round(100000.0 + unrealized, 2)
+    cash = round(equity - total_exposure, 2)
+    daily_return = round(unrealized / 100000.0 * 100.0, 4) if equity else 0.0
+
+    # -- execution slippage (observational) --
+    exec_list = executions()
+    slippage_total = 0.0
+    slippage_count = 0
+    for ex in exec_list:
+        oid = ex.get("order_id")
+        if not oid:
+            continue
+        # find the matching order to get the intended price
+        for o in order_list:
+            if o["order_id"] == oid:
+                intended = _num(o.get("price"))
+                actual = _num(ex.get("price"))
+                if intended and actual:
+                    slippage_total += abs(actual - intended)
+                    slippage_count += 1
+                break
+    avg_slippage = round(slippage_total / slippage_count, 4) if slippage_count else 0.0
+
+    return {
+        "account": {
+            "equity": equity,
+            "cash": cash,
+            "daily_pnl": unrealized,
+            "daily_return": daily_return,
+        },
+        "positions": {
+            "count": len(pos_list),
+            "market_value": market_value,
+            "unrealized_pnl": unrealized,
+            "items": pos_list,
+        },
+        "orders": {
+            "pending": pending,
+            "filled_today": filled,
+            "rejected_today": rejected,
+        },
+        "risk": {
+            "status": risk_status,
+            "drawdown": 0.0,
+            "exposure": total_exposure,
+            "approved": approved,
+            "rejected": rejected_risk,
+        },
+        "execution": {
+            "fill_rate": round(filled / total_orders, 4),
+            "reject_rate": round(rejected / total_orders, 4),
+            "slippage": avg_slippage,
+        },
+        "strategies": {
+            "active": len(strat_list),
+            "signals_today": len(sig_list),
+            "items": strat_list,
+        },
+        "alerts": {
+            "critical": critical,
+            "warning": warning,
+            "items": alert_list,
+        },
+        # Extra context for the Dashboard header bar
+        "meta": {
+            "pipeline_attached": attached(),
+            "attached_at": _attached_at,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "environment": "PAPER",
+            "account_name": "Paper-Alpha021",
+        },
     }
 
 

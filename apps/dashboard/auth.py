@@ -255,10 +255,35 @@ def require_roles(*roles: str) -> Callable:
     return dependency
 
 
+def optional_principal(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> Optional[Principal]:
+    """FastAPI dependency: valid bearer token -> :class:`Principal`, else ``None``.
+
+    Never raises 401 / 403.  Useful for endpoints that should work both
+    anonymously (e.g. connectivity probes) and with extra detail for
+    authenticated callers.
+    """
+    if (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or not credentials.credentials
+    ):
+        return None
+    return auth.resolve(credentials.credentials) or None
+
+
+# Convenience alias so callers can write ``Depends(auth.optional)``.
+# Note: ``auth`` is a :class:`DashboardAuth` instance; attaching the
+# callable directly keeps the import surface small for api.py consumers.
+auth.optional = optional_principal  # type: ignore[attr-defined]
+
+
 __all__ = [
     "Principal",
     "DashboardAuth",
     "auth",
     "require_roles",
+    "optional_principal",
     "ROLE_MAP",
 ]
