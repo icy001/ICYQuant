@@ -7008,120 +7008,47 @@
   };
 
   /* ==================================================================
-   * Execution module — Commit 014
+   * Execution module — Integration 011
    * Execution Control Center: engine status → KPI → quality → order flow
-   * → timeline (Signal→Risk→Order→Execution→Fill) → venues.
-   * UI-only mock data; does NOT modify the execution engine, order
-   * engine, risk check, or any API/database.
+   * → recent orders (with slippage / latency) → venues.
+   * All data from GET /dashboard/execution/center; no mock data.
    * ================================================================== */
 
-  // ── Execution data ────────────────────────────────────────────
-  var EX_ENGINES = [
-    { name: "Execution Engine", status: "ONLINE" },
-    { name: "Order Engine", status: "ONLINE" },
-    { name: "Risk Check", status: "ONLINE" },
-  ];
-  var EX_LAST_UPDATE = "10:32:18";
-
-  var EX_KPI = {
-    orders: 128, filled: 110, fillRate: "85.94%", rejectRate: "11.72%", slippage: "3.1 bps",
+  // ── Execution state (Integration 011) ────────────────────────
+  var EX_STATE = {
+    data: null,
+    error: null,
   };
 
-  var EX_QUALITY = [
-    { label: "Fill Rate", value: "85.94%", fill: 85.94, cls: "good" },
-    { label: "Reject Rate", value: "11.72%", fill: 11.72, cls: "bad" },
-    { label: "Avg Slippage", value: "3.1 bps", fill: 31, cls: "neutral" },
-    { label: "P95 Latency", value: "42 ms", fill: 42, cls: "good" },
-    { label: "Market Impact", value: "1.2 bps", fill: 12, cls: "neutral" },
-  ];
+  async function exLoadCenter(force) {
+    if (EX_STATE.data && !force) return;
+    try {
+      var data = await api.executionCenter();
+      EX_STATE.data = data;
+      EX_STATE.error = null;
+    } catch (err) {
+      EX_STATE.error = (err && err.message) || "Failed to load execution data";
+    }
+  }
 
-  var EX_FLOW = [
-    { label: "Pending", count: 3, cls: "pending" },
-    { label: "Working", count: 8, cls: "working" },
-    { label: "Partial", count: 7, cls: "partial" },
-    { label: "Filled", count: 110, cls: "filled" },
-    { label: "Rejected", count: 15, cls: "rejected" },
-    { label: "Cancelled", count: 5, cls: "cancelled" },
-  ];
-
-  var EX_TIMELINE = [
-    {
-      time: "09:31:02", symbol: "NVDA", side: "BUY", qty: 100, type: "filled",
-      steps: [
-        { label: "Signal", detail: "Alpha021 BUY 100", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "ACCEPTED", status: "done" },
-        { label: "Execution", detail: "Fill 100 @ 738.90", status: "done" },
-        { label: "Slippage", detail: "+2.1 bps", status: "done" },
-      ],
-    },
-    {
-      time: "09:42:17", symbol: "QQQ", side: "SELL", qty: 100, type: "partial",
-      steps: [
-        { label: "Signal", detail: "Alpha021 SELL 100", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "PARTIAL FILL 60/100", status: "active" },
-        { label: "Remaining", detail: "40 qty", status: "pending" },
-      ],
-    },
-    {
-      time: "09:55:30", symbol: "SPY", side: "BUY", qty: 200, type: "filled",
-      steps: [
-        { label: "Signal", detail: "Alpha021 BUY 200", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "ACCEPTED", status: "done" },
-        { label: "Execution", detail: "Fill 200 @ 410.20", status: "done" },
-        { label: "Slippage", detail: "+1.3 bps", status: "done" },
-      ],
-    },
-    {
-      time: "10:02:15", symbol: "AAPL", side: "SELL", qty: 50, type: "rejected",
-      steps: [
-        { label: "Signal", detail: "MeanRev SELL 50", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "REJECTED — insufficient liquidity", status: "failed" },
-      ],
-    },
-    {
-      time: "10:15:00", symbol: "NVDA", side: "SELL", qty: 100, type: "filled",
-      steps: [
-        { label: "Signal", detail: "Alpha021 SELL 100", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "ACCEPTED", status: "done" },
-        { label: "Execution", detail: "Fill 100 @ 738.85", status: "done" },
-        { label: "Slippage", detail: "-0.5 bps", status: "done" },
-      ],
-    },
-    {
-      time: "10:28:44", symbol: "TSLA", side: "BUY", qty: 75, type: "working",
-      steps: [
-        { label: "Signal", detail: "Momentum BUY 75", status: "done" },
-        { label: "Risk", detail: "PASS", status: "done" },
-        { label: "Order", detail: "ACCEPTED — working", status: "active" },
-        { label: "Execution", detail: "Pending fill", status: "pending" },
-      ],
-    },
-  ];
-
-  var EX_VENUES = [
-    { venue: "US Stocks (IB)", account: "Paper-A", execs: 105, fillRate: "87.6%", latency: "12 ms", status: "ONLINE" },
-    { venue: "Futures (CQG)", account: "Paper-B", execs: 3, fillRate: "66.7%", latency: "31 ms", status: "ONLINE" },
-    { venue: "Forex (IB)", account: "Paper-C", execs: 2, fillRate: "100%", latency: "18 ms", status: "ONLINE" },
-    { venue: "A-Share (XTS)", account: "—", execs: 0, fillRate: "—", latency: "—", status: "OFFLINE" },
-  ];
-
-  function exStepIcon(status) {
-    if (status === "done") return "✓";
-    if (status === "active") return "●";
-    if (status === "pending") return "○";
-    if (status === "failed") return "✕";
-    return "○";
+  function exData() {
+    return EX_STATE.data || {
+      engine: { status: "—", attached: false, engines: [], last_update: "" },
+      kpi: { orders: 0, filled: 0, rejected: 0, errors: 0,
+             fill_rate: 0, reject_rate: 0, error_rate: 0,
+             avg_latency_ms: 0, avg_slippage_bps: 0, turnover: 0 },
+      quality: [],
+      flow: [],
+      orders: [],
+      venues: [],
+    };
   }
 
   // ── Engine status bar ────────────────────────────────────────
   function renderExEngineBar() {
-    var items = EX_ENGINES.map(function (e) {
-      var st = e.status.toLowerCase();
+    var d = exData();
+    var items = (d.engine.engines || []).map(function (e) {
+      var st = String(e.status).toLowerCase();
       return '<div class="ex-engine-item ex-engine-' + st + '">' +
         '<span class="ex-engine-dot"></span>' +
         "<span>" + esc(e.name) + "</span>" +
@@ -7129,25 +7056,26 @@
         "</div>";
     }).join("");
     return '<div class="ex-engine-bar">' + items +
-      '<div class="ex-last-update">Last Update: ' + esc(EX_LAST_UPDATE) + "</div>" +
+      '<div class="ex-last-update">Last Update: ' + esc(d.engine.last_update || "—") + "</div>" +
       "</div>";
   }
 
   // ── Overview KPI ──────────────────────────────────────────────
   function renderExKpis() {
-    var k = EX_KPI;
+    var k = exData().kpi;
     return UI.kpiGrid(
       UI.metricCard("Orders", String(k.orders), "", "") +
       UI.metricCard("Filled", String(k.filled), "", "pos") +
-      UI.metricCard("Fill Rate", k.fillRate, "", "pos") +
-      UI.metricCard("Reject Rate", k.rejectRate, "", "neg") +
-      UI.metricCard("Avg Slippage", k.slippage, "", "")
-    , 5);
+      UI.metricCard("Fill Rate", (k.fill_rate * 100).toFixed(2) + "%", "", k.fill_rate >= 0.5 ? "pos" : "warning") +
+      UI.metricCard("Reject Rate", (k.reject_rate * 100).toFixed(2) + "%", "", k.reject_rate > 0.2 ? "neg" : "") +
+      UI.metricCard("Avg Slippage", k.avg_slippage_bps.toFixed(1) + " bps", "", "") +
+      UI.metricCard("Avg Latency", k.avg_latency_ms.toFixed(0) + " ms", "", "")
+    , 6);
   }
 
   // ── Execution quality bars ───────────────────────────────────
   function renderExQuality() {
-    var rows = EX_QUALITY.map(function (q) {
+    var rows = (exData().quality || []).map(function (q) {
       return '<div class="ex-q-row">' +
         '<span class="ex-q-label">' + esc(q.label) + "</span>" +
         '<div class="ex-q-track"><div class="ex-q-fill ' + q.cls + '" style="width:' + q.fill + '%;"></div></div>' +
@@ -7159,7 +7087,7 @@
 
   // ── Order flow grid ───────────────────────────────────────────
   function renderExFlow() {
-    var cells = EX_FLOW.map(function (f) {
+    var cells = (exData().flow || []).map(function (f) {
       return '<div class="ex-flow-cell ex-flow-' + f.cls + '">' +
         '<span class="ex-flow-count">' + f.count + "</span>" +
         '<span class="ex-flow-label">' + esc(f.label) + "</span>" +
@@ -7168,33 +7096,38 @@
     return '<div class="ex-flow-grid">' + cells + "</div>";
   }
 
-  // ── Execution timeline (Signal→Risk→Order→Execution→Fill) ───
-  function renderExTimeline() {
-    return EX_TIMELINE.map(function (t) {
-      var sideCls = t.side === "BUY" ? "ex-tl-side-buy" : "ex-tl-side-sell";
-      var steps = t.steps.map(function (s) {
-        return '<div class="ex-tl-step ex-tl-step-' + s.status + '">' +
-          '<span class="ex-tl-step-icon">' + exStepIcon(s.status) + "</span>" +
-          '<span class="ex-tl-step-label">' + esc(s.label) + "</span>" +
-          '<span class="ex-tl-step-detail">' + esc(s.detail) + "</span>" +
-          "</div>";
-      }).join("");
-      return '<div class="ex-tl-item ex-tl-' + t.type + '">' +
-        '<div class="ex-tl-time">' + esc(t.time) + "</div>" +
-        '<div class="ex-tl-body">' +
-        '<div class="ex-tl-head">' +
-        '<span class="ex-tl-side ' + sideCls + '">' + esc(t.side) + "</span>" +
-        '<span class="ex-tl-symbol">' + esc(t.symbol) + "</span>" +
-        '<span class="ex-tl-qty">' + t.qty + "</span>" +
-        "</div>" +
-        '<div class="ex-tl-steps">' + steps + "</div>" +
-        "</div>" +
-        "</div>";
-    }).join("");
+  // ── Recent orders table (Execution Orders) ───────────────────
+  function renderExOrders() {
+    var rows = exData().orders || [];
+    if (!rows.length) return UI.empty("No Orders", "No orders in the current session.");
+    return UI.table({
+      columns: [
+        { key: "order_id", label: "Order ID", format: function (v) { return '<span class="mono">' + esc(String(v).slice(0, 14)) + "</span>"; } },
+        { key: "symbol", label: "Symbol" },
+        { key: "side", label: "Side", format: function (v) {
+          var cls = v === "BUY" ? "ex-tl-side-buy" : "ex-tl-side-sell";
+          return '<span class="' + cls + '">' + esc(v) + "</span>";
+        } },
+        { key: "quantity", label: "Qty", numeric: true, format: function (v) { return fmtNum(v); } },
+        { key: "order_type", label: "Type" },
+        { key: "status", label: "Status", format: function (v) {
+          var st = String(v).toLowerCase();
+          return '<span class="ex-order-status ex-order-' + st + '">' + esc(v) + "</span>";
+        } },
+        { key: "submit_time", label: "Submit Time", format: function (v) { return v ? esc(fmtTime(v)) : "—"; } },
+        { key: "fill_time", label: "Fill Time", format: function (v) { return v ? esc(fmtTime(v)) : "—"; } },
+        { key: "fill_price", label: "Fill Price", numeric: true, format: function (v) { return v != null ? fmtNum(v) : "—"; } },
+        { key: "slippage_bps", label: "Slippage", numeric: true, format: function (v) { return v != null ? v.toFixed(1) + " bps" : "—"; } },
+        { key: "latency_ms", label: "Latency", numeric: true, format: function (v) { return v != null ? v.toFixed(0) + " ms" : "—"; } },
+      ],
+      rows: rows,
+    });
   }
 
   // ── Venues & accounts ─────────────────────────────────────────
   function renderExVenues() {
+    var venues = exData().venues || [];
+    if (!venues.length) return UI.empty("No Venues", "No venue activity yet.");
     return UI.table({
       columns: [
         { key: "venue", label: "Venue" },
@@ -7204,45 +7137,45 @@
         { key: "latency", label: "Latency", numeric: true },
         { key: "status", label: "Status", format: function (v) {
           var st = String(v).toLowerCase();
-          var color = st === "online" ? "var(--ds-profit)" : "var(--ds-loss)";
+          var color = st === "online" ? "var(--ds-profit)" : (st === "idle" ? "var(--ds-text-muted)" : "var(--ds-loss)");
           return '<span style="color:' + color + ';font-weight:var(--ds-font-bold);font-family:var(--ds-num-font);font-size:var(--ds-text-xs);">' + esc(v) + "</span>";
         } },
       ],
-      rows: EX_VENUES,
+      rows: venues,
     });
   }
 
-  // ── Bindings (refresh, timeline click) ───────────────────────
+  // ── Bindings (refresh) ───────────────────────────────────────
   function bindExecutionPage() {
     var refreshBtn = document.querySelector('[data-action="ex:refresh"]');
     if (refreshBtn) {
-      refreshBtn.addEventListener("click", function () {
+      refreshBtn.addEventListener("click", async function () {
         refreshBtn.disabled = true;
         refreshBtn.textContent = "Refreshing…";
-        setTimeout(function () {
-          var now = new Date();
-          var hh = (now.getHours() < 10 ? "0" : "") + now.getHours();
-          var mm = (now.getMinutes() < 10 ? "0" : "") + now.getMinutes();
-          var ss = (now.getSeconds() < 10 ? "0" : "") + now.getSeconds();
-          EX_LAST_UPDATE = hh + ":" + mm + ":" + ss;
+        await exLoadCenter(true);
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = "Refresh";
+        if (EX_STATE.error) {
+          showToast("Execution refresh failed: " + EX_STATE.error, "error");
+        } else {
+          var d = exData();
+          var k = d.kpi;
           var bar = document.querySelector(".ex-engine-bar");
           if (bar) bar.outerHTML = renderExEngineBar();
-          refreshBtn.disabled = false;
-          refreshBtn.textContent = "Refresh";
-          showToast("Execution snapshot updated / 执行快照已更新 (UI only)", "ok");
-        }, 800);
+          showToast("Execution snapshot updated · {0} orders / {1} filled / 执行快照已更新".replace("{0}", k.orders).replace("{1}", k.filled), "ok");
+        }
       });
     }
-    document.querySelectorAll(".ex-tl-item").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var head = el.querySelector(".ex-tl-head");
-        showToast(head ? head.textContent.trim() : "Execution event", "info");
-      });
-    });
   }
 
-  // ── Execution Control Center (Commit 014) ────────────────────
-  PAGE_FRAMEWORK["operations/execution"] = function () {
+  // ── Execution Control Center (Integration 011) ───────────────
+  PAGE_FRAMEWORK["operations/execution"] = async function () {
+    await exLoadCenter();
+    if (EX_STATE.error) {
+      return UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心",
+        UI.button("Refresh", "ghost", { sm: true, action: "ex:refresh" })) +
+        UI.panel("Error", '<div class="empty">Failed to load: ' + esc(EX_STATE.error) + "</div>");
+    }
     return (
       UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心",
         UI.button("Refresh", "ghost", { sm: true, action: "ex:refresh" })) +
@@ -7253,8 +7186,8 @@
       UI.panel("Quality Metrics", renderExQuality()) +
       UI.sectionHeading("Order Flow") +
       UI.panel("Order Status", renderExFlow()) +
-      UI.sectionHeading("Execution Timeline") +
-      UI.panel("Lifecycle Events", '<div class="ex-timeline">' + renderExTimeline() + "</div>") +
+      UI.sectionHeading("Execution Orders") +
+      UI.panel("Recent Orders", renderExOrders()) +
       UI.sectionHeading("Venues & Accounts") +
       UI.panel("Execution Venues", renderExVenues())
     );

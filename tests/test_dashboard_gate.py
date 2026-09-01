@@ -1235,3 +1235,114 @@ def test_d27_risk_api_offline_and_access():
 
     # unauthenticated -> 401
     assert client.get("/api/dashboard/risk/center").status_code == 401
+
+
+# --- D-28 Execution API (Integration 011) ------------------------------------
+
+
+def test_d28_execution_api_integration(attached_pipeline):
+    """Integration 011: Execution Control Center reads the live pipeline."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: mock EX_* arrays are gone; page is API-driven
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("EX_ENGINES =", "EX_KPI =", "EX_QUALITY =",
+                 "EX_FLOW =", "EX_TIMELINE =", "EX_VENUES =",
+                 "EX_LAST_UPDATE ="):
+        assert gone not in app_js, f"mock execution data still present: {gone}"
+    assert "EX_STATE" in app_js and "executionCenter" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "executionCenter" in api_js, "api.js missing executionCenter"
+
+    token = _login("admin", "admin123")
+
+    # --- live snapshot ----------------------------------------------------
+    res = client.get("/api/dashboard/execution/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # engine: pipeline attached + services UP
+    assert d["engine"]["status"] == "ONLINE"
+    assert d["engine"]["attached"] is True
+    assert d["engine"]["last_update"]
+    assert len(d["engine"]["engines"]) == 3
+
+    # cross-check KPI against the orders endpoint
+    orders = client.get("/api/dashboard/orders",
+                        headers=_headers(token)).json()["orders"]
+    total = len(orders)
+    filled = sum(1 for o in orders if o["status"] == "FILLED")
+    rejected = sum(1 for o in orders if o["status"] == "REJECTED")
+    k = d["kpi"]
+    assert k["orders"] == total
+    assert k["filled"] == filled
+    assert k["rejected"] == rejected
+    assert k["fill_rate"] == pytest.approx(
+        filled / total if total else 0, abs=1e-4)
+    assert k["reject_rate"] == pytest.approx(
+        rejected / total if total else 0, abs=1e-4)
+
+    # every flow cell count is non-negative and sums to total
+    assert sum(f["count"] for f in d["flow"]) == total
+    for f in d["flow"]:
+        assert f["count"] >= 0
+        assert f["cls"] in ("pending", "working", "partial", "filled",
+                            "rejected", "cancelled")
+
+    # quality bars: labels + bounded fills
+    labels = {q["label"] for q in d["quality"]}
+    assert {"Fill Rate", "Reject Rate", "Error Rate"}.issubset(labels)
+    for q in d["quality"]:
+        assert 0 <= q["fill"] <= 100
+        assert q["cls"] in ("good", "neutral", "bad")
+
+    # orders table: each row maps to a real order
+    order_ids_api = {o["order_id"] for o in orders}
+    order_rows = d["orders"]
+    assert len(order_rows) == total
+    for row in order_rows:
+        assert row["order_id"] in order_ids_api
+        assert row["symbol"]
+        assert row["side"] in ("BUY", "SELL")
+        assert row["status"]
+        # slippage / latency only meaningful on filled orders
+        if row["status"] == "FILLED":
+            if row["slippage_bps"] is not None:
+                assert isinstance(row["slippage_bps"], (int, float))
+            if row["latency_ms"] is not None:
+                assert row["latency_ms"] >= 0
+        elif row["status"] == "REJECTED":
+            # rejected orders have no fill
+            assert not row["fill_price"] or row["fill_price"] == 0
+
+    # venues: at least one venue derived from real orders
+    assert len(d["venues"]) >= 1
+    venue_filled = sum(v["execs"] for v in d["venues"])
+    assert venue_filled <= filled
+
+
+def test_d28_execution_api_offline_and_access():
+    """Integration 011: offline snapshot, RBAC and the auth gate."""
+    runtime.detach()
+
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/execution/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # offline: engine OFFLINE, zeroed KPI, empty orders
+    assert d["engine"]["status"] == "OFFLINE"
+    assert d["engine"]["attached"] is False
+    assert d["kpi"]["orders"] == 0
+    assert d["kpi"]["filled"] == 0
+    assert d["kpi"]["fill_rate"] == 0
+    assert d["orders"] == []
+
+    # unauthenticated -> 401
+    assert client.get("/api/dashboard/execution/center").status_code == 401
