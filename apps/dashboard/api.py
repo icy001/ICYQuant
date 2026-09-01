@@ -13,6 +13,8 @@ from __future__ import annotations
 import logging
 import random
 import threading
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -529,6 +531,115 @@ class BacktestRequest(BaseModel):
     initial_capital: float = 1_000_000.0
 
 
+# In-memory run history (Integration 008): every completed/failed POST is
+# recorded so the UI can list past runs and re-open a cached result via
+# GET /dashboard/backtest/runs.  Bounded — keeps the newest MAX_RUNS.
+_backtest_runs: list[dict] = []
+_backtest_runs_lock = threading.Lock()
+_BACKTEST_MAX_RUNS = 20
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _record_backtest_run(status: str, config: dict,
+                         payload: Optional[dict] = None,
+                         error: Optional[str] = None) -> dict:
+    """Append a run record to the history (caller holds no lock needed)."""
+    meta = (payload or {}).get("meta") or {}
+    record = {
+        "run_id": "bt-" + _utc_now().strftime("%Y%m%d-%H%M%S") \
+            + "-" + uuid.uuid4().hex[:6],
+        "status": status,                     # completed | failed
+        "created_at": _utc_now().isoformat(timespec="seconds"),
+        "config": {
+            "strategy": meta.get("alpha_id") or "Alpha021",
+            "symbols": config.get("symbols") or [],
+            "start": config.get("start"),
+            "end": config.get("end"),
+            "initial_capital": config.get("initial_capital"),
+        },
+        "metrics": {k: meta.get(k) for k in (
+            "return_pct", "sharpe", "maxdd_pct", "win_rate",
+            "profit_factor", "cagr")} if meta else {},
+        "period": meta.get("period") if meta else None,
+        "trades": len((payload or {}).get("trades") or []),
+        "error": error,
+        "result": payload,
+    }
+    with _backtest_runs_lock:
+        _backtest_runs.append(record)
+        del _backtest_runs[:-_BACKTEST_MAX_RUNS]
+    return record
+
+
+@router.get("/dashboard/backtest/universe")
+def backtest_universe(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Available backtest instruments + frozen strategy metadata (read-only).
+
+    Surfaces what the sealed FACTOR_SPEC_REAL_D1 replay supports so the
+    UI config form lists only runnable options.  No engine state is
+    mutated.
+    """
+    from apps.runtime.factor_gate import (BACKTEST_UNIVERSE, SYMBOLS,
+                                          data_dir as real_data_dir)
+
+    root = real_data_dir()
+    symbols = [
+        {"symbol": s, "gate_passed": s in SYMBOLS,
+         "data_available": (root / f"{s}_1d.csv").exists()}
+        for s in BACKTEST_UNIVERSE
+    ]
+    return {
+        "strategy": {
+            "alpha_id": "Alpha021",
+            "source_run": "factor-real-d1",
+            "timeframe": "1D",
+            "slippage_bps": 3,
+            "frozen": True,       # formula/windows/orientation are sealed
+        },
+        "symbols": symbols,
+    }
+
+
+@router.get("/dashboard/backtest/runs")
+def backtest_runs(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Backtest run history (newest first) — the UI's Run list source."""
+    with _backtest_runs_lock:
+        runs = [
+            {k: r[k] for k in (
+                "run_id", "status", "created_at", "config", "metrics",
+                "period", "trades", "error")}
+            for r in reversed(_backtest_runs)
+        ]
+    return {"runs": runs, "total": len(runs)}
+
+
+@router.get("/dashboard/backtest/runs/{run_id}")
+def backtest_run_result(
+    run_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Cached result payload for a recorded backtest run."""
+    with _backtest_runs_lock:
+        record = next(
+            (r for r in _backtest_runs if r["run_id"] == run_id), None)
+    if record is None:
+        raise HTTPException(status_code=404,
+                            detail=f"backtest run not found: {run_id}")
+    if record["status"] != "completed" or record["result"] is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"backtest run {run_id} did not complete: "
+                   f"{record.get('error') or record['status']}")
+    return record["result"]
+
+
 @router.post("/dashboard/backtest/run")
 def backtest_run(
     body: BacktestRequest,
@@ -538,7 +649,8 @@ def backtest_run(
 
     Product-layer wrapper only: the factor formula, windows and the
     train-IC orientation stay exactly as sealed in FACTOR_SPEC_REAL_D1
-    (Factor Discovery v2 — CLOSED).
+    (Factor Discovery v2 — CLOSED).  Each submission is recorded in the
+    run history with its status (completed/failed) for the Runs list.
     """
     from apps.runtime.factor_gate import run_backtest
 
@@ -551,12 +663,16 @@ def backtest_run(
             symbols=body.symbols, start=body.start, end=body.end,
             initial_capital=body.initial_capital)
     except FileNotFoundError as exc:
+        _record_backtest_run("failed", body.model_dump(), error=str(exc))
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     # strip per-trade latency (wall-clock noise, meaningless for a replay)
     for r in payload["trades"]:
         r.pop("latency_total_us", None)
+    record = _record_backtest_run(
+        "completed", body.model_dump(), payload=payload)
+    payload = {**payload, "run_id": record["run_id"]}
     return payload
 
 
