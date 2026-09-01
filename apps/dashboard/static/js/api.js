@@ -433,6 +433,20 @@
       return this.get("/dashboard/backtest/runs/" + encodeURIComponent(runId));
     },
 
+    // ── Strategy API (Integration 009) ─────────────────────────
+    /** Strategy catalog: research funnel mapped onto the lifecycle. */
+    strategyCatalog: async function () {
+      return this.get("/dashboard/strategy/catalog");
+    },
+
+    /** Strategy detail: research + paper replay + backtest history.
+     *  The paper replay is computed on first call, so the timeout is
+     *  raised like the backtest run (same replay engine). */
+    strategyDetail: async function (strategyId) {
+      return this.get("/dashboard/strategy/catalog/" + encodeURIComponent(strategyId),
+                      null, { timeoutMs: 180000 });
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

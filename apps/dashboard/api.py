@@ -677,6 +677,306 @@ def backtest_run(
 
 
 # ---------------------------------------------------------------------------
+# Strategy catalog (product UI) - Integration 009
+#
+# The Strategy page reads the *real* pipeline state instead of mock data:
+#   - research run factor-real-d1 (which alphas survived which funnel stage)
+#   - the frozen Alpha021 paper replay (build_paper_data)
+#   - the recorded backtest run history (Integration 008)
+# Read-only: nothing in the research / factor / trading core is mutated.
+# ---------------------------------------------------------------------------
+_STRATEGY_SOURCE_RUN = "factor-real-d1"
+
+
+def _strategy_paper_payload() -> Optional[dict]:
+    """Frozen-alpha paper replay payload (None when data files are missing).
+
+    Shares the module-level cache with GET /dashboard/factor — both wrap
+    the same deterministic build_paper_data() replay.
+    """
+    global _factor_paper_cache
+    if _factor_paper_cache is not None:
+        return _factor_paper_cache
+    try:
+        from apps.runtime.factor_gate import build_paper_data, data_dir
+
+        missing = [s for s in ("NVDA", "QQQ", "SPY")
+                   if not (data_dir() / f"{s}_1d.csv").exists()]
+        if missing:
+            return None
+        payload = build_paper_data()
+    except Exception as exc:  # noqa: BLE001 - catalog degrades to research-only
+        logger.warning("strategy paper replay failed: %s", exc)
+        return None
+    _factor_paper_cache = payload
+    return payload
+
+
+def _strategy_status(stage: dict, frozen: bool) -> str:
+    """Map the real research funnel onto the UI lifecycle buckets.
+
+    Mirrors the funnel honestly: validation-passed -> CANDIDATE, oos-passed
+    -> VALIDATED, and only the frozen alpha (which actually carries a
+    paper replay) sits in PAPER.  Alphas below the validation cut are
+    REJECTED and stay off the catalog (they belong to the Research pages).
+    """
+    if frozen:
+        return "PAPER"
+    if stage.get("oos_passed"):
+        return "VALIDATED"
+    if stage.get("validation_passed"):
+        return "CANDIDATE"
+    return "REJECTED"
+
+
+def _strategy_backtest_runs(alpha_id: str) -> list[dict]:
+    """Recorded backtest runs for a strategy (newest first, no results)."""
+    with _backtest_runs_lock:
+        return [
+            {k: r[k] for k in ("run_id", "status", "created_at", "config",
+                               "metrics", "period", "trades", "error")}
+            for r in reversed(_backtest_runs)
+            if (r["config"].get("strategy") or "").lower()
+            == alpha_id.lower()
+        ]
+
+
+@router.get("/dashboard/strategy/catalog")
+def strategy_catalog(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Strategy catalog: the research pipeline mapped onto the lifecycle.
+
+    One entry per alpha that survived at least the validation stage of
+    the source run, plus the frozen Alpha021 paper strategy (PAPER).
+    Headline metrics come from the paper replay for the frozen alpha and
+    from the research run's OOS aggregates for the rest.
+    """
+    report = _load_research_report(_STRATEGY_SOURCE_RUN)
+    stages = _research_stage_flags(report)
+    aggs = _research_pair_aggregates(report)
+    families = _research_family_index(report)
+    paper = _strategy_paper_payload()
+    paper_alpha = (paper or {}).get("meta", {}).get("alpha_id", "")
+    spec = report.get("spec") or {}
+
+    strategies = []
+    for row in report.get("alpha_ranking", []):
+        aid = row.get("alpha_id", "")
+        stage = stages.get(aid, {})
+        frozen = bool(paper) and aid == paper_alpha
+        status = _strategy_status(stage, frozen)
+        if status == "REJECTED":
+            continue
+        agg = aggs.get(aid, {})
+        fam = families.get(aid, {})
+        meta = (paper or {}).get("meta", {})
+        strategies.append({
+            "id": aid.lower(),
+            "alpha_id": aid,
+            "name": aid,
+            "type": "Factor",
+            "status": status,
+            "universe": row.get("assets_passed", []),
+            "timeframe": spec.get("timeframe", "1D"),
+            "version": _STRATEGY_SOURCE_RUN,
+            "metrics_source": "paper-replay" if frozen else "research-run",
+            "ret": (meta.get("return_pct", 0.0) / 100.0 if frozen
+                    else agg.get("oos_return")),
+            "sharpe": (meta.get("sharpe") if frozen
+                       else row.get("mean_oos_sharpe")),
+            "max_dd": (meta.get("maxdd_pct", 0.0) / 100.0 if frozen
+                       else agg.get("max_drawdown")),
+            "win_rate": (meta.get("win_rate", 0.0) / 100.0
+                         if frozen and meta.get("closed_trips") else None),
+            "turnover": (meta.get("turnover_shares_per_day") if frozen
+                         else row.get("mean_turnover")),
+            "backtest_run_count": len(_strategy_backtest_runs(aid)),
+            "family": fam.get("family"),
+            "is_representative": aid == fam.get("representative"),
+        })
+
+    counts = {
+        "total": len(strategies),
+        "active": sum(1 for s in strategies
+                      if s["status"] in ("PAPER", "SHADOW", "LIVE")),
+        "paper": sum(1 for s in strategies if s["status"] == "PAPER"),
+        "shadow": sum(1 for s in strategies if s["status"] == "SHADOW"),
+        "live": sum(1 for s in strategies if s["status"] == "LIVE"),
+    }
+    return {
+        "source": {
+            "research_run": _STRATEGY_SOURCE_RUN,
+            "experiment_id": report.get("experiment_id",
+                                        _STRATEGY_SOURCE_RUN),
+            "report_generated_at": report.get("report_generated_at", ""),
+            "paper_replay_available": paper is not None,
+        },
+        "counts": counts,
+        "strategies": strategies,
+    }
+
+
+@router.get("/dashboard/strategy/catalog/{strategy_id}")
+def strategy_catalog_detail(
+    strategy_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Strategy detail: research block + paper replay + backtest history."""
+    report = _load_research_report(_STRATEGY_SOURCE_RUN)
+    stages = _research_stage_flags(report)
+    families = _research_family_index(report)
+    formulas = _alpha_formulas()
+    paper = _strategy_paper_payload()
+    paper_alpha = (paper or {}).get("meta", {}).get("alpha_id", "")
+    spec = report.get("spec") or {}
+
+    row = next((r for r in report.get("alpha_ranking", [])
+                if r.get("alpha_id", "").lower() == strategy_id.lower()),
+               None)
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"strategy not found: {strategy_id}")
+    aid = row["alpha_id"]
+    stage = stages.get(aid, {})
+    frozen = bool(paper) and aid == paper_alpha
+    status = _strategy_status(stage, frozen)
+    if status == "REJECTED":
+        raise HTTPException(
+            status_code=404,
+            detail=f"{aid} did not pass validation and is not in "
+                   f"the strategy catalog (see Research pages)")
+    fam = families.get(aid, {})
+    summary = next((s for s in report.get("alpha_summary", [])
+                    if s.get("alpha_id") == aid), {})
+
+    detail = {
+        "id": aid.lower(),
+        "alpha_id": aid,
+        "name": aid,
+        "type": "Factor",
+        "status": status,
+        "universe": row.get("assets_passed", []),
+        "timeframe": spec.get("timeframe", "1D"),
+        "version": _STRATEGY_SOURCE_RUN,
+        "metrics_source": "paper-replay" if frozen else "research-run",
+        "ret": None, "sharpe": None, "max_dd": None,
+        "win_rate": None, "turnover": None,
+        "research": {
+            "run_id": _STRATEGY_SOURCE_RUN,
+            "experiment_id": report.get("experiment_id"),
+            "rank": row.get("rank"),
+            "score": row.get("score"),
+            "run_status": row.get("status"),
+            "validation_passed": stage.get("validation_passed"),
+            "oos_passed": stage.get("oos_passed"),
+            "robustness_passed": stage.get("robustness_passed"),
+            "family": fam.get("family"),
+            "is_representative": aid == fam.get("representative"),
+            "formula": formulas.get(aid, ""),
+            "mean_oos_ic": row.get("mean_oos_ic"),
+            "mean_oos_rank_ic": row.get("mean_oos_rank_ic"),
+            "mean_oos_icir": row.get("mean_oos_icir"),
+            "mean_oos_sharpe": row.get("mean_oos_sharpe"),
+            "mean_turnover": row.get("mean_turnover"),
+            "breadth": row.get("breadth"),
+            "assets_passed": row.get("assets_passed", []),
+            "assets_passed_count": row.get("assets_passed_count", 0),
+            "reject_reasons": summary.get("reject_reasons") or {},
+        },
+        "paper": None,
+        "backtest_runs": _strategy_backtest_runs(aid),
+        "history": [],
+    }
+    events: list[dict] = []
+    generated = (report.get("report_generated_at") or "")[:10]
+    if generated:
+        events.append({
+            "date": generated,
+            "event": "Research run completed",
+            "detail": f"{_STRATEGY_SOURCE_RUN}: {aid} ranked #"
+                      f"{row.get('rank', '-')} (score {row.get('score', '-')})"
+                      f", run status {row.get('status', '-')}",
+        })
+    if fam:
+        events.append({
+            "date": generated or "—",
+            "event": "De-correlation family assigned",
+            "detail": f"family {fam.get('family')}"
+                      + (" (representative)" if aid == fam.get("representative")
+                         else f" (members: {', '.join(fam.get('members', []))})"),
+        })
+
+    if frozen:
+        meta = paper["meta"]
+        positions = [
+            {
+                "symbol": s["symbol"],
+                "qty": s["final_position"],
+                "side": "LONG" if s["final_position"] > 0 else "SHORT",
+                "entry": s["avg_cost"],
+                "current": s["last_close"],
+                "pnl": s["unrealized_pnl"],
+            }
+            for s in paper.get("summary", [])
+            if s.get("symbol") != "TOTAL" and s.get("final_position")
+        ]
+        equity_final = meta.get("equity_final") or meta.get("initial_capital")
+        pos_value = sum(
+            s["final_position"] * s["last_close"]
+            for s in paper.get("summary", [])
+            if s.get("symbol") != "TOTAL" and s.get("final_position")
+            and s.get("last_close"))
+        detail.update({
+            "ret": meta.get("return_pct", 0.0) / 100.0,
+            "sharpe": meta.get("sharpe"),
+            "max_dd": meta.get("maxdd_pct", 0.0) / 100.0,
+            "win_rate": (meta.get("win_rate", 0.0) / 100.0
+                         if meta.get("closed_trips") else None),
+            "turnover": meta.get("turnover_shares_per_day"),
+        })
+        detail["paper"] = {
+            "meta": meta,
+            "trades": paper.get("trades", []),
+            "positions": positions,
+            "exposure": (round(pos_value / equity_final, 4)
+                         if pos_value and equity_final else None),
+            "execution": {
+                "venue": "Paper (replay)",
+                "order_type": "Market",
+                "tif": "DAY",
+                "slippage": "3 bps (frozen spec)",
+            },
+        }
+        events.append({
+            "date": (meta.get("period") or "").split("→")[-1].strip()[:10]
+                    or "—",
+            "event": "Paper replay available",
+            "detail": f"{meta.get('period', '')}, "
+                      f"{meta.get('signals', 0)} signals "
+                      f"({meta.get('filled', 0)} filled / "
+                      f"{meta.get('rejected', 0)} rejected)",
+        })
+
+    for run in detail["backtest_runs"]:
+        if run["status"] != "completed":
+            continue
+        m = run.get("metrics") or {}
+        events.append({
+            "date": (run.get("created_at") or "")[:10],
+            "event": "Backtest completed",
+            "detail": f"{run['run_id']} on "
+                      f"{'/'.join(run['config'].get('symbols') or [])}: "
+                      f"return {m.get('return_pct')}%, "
+                      f"Sharpe {m.get('sharpe')}",
+        })
+    detail["history"] = sorted(
+        events, key=lambda e: str(e.get("date") or ""))
+    return detail
+
+
+# ---------------------------------------------------------------------------
 # Trading-UI config (paper account + risk rules), persisted as JSON
 # ---------------------------------------------------------------------------
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "config" / "trading_ui.json"

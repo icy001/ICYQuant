@@ -953,4 +953,154 @@ def test_d25_backtest_api_integration():
 
     # --- unauthenticated -> 401 ------------------------------------------
     assert client.get("/api/dashboard/backtest/universe").status_code == 401
+
+
+# --- D-26 Strategy API (Integration 009) -------------------------------------
+
+def test_d26_strategy_api_integration():
+    """Integration 009: catalog + detail endpoints on real data sources.
+
+    The Strategy page reads the research funnel (run factor-real-d1),
+    the frozen Alpha021 paper replay and the recorded backtest history
+    through GET /dashboard/strategy/catalog and /catalog/{id}.  Frozen-core
+    boundary: read-only mapping — validation-passed -> CANDIDATE,
+    OOS-passed -> VALIDATED, frozen replay -> PAPER, and alphas below
+    the validation cut stay off the catalog entirely.
+    """
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: the strategies route is registered in the nav
+    index = (static / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/research/strategies"' in index
+
+    # the mock STRATEGIES array is gone; the page is API-driven
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    assert "var STRATEGIES = [" not in app_js
+    assert "strategyCatalog" in app_js and "strategyDetail" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    for method in ("strategyCatalog", "strategyDetail"):
+        assert method in api_js, f"api.js missing client method {method}"
+
+    token = _login("admin", "admin123")
+
+    # --- catalog: the research funnel mapped onto the lifecycle ----------
+    res = client.get("/api/dashboard/strategy/catalog",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    catalog = res.json()
+    assert catalog["source"]["research_run"] == "factor-real-d1"
+    assert isinstance(catalog["source"]["paper_replay_available"], bool)
+    strats = {s["id"]: s for s in catalog["strategies"]}
+
+    # funnel honesty: only the three validation-passing alphas are listed
+    assert set(strats) == {"alpha021", "alpha035", "alpha053"}
+    # Alpha021 is the frozen alpha carrying the paper replay -> PAPER
+    assert strats["alpha021"]["status"] == "PAPER"
+    assert strats["alpha021"]["metrics_source"] == "paper-replay"
+    assert strats["alpha021"]["universe"] == ["NVDA", "QQQ", "SPY"]
+    assert strats["alpha021"]["type"] == "Factor"
+    assert strats["alpha021"]["timeframe"] == "1D"
+    # research-run strategies never claim paper metrics
+    assert strats["alpha035"]["status"] == "VALIDATED"
+    assert strats["alpha035"]["metrics_source"] == "research-run"
+    assert strats["alpha053"]["status"] == "CANDIDATE"
+    assert strats["alpha053"]["metrics_source"] == "research-run"
+    # counts are derived from the same list (no mock totals)
+    counts = catalog["counts"]
+    assert counts["total"] == len(catalog["strategies"]) == 3
+    assert counts["paper"] == 1
+    assert counts["active"] == 1          # PAPER only; no SHADOW/LIVE yet
+    assert counts["shadow"] == 0 and counts["live"] == 0
+
+    # --- detail (frozen alpha): research + paper replay + history ---------
+    res = client.get("/api/dashboard/strategy/catalog/alpha021",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+    assert d["id"] == "alpha021" and d["status"] == "PAPER"
+    research = d["research"]
+    assert research["run_id"] == "factor-real-d1"
+    assert research["validation_passed"] is True
+    assert research["oos_passed"] is True
+    assert research["robustness_passed"] is True
+    assert research["family"] == "D1"
+    assert research["is_representative"] is True
+    assert research["reject_reasons"]      # per-asset rejects survive
+    paper = d["paper"]
+    assert paper is not None
+    assert paper["trades"]                 # deterministic replay has trades
+    assert isinstance(paper["positions"], list)
+    assert paper["execution"]["venue"].startswith("Paper")
+    # headline metrics are fractions consistent with the paper replay
+    from apps.runtime.factor_gate import build_paper_data
+    meta = build_paper_data()["meta"]
+    assert d["ret"] == pytest.approx(meta["return_pct"] / 100.0)
+    assert d["sharpe"] == pytest.approx(meta["sharpe"])
+    assert d["max_dd"] == pytest.approx(meta["maxdd_pct"] / 100.0)
+    assert d["history"] and all(
+        {"date", "event", "detail"} <= set(e) for e in d["history"])
+
+    # --- detail (research-run alpha): honest empty paper state -----------
+    res = client.get("/api/dashboard/strategy/catalog/alpha035",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d35 = res.json()
+    assert d35["paper"] is None
+    assert d35["research"]["oos_passed"] is True
+    assert d35["research"]["robustness_passed"] is False
+    assert d35["research"]["family"] is None
+    assert d35["status"] == "VALIDATED"
+
+    # --- backtest history linkage (Integration 008 -> 009) ----------------
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if (data_root / "NVDA_1d.csv").exists():
+        res = client.post(
+            "/api/dashboard/backtest/run",
+            json={"symbols": ["NVDA"], "start": "2025-01-01",
+                  "end": "2025-12-31", "initial_capital": 500_000.0},
+            headers=_headers(token),
+        )
+        assert res.status_code == 200
+        res = client.get("/api/dashboard/strategy/catalog/alpha021",
+                         headers=_headers(token))
+        detail = res.json()
+        runs = detail["backtest_runs"]
+        assert runs, "the submitted run must be linked to the strategy"
+        assert runs[0]["status"] == "completed"
+        assert runs[0]["config"]["strategy"] == "Alpha021"
+        # the run also shows up in the lifecycle history
+        assert any(e["event"] == "Backtest completed"
+                   for e in detail["history"])
+
+    # --- error paths ------------------------------------------------------
+    # unknown strategy -> 404
+    assert client.get(
+        "/api/dashboard/strategy/catalog/nope-404",
+        headers=_headers(token)).status_code == 404
+    # a below-validation alpha is intentionally not part of the catalog
+    assert client.get(
+        "/api/dashboard/strategy/catalog/alpha047",
+        headers=_headers(token)).status_code == 404
+
+    # --- RBAC: readonly may view the catalog (read-only integration) -----
+    ro_token = _login("readonly", "readonly123")
+    assert client.get(
+        "/api/dashboard/strategy/catalog",
+        headers=_headers(ro_token)).status_code == 200
+    assert client.get(
+        "/api/dashboard/strategy/catalog/alpha021",
+        headers=_headers(ro_token)).status_code == 200
+
+    # --- unauthenticated -> 401 ------------------------------------------
+    assert client.get(
+        "/api/dashboard/strategy/catalog").status_code == 401
+    assert client.get(
+        "/api/dashboard/strategy/catalog/alpha021").status_code == 401
     assert client.get("/api/dashboard/backtest/runs").status_code == 401

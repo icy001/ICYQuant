@@ -2727,6 +2727,7 @@ tr:focus-within {
 .st-drift-value { font-size: var(--ds-text-sm); font-weight: var(--ds-font-bold); }
 .st-drift-normal { color: var(--ds-profit); }
 .st-drift-pending { color: var(--ds-warning); }
+.st-drift-failed { color: var(--ds-loss); }
 .st-compare-table th, .st-compare-table td { padding: var(--ds-space-2) var(--ds-space-3); }
 .st-compare-table td.num { font-family: var(--ds-num-font); font-variant-numeric: var(--ds-num-variant); font-weight: var(--ds-font-semibold); }
 
