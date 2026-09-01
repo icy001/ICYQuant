@@ -388,6 +388,126 @@ def accounts(principal: Principal = Depends(require_roles())) -> dict:
     return runtime.multi_accounts()
 
 
+@router.get("/dashboard/accounts/center")
+def accounts_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Accounts Control Center: overview KPI, multi-account list with
+    balances / connection / capabilities, market breakdown, and the
+    per-account context (positions / orders / executions counts) that
+    every downstream page (Portfolio / Orders / Risk) keys off.
+
+    Read-only — does NOT register brokers, modify the adapter layer,
+    touch the Position Ledger, or run any sync. All numbers come from
+    the existing Multi-Account Service + global_portfolio snapshot."""
+    from apps.dashboard import runtime as rt
+
+    svc = rt._multi_service()
+    svc.ensure_seeded()
+
+    accounts = svc.accounts()
+    brokers = svc.brokers()
+    health = svc.health()
+    portfolio = svc.global_portfolio()
+
+    # ── overview KPI (USD-normalised) ───────────────────────────
+    fx = rt._MULTI_FX_RATE
+
+    def _usd(v: float, ccy: str) -> float:
+        return float(v) * fx.get(ccy or "USD", 1.0)
+
+    total_equity = round(sum(_usd(a["equity"], a["currency"]) for a in accounts), 2)
+    total_cash = round(sum(_usd(a["cash"], a["currency"]) for a in accounts), 2)
+    gross_exposure = round(portfolio["summary"]["gross_exposure_usd"], 2)
+    margin_used = round(sum(_usd(a["margin"], a["currency"]) for a in accounts), 2)
+    unrealized_pnl = round(
+        sum(_usd(p["unrealized_pnl"], p["currency"]) for p in portfolio["positions"]),
+        2,
+    )
+    realized_pnl = round(sum(_usd(a["total_pnl"], a["currency"]) for a in accounts), 2)
+    available_cash = round(total_cash - margin_used, 2)
+
+    connected = sum(1 for a in accounts if a["connection"] == "CONNECTED")
+    degraded = sum(1 for a in accounts if a["connection"] in ("CONNECTING", "ERROR"))
+    offline = sum(1 for a in accounts if a["connection"] == "DISCONNECTED")
+
+    # ── account rows: row + balance + status + capabilities ────
+    account_rows = []
+    for a in accounts:
+        # permissions view: capabilities the adapter actually supports
+        caps = set(a.get("capabilities") or [])
+        account_rows.append({
+            "account_id": a["account_id"],
+            "name": a["name"] or a["account_id"],
+            "broker_id": a["broker_id"],
+            "broker_name": a["broker_name"],
+            "market": a["market"],
+            "market_label": a["market_label"],
+            "currency": a["currency"],
+            "type": a["market_label"],
+            "trading_mode": "PAPER",  # adapter layer is paper/simulated only
+            "connection": a["connection"],
+            "status": a["status"],
+            "equity": a["equity"],
+            "cash": a["cash"],
+            "buying_power": a["buying_power"],
+            "margin": a["margin"],
+            "daily_pnl": a["daily_pnl"],
+            "total_pnl": a["total_pnl"],
+            "drawdown": a["drawdown"],
+            "positions": a["positions"],
+            "orders": a["orders"],
+            "executions": a["executions"],
+            "capabilities": sorted(caps),
+            "permissions": {
+                "market_data": "positions" in caps or "executions" in caps,
+                "trading": "submit_order" in caps,
+                "cancel_order": "cancel_order" in caps,
+                # no adapter currently exposes short-selling; report honestly
+                "short_selling": False,
+            },
+        })
+
+    # ── market breakdown ────────────────────────────────────────
+    market_map: dict[str, dict] = {}
+    for a in accounts:
+        label = a["market_label"]
+        m = market_map.setdefault(label, {
+            "market": a["market"],
+            "market_label": label,
+            "currency": a["currency"],
+            "accounts": 0,
+            "connected": 0,
+            "equity": 0.0,
+        })
+        m["accounts"] += 1
+        if a["connection"] == "CONNECTED":
+            m["connected"] += 1
+        m["equity"] = round(m["equity"] + _usd(a["equity"], a["currency"]), 2)
+    markets = list(market_map.values())
+
+    return {
+        "overview": {
+            "total_equity": total_equity,
+            "available_cash": available_cash,
+            "gross_exposure": gross_exposure,
+            "margin_used": margin_used,
+            "unrealized_pnl": unrealized_pnl,
+            "realized_pnl": realized_pnl,
+            "currency": "USD",
+        },
+        "status": {
+            "total": len(accounts),
+            "connected": connected,
+            "degraded": degraded,
+            "offline": offline,
+            "last_update": _utc_now().isoformat(timespec="seconds"),
+        },
+        "accounts": account_rows,
+        "markets": markets,
+        "brokers": brokers,
+        "health": health,
+    }
+
+
 @router.get("/dashboard/accounts/{account_id}")
 def account_detail(
     account_id: str, principal: Principal = Depends(require_roles())

@@ -1346,3 +1346,97 @@ def test_d28_execution_api_offline_and_access():
 
     # unauthenticated -> 401
     assert client.get("/api/dashboard/execution/center").status_code == 401
+
+
+# --- D-29 Accounts API (Integration 012) -------------------------------------
+
+
+def test_d29_accounts_api_integration():
+    """Integration 012: Accounts Control Center reads the live adapter layer."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: mock ACCOUNTS / AC_OVERVIEW arrays are gone; page is API-driven
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("var ACCOUNTS = [", "AC_OVERVIEW = {"):
+        assert gone not in app_js, f"mock accounts data still present: {gone}"
+    assert "AC_STATE" in app_js and "accountsCenter" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "accountsCenter" in api_js, "api.js missing accountsCenter"
+
+    token = _login("trader", "trader123")
+
+    # --- live snapshot ----------------------------------------------------
+    res = client.get("/api/dashboard/accounts/center", headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # status bar
+    assert d["status"]["total"] == 4
+    assert d["status"]["connected"] >= 1
+    assert d["status"]["total"] == sum(
+        d["status"][k] for k in ("connected", "degraded", "offline"))
+    assert d["status"]["last_update"]
+
+    # cross-check overview against the accounts list (USD-normalised)
+    accounts = d["accounts"]
+    assert len(accounts) == 4
+    fx_cny = 0.139
+    expected_equity = round(
+        sum(a["equity"] * (fx_cny if a["currency"] == "CNY" else 1.0)
+            for a in accounts), 2)
+    assert d["overview"]["total_equity"] == pytest.approx(
+        expected_equity, abs=1e-2)
+    assert d["overview"]["currency"] == "USD"
+
+    # every account carries the unified Account Domain fields + permissions
+    for a in accounts:
+        for key in ("account_id", "name", "broker_name", "market",
+                    "market_label", "currency", "type", "trading_mode",
+                    "connection", "status", "equity", "cash", "buying_power",
+                    "margin", "daily_pnl", "total_pnl", "drawdown",
+                    "positions", "orders", "executions", "capabilities",
+                    "permissions"):
+            assert key in a, f"account row missing {key}"
+        assert a["trading_mode"] == "PAPER"
+        assert a["connection"] in ("CONNECTED", "CONNECTING",
+                                   "DISCONNECTED", "ERROR")
+        perms = a["permissions"]
+        for pk in ("market_data", "trading", "cancel_order", "short_selling"):
+            assert isinstance(perms[pk], bool)
+
+    # cross-check KPI against the global portfolio endpoint (same source)
+    portfolio = client.get("/api/dashboard/portfolio",
+                           headers=_headers(token)).json()
+    assert d["overview"]["gross_exposure"] == pytest.approx(
+        portfolio["summary"]["gross_exposure_usd"], abs=1e-2)
+
+    # markets breakdown: each market maps to real accounts
+    market_labels = {a["market_label"] for a in accounts}
+    assert {m["market_label"] for m in d["markets"]} == market_labels
+    for m in d["markets"]:
+        assert m["accounts"] >= 1
+        assert m["connected"] <= m["accounts"]
+
+    # account detail via the existing endpoint stays consistent
+    first_id = accounts[0]["account_id"]
+    detail = client.get("/api/dashboard/accounts/" + first_id,
+                        headers=_headers(token)).json()
+    assert detail["account_id"] == first_id
+    assert detail["equity"] == accounts[0]["equity"]
+    assert detail["connection"] == accounts[0]["connection"]
+
+
+def test_d29_accounts_api_access():
+    """Integration 012: RBAC and the auth gate."""
+    # unauthenticated -> 401
+    assert client.get("/api/dashboard/accounts/center").status_code == 401
+
+    # readonly can read the accounts center (view-only role)
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/accounts/center", headers=_headers(token))
+    assert res.status_code == 200
+    assert res.json()["status"]["total"] == 4

@@ -3000,7 +3000,26 @@ tr:focus-within {
 }
 .ac-conn-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .ac-conn-connected { color: var(--ds-profit); background: var(--ds-profit-dim); border-color: rgba(0, 229, 160, 0.3); }
+.ac-conn-connecting { color: var(--ds-warning); background: var(--ds-warning-dim); border-color: rgba(245, 158, 11, 0.3); }
+.ac-conn-error { color: var(--ds-loss); background: var(--ds-loss-dim); border-color: rgba(244, 63, 94, 0.3); }
 .ac-conn-offline { color: var(--ds-neutral); background: var(--ds-neutral-dim); border-color: rgba(148, 163, 184, 0.3); }
+
+/* ── Account status summary bar ─────────────────────────────── */
+.ac-status-bar {
+  display: flex; align-items: center; gap: var(--ds-space-5);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  background: var(--ds-bg-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  margin-bottom: var(--ds-space-4);
+  font-size: var(--ds-text-sm);
+}
+.ac-status-item { color: var(--ds-text-secondary); }
+.ac-status-item b { color: var(--ds-text-primary); font-family: var(--ds-num-font); margin-left: 4px; }
+.ac-status-connected b { color: var(--ds-profit); }
+.ac-status-degraded b { color: var(--ds-warning); }
+.ac-status-offline b { color: var(--ds-neutral); }
+.ac-last-update { margin-left: auto; color: var(--ds-text-muted); font-size: var(--ds-text-xs); }
 
 /* ── Account list (clickable rows) ──────────────────────────── */
 .ac-list-table tbody tr.ac-row { cursor: pointer; transition: background var(--ds-transition-fast); }
