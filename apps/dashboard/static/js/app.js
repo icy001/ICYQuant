@@ -8217,98 +8217,110 @@
   };
 
   /* ==================================================================
-   * Data module — Commit 017
+   * Data module — Integration 013
    * Market Data & Data Pipeline Center: overview → markets → datasets →
-   * detail → quality → pipeline. UI-only; does NOT implement new data
-   * collectors, modify fetch_real, data providers, CSV/Lakehouse, or
-   * research datasets. No API/db changes.
+   * detail → quality → pipeline. Reads the live data layer via
+   * GET /dashboard/data/center (data/real/d1 + data/processed/manifests +
+   * data/lakehouse/_state.json). No mock data, no fetch triggers, no
+   * schema edits — purely a read view over what Research / Backtest use.
    * ================================================================== */
 
-  // ── Data overview ────────────────────────────────────────────
-  var DT_OVERVIEW = {
-    pipeline: "HEALTHY", lastUpdate: "2026-08-28 09:30",
-    assets: 128, records: "4.82M", quality: "99.7%", coverage: "98.6%",
+  // ── Data state (Integration 013) ─────────────────────────────
+  var DT_STATE = {
+    data: null,
+    error: null,
+    selectedId: null,
   };
 
-  // ── Markets ──────────────────────────────────────────────────
-  var DT_MARKETS = [
-    { name: "A-Share", status: "healthy", instruments: "CSI 300 · CSI 500 · STAR 50" },
-    { name: "Futures", status: "healthy", instruments: "Gold · Silver · Index Futures" },
-    { name: "US Stocks", status: "healthy", instruments: "NVDA · QQQ · SPY" },
-    { name: "Forex", status: "healthy", instruments: "EURUSD" },
-    { name: "Commodities", status: "healthy", instruments: "XAUUSD" },
-  ];
+  async function dtLoadCenter(force) {
+    if (DT_STATE.data && !force) return;
+    try {
+      var data = await api.dataCenter();
+      DT_STATE.data = data;
+      DT_STATE.error = null;
+      // default selection: first dataset, else 'real-d1'
+      if (!DT_STATE.selectedId && data.datasets && data.datasets.length) {
+        var firstReady = data.datasets.find(function (d) { return d.status === "READY"; });
+        DT_STATE.selectedId = (firstReady || data.datasets[0]).id;
+      }
+    } catch (err) {
+      DT_STATE.error = (err && err.message) || "Failed to load data center";
+    }
+  }
 
-  // ── Datasets ─────────────────────────────────────────────────
-  var DT_DATASETS = [
-    { id: "us-eq",   name: "US Equities",   type: "Real",      tf: "D1", assets: 35, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 238421, missing: "0.18%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
-    { id: "a-share", name: "A-Share",       type: "Real",      tf: "D1", assets: 80, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 186200, missing: "0.12%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
-    { id: "futures", name: "Futures",       type: "Real",      tf: "D1", assets: 12, status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 58300,  missing: "0.05%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
-    { id: "forex",   name: "Forex",         type: "Real",      tf: "D1", assets: 4,  status: "READY", dateRange: "2023-01-01 → 2026-08-28", bars: 24100,  missing: "0.02%", duplicates: 0, lastUpdate: "2026-08-28 09:31" },
-    { id: "alpha",   name: "Alpha Research", type: "Processed", tf: "1H", assets: 9,  status: "READY", dateRange: "2024-01-01 → 2026-08-28", bars: 42100,  missing: "0.08%", duplicates: 0, lastUpdate: "2026-08-28 09:30" },
-    { id: "paper",   name: "Paper Trading",  type: "Snapshot",  tf: "D1", assets: 3,  status: "READY", dateRange: "2026-08-20 → 2026-08-28", bars: 240,    missing: "0.00%", duplicates: 0, lastUpdate: "2026-08-28 09:30" },
-  ];
-  var DT_STATE = { selectedId: "us-eq" };
-
-  // ── Data quality ─────────────────────────────────────────────
-  var DT_QUALITY = [
-    { label: "Completeness",      value: "99.82%", status: "PASS" },
-    { label: "Duplicates",        value: "0",      status: "PASS" },
-    { label: "OHLC Validation",   value: "100%",   status: "PASS" },
-    { label: "Timestamp Gaps",    value: "3",      status: "WARN" },
-    { label: "Corporate Actions", value: "0",     status: "PASS" },
-  ];
-
-  // ── Pipeline stages ──────────────────────────────────────────
-  var DT_PIPELINE = [
-    { label: "Fetch",     state: "done" },
-    { label: "Normalize", state: "done" },
-    { label: "Validate",  state: "done" },
-    { label: "Store",     state: "done" },
-    { label: "Ready",     state: "done" },
-  ];
+  function dtData() {
+    return DT_STATE.data || {
+      overview: { data_service: "—", datasets: 0, symbols: 0, records: 0,
+                  coverage: "—", range_start: "", range_end: "", last_update: "" },
+      datasets: [],
+      symbols: [],
+      markets: [],
+      quality: { datasets_pass: 0, datasets_fail: 0, datasets_total: 0,
+                 coverage: "—", checks: [] },
+      pipeline: { status: "—", stages: [], lakehouse: {} },
+      real_daily: { fetched_at: null, range: [null, null], rows: [] },
+    };
+  }
 
   // ── Helpers ──────────────────────────────────────────────────
   function dtFind(id) {
-    for (var i = 0; i < DT_DATASETS.length; i++) {
-      if (DT_DATASETS[i].id === id) return DT_DATASETS[i];
+    var ds = dtData().datasets || [];
+    for (var i = 0; i < ds.length; i++) {
+      if (ds[i].id === id) return ds[i];
     }
-    return DT_DATASETS[0];
+    return ds[0] || null;
   }
   function dtMarketStatus(s) {
     return '<span class="dt-market-status ' + s + '">' + esc(s.toUpperCase()) + "</span>";
   }
   function dtDsStatusBadge(s) {
-    var cls = s === "READY" ? "healthy" : (s === "STALE" ? "degraded" : "down");
+    var cls = s === "READY" ? "healthy" : (s === "STALE" || s === "DEGRADED" ? "degraded" : "down");
     return '<span class="dt-market-status ' + cls + '">' + esc(s) + "</span>";
   }
   function dtQualityBadge(s) {
     var key = s === "PASS" ? "pass" : (s === "WARN" ? "warn" : "fail");
     return '<span class="dt-quality-status dt-quality-' + key + '">' + esc(s) + "</span>";
   }
+  function dtFmtNum(n) {
+    if (n === null || n === undefined || n === "—") return "—";
+    var x = Number(n);
+    if (isNaN(x)) return String(n);
+    return x.toLocaleString("en-US");
+  }
+  function dtServiceBadge(s) {
+    var cls = s === "HEALTHY" ? "healthy" : (s === "EMPTY" ? "down" : "degraded");
+    var label = s === "HEALTHY" ? "● HEALTHY" : (s === "EMPTY" ? "○ EMPTY" : "● " + s);
+    return '<span class="dt-market-status ' + cls + '">' + esc(label) + "</span>";
+  }
 
   // ── Overview KPI ─────────────────────────────────────────────
   function renderDtOverview() {
-    var o = DT_OVERVIEW;
+    var o = dtData().overview;
+    var svcCls = o.data_service === "HEALTHY" ? "pos" : (o.data_service === "EMPTY" ? "neg" : "");
     return UI.kpiGrid(
-      UI.metricCard("Data Pipeline", o.pipeline, "", "pos") +
-      UI.metricCard("Last Update", o.lastUpdate, "", "") +
-      UI.metricCard("Assets", String(o.assets), "", "") +
-      UI.metricCard("Records", o.records, "", "") +
-      UI.metricCard("Data Quality", o.quality, "", "pos")
-    , 5);
+      UI.metricCard("Data Service", o.data_service, "", svcCls) +
+      UI.metricCard("Datasets", String(o.datasets), "", "") +
+      UI.metricCard("Symbols", String(o.symbols), "", "") +
+      UI.metricCard("Records", dtFmtNum(o.records), "", "") +
+      UI.metricCard("Coverage", o.coverage, "", "pos") +
+      UI.metricCard("Last Update", o.last_update || "—", "", "")
+    , 6);
   }
 
   // ── Markets ──────────────────────────────────────────────────
   function renderDtMarkets() {
-    var cards = DT_MARKETS.map(function (m) {
+    var markets = dtData().markets || [];
+    if (!markets.length) {
+      return '<div class="dt-empty">No markets registered.</div>';
+    }
+    var cards = markets.map(function (m) {
       return (
         '<div class="dt-market-card">' +
         '<div class="dt-market-head">' +
-        '<span class="dt-market-name">' + esc(m.name) + "</span>" +
+        '<span class="dt-market-name">' + esc(m.market) + "</span>" +
         dtMarketStatus(m.status) +
         "</div>" +
-        '<div class="dt-market-inst">' + esc(m.instruments) + "</div>" +
+        '<div class="dt-market-inst">' + m.symbols + " symbol" + (m.symbols === 1 ? "" : "s") + "</div>" +
         "</div>"
       );
     }).join("");
@@ -8317,14 +8329,18 @@
 
   // ── Dataset table (clickable rows) ──────────────────────────
   function renderDtRows() {
-    return DT_DATASETS.map(function (d) {
+    var ds = dtData().datasets || [];
+    if (!ds.length) {
+      return '<tr><td colspan="5" class="dt-empty">No datasets registered.</td></tr>';
+    }
+    return ds.map(function (d) {
       var sel = d.id === DT_STATE.selectedId ? " dt-ds-row-selected" : "";
       return (
         '<tr class="dt-ds-row' + sel + '" data-dt-id="' + esc(d.id) + '">' +
         "<td>" + esc(d.name) + "</td>" +
         "<td>" + esc(d.type) + "</td>" +
         "<td>" + esc(d.tf) + "</td>" +
-        '<td class="num">' + d.assets + "</td>" +
+        '<td class="num">' + dtFmtNum(d.bars) + "</td>" +
         "<td>" + dtDsStatusBadge(d.status) + "</td>" +
         "</tr>"
       );
@@ -8335,7 +8351,7 @@
       '<table class="ds-table dt-ds-table">' +
       "<thead><tr>" +
       "<th>Name</th><th>Type</th><th>TF</th>" +
-      '<th class="num">Assets</th><th>Status</th>' +
+      '<th class="num">Bars</th><th>Status</th>' +
       "</tr></thead>" +
       '<tbody id="dt-ds-tbody">' + renderDtRows() + "</tbody>" +
       "</table>"
@@ -8353,17 +8369,21 @@
   }
   function renderDtDetail() {
     var d = dtFind(DT_STATE.selectedId);
+    if (!d) {
+      return '<div class="dt-empty">Select a dataset to view details.</div>';
+    }
     return (
       '<div class="dt-detail-grid">' +
       dtDetailCell("Dataset", d.name + " / " + d.tf) +
       dtDetailCell("Type", d.type) +
       dtDetailCell("Status", d.status) +
-      dtDetailCell("Date Range", d.dateRange) +
+      dtDetailCell("Date Range", d.date_range) +
       dtDetailCell("Assets", String(d.assets)) +
-      dtDetailCell("Bars", d.bars.toLocaleString("en-US")) +
+      dtDetailCell("Bars", dtFmtNum(d.bars)) +
       dtDetailCell("Missing", d.missing) +
       dtDetailCell("Duplicates", String(d.duplicates)) +
-      dtDetailCell("Last Update", d.lastUpdate) +
+      dtDetailCell("Last Update", d.last_update) +
+      dtDetailCell("Source", d.source) +
       "</div>"
     );
   }
@@ -8372,39 +8392,95 @@
     if (host) host.innerHTML = renderDtDetail();
   }
 
+  // ── Symbols table ────────────────────────────────────────────
+  function renderDtSymbols() {
+    var syms = dtData().symbols || [];
+    if (!syms.length) {
+      return '<div class="dt-empty">No symbols registered.</div>';
+    }
+    var rows = syms.map(function (s) {
+      return (
+        "<tr>" +
+        "<td>" + esc(s.symbol) + "</td>" +
+        "<td>" + esc(s.asset_class) + "</td>" +
+        "<td>" + esc(s.market) + "</td>" +
+        "<td>" + esc((s.timeframes || []).join(", ")) + "</td>" +
+        "<td>" + esc(s.first_date || "—") + "</td>" +
+        "<td>" + esc(s.last_date || "—") + "</td>" +
+        '<td class="num">' + dtFmtNum(s.bars) + "</td>" +
+        "<td>" + dtDsStatusBadge(s.status) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    return (
+      '<table class="ds-table">' +
+      "<thead><tr>" +
+      "<th>Symbol</th><th>Asset Class</th><th>Market</th><th>TFs</th>" +
+      "<th>First</th><th>Last</th>" +
+      '<th class="num">Bars</th><th>Status</th>' +
+      "</tr></thead>" +
+      '<tbody>' + rows + "</tbody>" +
+      "</table>"
+    );
+  }
+
   // ── Data quality ─────────────────────────────────────────────
   function renderDtQuality() {
-    var rows = DT_QUALITY.map(function (q) {
+    var q = dtData().quality;
+    var rows = (q.checks || []).map(function (c) {
+      var status = c.pass === c.total ? "PASS" : (c.pass > 0 ? "WARN" : "FAIL");
       return (
         '<div class="dt-quality-row">' +
-        '<span class="dt-quality-label">' + esc(q.label) + "</span>" +
-        '<span class="dt-quality-value">' + esc(q.value) + "</span>" +
-        dtQualityBadge(q.status) +
+        '<span class="dt-quality-label">' + esc(c.name) + "</span>" +
+        '<span class="dt-quality-value">' + c.pass + "/" + c.total + "</span>" +
+        dtQualityBadge(status) +
         "</div>"
       );
     }).join("");
-    return '<div class="dt-quality-list">' + rows + "</div>";
+    var summary = (
+      '<div class="dt-quality-row">' +
+      '<span class="dt-quality-label">Coverage</span>' +
+      '<span class="dt-quality-value">' + esc(q.coverage) + "</span>" +
+      dtQualityBadge(q.datasets_fail === 0 ? "PASS" : "WARN") +
+      "</div>"
+    );
+    return '<div class="dt-quality-list">' + summary + rows + "</div>";
   }
 
   // ── Pipeline stepper ─────────────────────────────────────────
   function renderDtPipeline() {
+    var p = dtData().pipeline;
+    var stages = p.stages || [];
+    if (!stages.length) {
+      return '<div class="dt-empty">No pipeline state available.</div>';
+    }
     var html = '<div class="dt-pipeline">';
-    DT_PIPELINE.forEach(function (p, i) {
-      var icon = p.state === "done" ? "✓" : (p.state === "fail" ? "✕" : "—");
+    stages.forEach(function (s, i) {
+      var icon = s.state === "done" ? "✓" : (s.state === "fail" ? "✕" : "—");
       html +=
-        '<div class="dt-pipe-step ' + p.state + '">' +
+        '<div class="dt-pipe-step ' + s.state + '">' +
         '<div class="dt-pipe-icon">' + icon + "</div>" +
-        '<div class="dt-pipe-label">' + esc(p.label) + "</div>" +
+        '<div class="dt-pipe-label">' + esc(s.label) + "</div>" +
         "</div>";
-      if (i < DT_PIPELINE.length - 1) {
+      if (i < stages.length - 1) {
         html += '<span class="dt-pipe-arrow">→</span>';
       }
     });
     html += "</div>";
+
+    var lk = p.lakehouse || {};
+    html += (
+      '<div class="dt-lakehouse-summary">' +
+      '<span><b>Lakehouse:</b> ' + (lk.datasets || 0) + " datasets · " +
+      (lk.current_snapshots || 0) + " current snapshots · " +
+      (lk.files || 0) + " files</span>" +
+      '<span class="dt-last-write">Last write: ' + esc(lk.last_write || "—") + "</span>" +
+      "</div>"
+    );
     return html;
   }
 
-  // ── Bindings (row select) ───────────────────────────────────
+  // ── Bindings (row select + refresh) ─────────────────────────
   function bindDataPage() {
     var tbody = document.getElementById("dt-ds-tbody");
     if (tbody) {
@@ -8416,24 +8492,64 @@
         updateDtDetail();
       });
     }
+    var refresh = document.getElementById("dt-refresh");
+    if (refresh) {
+      refresh.addEventListener("click", function () {
+        DT_STATE.data = null;
+        DT_STATE.selectedId = null;
+        dtLoadCenter(true).then(function () { renderDtPageInto(); });
+      });
+    }
   }
 
-  // ── Data page (Commit 017) ────────────────────────────────────
-  PAGE_FRAMEWORK["system/data"] = function () {
+  function renderDtPageInto() {
+    var host = document.getElementById("dt-page");
+    if (!host) return;
+    host.innerHTML = renderDtPage();
+    bindDataPage();
+  }
+
+  function renderDtPage() {
+    if (DT_STATE.error) {
+      return UI.pageHeader("Data", "Market data & data pipeline center · 市场数据中心") +
+        '<div class="ds-error">' + esc(DT_STATE.error) + "</div>";
+    }
+    var o = dtData().overview;
     return (
       UI.pageHeader("Data", "Market data & data pipeline center · 市场数据中心") +
+      '<div class="ds-toolbar">' +
+        '<button id="dt-refresh" class="btn btn-secondary btn-sm">Refresh</button>' +
+        '<span class="ds-toolbar-meta">Last update: ' + esc(o.last_update || "—") + "</span>" +
+      "</div>" +
       UI.sectionHeading("Data Overview") +
       renderDtOverview() +
       UI.sectionHeading("Markets") +
-      UI.panel("Market Data", renderDtMarkets()) +
+      UI.panel("Market Coverage", renderDtMarkets()) +
       UI.sectionHeading("Datasets") +
       UI.panel("Dataset Explorer", renderDtList()) +
       UI.sectionHeading("Dataset Details") +
       '<div id="dt-detail">' + renderDtDetail() + "</div>" +
+      UI.sectionHeading("Symbols") +
+      UI.panel("Instrument Universe", renderDtSymbols()) +
       UI.sectionHeading("Data Quality") +
       UI.panel("Quality Checks", renderDtQuality()) +
       UI.sectionHeading("Data Pipeline") +
       UI.panel("Pipeline Status", renderDtPipeline())
+    );
+  }
+
+  // ── Data page (Integration 013) — async hydrate ───────────────
+  PAGE_FRAMEWORK["system/data"] = function () {
+    // Returning a shell lets the framework mount immediately; we then
+    // hydrate async after the first API call resolves.
+    if (!DT_STATE.data && !DT_STATE.error) {
+      dtLoadCenter().then(function () { renderDtPageInto(); });
+    }
+    return (
+      '<div id="dt-page">' +
+      (UI.pageHeader("Data", "Market data & data pipeline center · 市场数据中心") +
+       '<div class="ds-loading">Loading data center…</div>') +
+      "</div>"
     );
   };
 

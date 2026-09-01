@@ -468,6 +468,15 @@
       return this.get("/dashboard/accounts/center");
     },
 
+    // ── Data API (Integration 013) ──────────────────────────────
+    /** Data Control Center: overview → datasets → symbols → quality →
+     *  pipeline. Read-only view over data/real/d1 +
+     *  data/processed/manifests + data/lakehouse/_state.json — the
+     *  exact sources Research / Backtest consume. */
+    dataCenter: async function () {
+      return this.get("/dashboard/data/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.
