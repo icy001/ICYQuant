@@ -453,6 +453,13 @@
       return this.get("/dashboard/risk/center");
     },
 
+    // ── Execution API (Integration 011) ─────────────────────────
+    /** Execution Control Center: live engine status, KPI, order flow,
+     *  quality, recent orders with slippage / latency, and venues. */
+    executionCenter: async function () {
+      return this.get("/dashboard/execution/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

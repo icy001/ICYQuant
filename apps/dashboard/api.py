@@ -2082,3 +2082,218 @@ def risk_center(principal: Principal = Depends(require_roles())) -> dict:
         "decisions": {"total": len(decisions), "approved": approved, "rejected": rejected},
         "events": events,
     }
+
+
+# =============================================================================
+# Integration 011 — Execution API
+# =============================================================================
+
+def _ex_engine_status(svc_status, attached: bool) -> str:
+    if not attached:
+        return "OFFLINE"
+    if svc_status == "UP":
+        return "ONLINE"
+    if svc_status in ("DEGRADED", "DOWN"):
+        return "DEGRADED"
+    return "OFFLINE"
+
+
+def _parse_iso_ms(ts) -> Optional[float]:
+    """Parse an ISO-8601 timestamp to epoch milliseconds (or None)."""
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp() * 1000.0
+    except (ValueError, TypeError):
+        return None
+
+
+def _ex_slippage_bps(intended: float, actual: float) -> Optional[float]:
+    """Slippage in basis points (signed); None when no reference price."""
+    if not intended or not actual:
+        return None
+    return round((actual - intended) / intended * 10000.0, 2)
+
+
+@router.get("/dashboard/execution/center")
+def execution_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Execution Control Center: live engine status, KPI, order flow,
+    execution quality, recent orders with slippage / latency, and venue
+    breakdown. Read-only — does not modify the execution engine, broker
+    adapter, or fill / reject rules."""
+    from apps.dashboard import runtime as rt
+
+    orders = rt.orders()
+    executions = rt.executions()
+    services = rt.system_health().get("services", {})
+    attached = rt.attached()
+
+    # ── engine status ────────────────────────────────────────────
+    # Execution Engine = the attached paper pipeline itself (no separate
+    # service registration); Order Engine and Risk Check use the official
+    # health-registry services.
+    order_svc = (services.get("order-engine") or {}).get("status")
+    risk_svc = (services.get("risk-engine") or {}).get("status")
+
+    engines = [
+        {"name": "Execution Engine", "status": "ONLINE" if attached else "OFFLINE"},
+        {"name": "Order Engine", "status": _ex_engine_status(order_svc, attached)},
+        {"name": "Risk Check", "status": _ex_engine_status(risk_svc, attached)},
+    ]
+    up_count = sum(1 for e in engines if e["status"] == "ONLINE")
+    if not attached:
+        overall = "OFFLINE"
+    elif up_count == len(engines):
+        overall = "ONLINE"
+    elif up_count == 0:
+        overall = "OFFLINE"
+    else:
+        overall = "DEGRADED"
+
+    # ── execution map (order_id -> fill) ──────────────────────────
+    exec_map = {}
+    for ex in executions:
+        exec_map[ex.get("order_id")] = ex
+
+    # ── KPI / overview ────────────────────────────────────────────
+    total = len(orders)
+    filled = sum(1 for o in orders if o["status"] == "FILLED")
+    rejected = sum(1 for o in orders if o["status"] == "REJECTED")
+    cancelled = sum(1 for o in orders if o["status"] in ("CANCELLED", "CANCELED"))
+    errors = cancelled + rejected
+    pending = sum(1 for o in orders if o["status"] in ("PENDING", "NEW", "SUBMITTED", "ACCEPTED"))
+    working = sum(1 for o in orders if o["status"] in ("WORKING", "PARTIALLY_FILLED"))
+
+    fill_rate = filled / total if total else 0.0
+    reject_rate = rejected / total if total else 0.0
+    error_rate = errors / total if total else 0.0
+
+    # ── slippage & latency & turnover ─────────────────────────────
+    slippage_list: list[float] = []
+    latency_list: list[float] = []
+    turnover = 0.0
+    for o in orders:
+        ex = exec_map.get(o["order_id"])
+        if ex:
+            intended = float(o.get("price") or 0)
+            actual = float(ex.get("price") or 0)
+            sp = _ex_slippage_bps(intended, actual)
+            if sp is not None:
+                slippage_list.append(abs(sp))
+            sub_ms = _parse_iso_ms(o.get("submitted_at"))
+            fill_ms = _parse_iso_ms(o.get("filled_at"))
+            if sub_ms is not None and fill_ms is not None and fill_ms >= sub_ms:
+                latency_list.append(round(fill_ms - sub_ms, 1))
+            turnover += float(ex.get("quantity") or 0) * float(ex.get("price") or 0)
+
+    avg_slippage = round(sum(slippage_list) / len(slippage_list), 2) if slippage_list else 0.0
+    avg_latency = round(sum(latency_list) / len(latency_list), 1) if latency_list else 0.0
+
+    # ── order flow by status ──────────────────────────────────────
+    flow = [
+        {"label": "Pending", "count": pending, "cls": "pending"},
+        {"label": "Working", "count": working, "cls": "working"},
+        {"label": "Partial", "count": sum(1 for o in orders if o["status"] == "PARTIALLY_FILLED"), "cls": "partial"},
+        {"label": "Filled", "count": filled, "cls": "filled"},
+        {"label": "Rejected", "count": rejected, "cls": "rejected"},
+        {"label": "Cancelled", "count": cancelled, "cls": "cancelled"},
+    ]
+
+    # ── execution quality bars ────────────────────────────────────
+    def _q_zone(pct: float, good_when_high: bool) -> str:
+        if good_when_high:
+            return "good" if pct >= 0.8 else ("neutral" if pct >= 0.5 else "bad")
+        return "good" if pct <= 0.05 else ("neutral" if pct <= 0.15 else "bad")
+
+    quality = [
+        {"label": "Fill Rate", "value": "{0:.2f}%".format(fill_rate * 100),
+         "fill": round(fill_rate * 100, 2), "cls": _q_zone(fill_rate, True)},
+        {"label": "Reject Rate", "value": "{0:.2f}%".format(reject_rate * 100),
+         "fill": round(reject_rate * 100, 2), "cls": _q_zone(reject_rate, False)},
+        {"label": "Error Rate", "value": "{0:.2f}%".format(error_rate * 100),
+         "fill": round(error_rate * 100, 2), "cls": _q_zone(error_rate, False)},
+        {"label": "Avg Slippage", "value": "{0:.1f} bps".format(avg_slippage),
+         "fill": round(min(avg_slippage, 100), 2), "cls": "neutral"},
+        {"label": "Avg Latency", "value": "{0:.0f} ms".format(avg_latency),
+         "fill": round(min(avg_latency, 100), 2), "cls": _q_zone(avg_latency / 200, False) if avg_latency else "neutral"},
+    ]
+
+    # ── recent orders with execution columns ──────────────────────
+    order_rows: list[dict] = []
+    for o in reversed(orders):
+        ex = exec_map.get(o["order_id"])
+        intended = float(o.get("price") or 0)
+        actual = float(ex.get("price") or 0) if ex else 0.0
+        sp = _ex_slippage_bps(intended, actual) if ex else None
+        sub_ms = _parse_iso_ms(o.get("submitted_at"))
+        fill_ms = _parse_iso_ms(o.get("filled_at"))
+        latency = round(fill_ms - sub_ms, 1) if (sub_ms is not None and fill_ms is not None and fill_ms >= sub_ms) else None
+        order_rows.append({
+            "order_id": o["order_id"],
+            "symbol": o["symbol"],
+            "side": o["side"],
+            "quantity": o["quantity"],
+            "order_type": o.get("order_type") or "MARKET",
+            "status": o["status"],
+            "submit_time": o.get("submitted_at") or o.get("created_at") or "",
+            "fill_time": o.get("filled_at") or "",
+            "requested_price": round(intended, 4) if intended else None,
+            "fill_price": round(actual, 4) if actual else None,
+            "filled_quantity": o.get("filled_quantity") or 0,
+            "slippage_bps": sp,
+            "latency_ms": latency,
+            "broker": o.get("broker") or "paper",
+            "market": o.get("market") or "PAPER",
+            "account_id": o.get("account_id") or "paper",
+            "rejection_reason": o.get("rejection_reason") or "",
+        })
+
+    # ── venue / account breakdown ────────────────────────────────
+    venue_map: dict[str, dict] = {}
+    for o in orders:
+        key = "{0} ({1})".format(o.get("market") or "PAPER", o.get("broker") or "paper")
+        v = venue_map.setdefault(key, {
+            "venue": key, "account": o.get("account_id") or "paper",
+            "execs": 0, "filled": 0, "total": 0,
+        })
+        v["total"] += 1
+        if o["status"] == "FILLED":
+            v["execs"] += 1
+            v["filled"] += 1
+    venues = []
+    for key, v in venue_map.items():
+        fr = v["filled"] / v["total"] if v["total"] else 0.0
+        venues.append({
+            "venue": v["venue"],
+            "account": v["account"],
+            "execs": v["execs"],
+            "fillRate": "{0:.1f}%".format(fr * 100) if v["total"] else "—",
+            "latency": "{0:.0f} ms".format(avg_latency) if v["execs"] else "—",
+            "status": "ONLINE" if v["execs"] else ("OFFLINE" if not attached else "IDLE"),
+        })
+
+    return {
+        "engine": {
+            "status": overall,
+            "attached": attached,
+            "engines": engines,
+            "services": {k: v.get("status") for k, v in services.items()},
+            "last_update": _utc_now().isoformat(timespec="seconds"),
+        },
+        "kpi": {
+            "orders": total,
+            "filled": filled,
+            "rejected": rejected,
+            "errors": errors,
+            "fill_rate": round(fill_rate, 4),
+            "reject_rate": round(reject_rate, 4),
+            "error_rate": round(error_rate, 4),
+            "avg_latency_ms": avg_latency,
+            "avg_slippage_bps": avg_slippage,
+            "turnover": round(turnover, 2),
+        },
+        "quality": quality,
+        "flow": flow,
+        "orders": order_rows,
+        "venues": venues,
+    }
