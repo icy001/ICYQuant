@@ -1574,3 +1574,128 @@ def test_d30_data_api_access():
     res = client.get("/api/dashboard/data/center", headers=_headers(token))
     assert res.status_code == 200
     assert res.json()["overview"]["datasets"] >= 1
+
+
+# ============================================================================
+# Integration 014 — Monitoring API
+# ============================================================================
+
+def test_d31_monitoring_api_integration(attached_pipeline):
+    """Integration 014: Monitoring Control Center aggregates the existing
+    runtime state (HealthRegistry + pipeline + metrics + event bus)."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: mock MO_HEALTH / MO_SERVICES / MO_INFRA / MO_TRADE / MO_EVENTS
+    # are gone; the page is API-driven via MO_STATE + monitoringCenter.
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("var MO_HEALTH = {", "var MO_SERVICES = [",
+                 "var MO_INFRA = [", "var MO_TRADE = [",
+                 "var MO_EVENTS = ["):
+        assert gone not in app_js, f"mock data still present: {gone}"
+    assert "MO_STATE" in app_js and "monitoringCenter" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "monitoringCenter" in api_js, "api.js missing monitoringCenter"
+
+    token = _login("operator", "operator123")
+
+    # --- live snapshot ----------------------------------------------------
+    res = client.get("/api/dashboard/monitoring/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # overview: derived from the official HealthRegistry snapshot
+    ov = d["overview"]
+    assert ov["status"] in ("READY", "DEGRADED")
+    assert ov["services_total"] == 10  # the 10 logical services
+    assert (ov["services_up"] + ov["services_down"]
+            + ov["services_unknown"]) == ov["services_total"]
+    assert ov["version"]
+    assert ov["checked_at"]  # epoch heartbeat
+    assert ov["pipeline_attached"] is True
+
+    # services: every row carries the unified schema + real status
+    services = d["services"]
+    assert len(services) == 10
+    required_svc = ("id", "name", "status", "detail", "version",
+                    "uptime", "last_heartbeat", "latency_ms")
+    for s in services:
+        for key in required_svc:
+            assert key in s, f"service row missing {key}"
+        assert s["status"] in ("UP", "DOWN", "UNKNOWN")
+    svc_ids = {s["id"] for s in services}
+    assert {"api", "database", "event-bus", "risk-engine",
+            "order-engine", "execution-engine", "position-ledger",
+            "reconciliation", "strategy-runtime"} <= svc_ids
+
+    # trading runtime: answers "what is the trading system doing now"
+    t = d["trading"]
+    assert t["pipeline_attached"] is True
+    assert t["strategies"] >= 1
+    assert t["open_positions"] >= 1   # AAPL / MSFT / NVDA filled
+    assert t["paper_accounts"] == 1
+    assert t["events"] > 0            # event bus carries real events
+    assert t["active_orders"] >= 0
+
+    # metrics: execution + risk numbers consistent with /orders
+    m = d["metrics"]
+    orders = client.get("/api/dashboard/orders",
+                        headers=_headers(token)).json()["orders"]
+    assert m["orders"] == len(orders)
+    assert m["executions"] == sum(1 for o in orders if o["status"] == "FILLED")
+    assert 0.0 <= m["fill_rate"] <= 1.0
+    assert 0.0 <= m["reject_rate"] <= 1.0
+    assert m["risk_decisions"] == len(
+        client.get("/api/dashboard/risk",
+                   headers=_headers(token)).json()["decisions"])
+    assert m["risk_rejected"] >= 1    # TSLA 99999 exceeds the risk limit
+
+    # alpha: Alpha021 paper replay KPIs (None when data files absent)
+    assert "alpha" in d
+    if d["alpha"] is not None:
+        for key in ("alpha_id", "signals", "fills", "rejects", "errors",
+                    "win_rate", "return_pct"):
+            assert key in d["alpha"], f"alpha row missing {key}"
+
+    # events: timeline carries the signal → risk → order → execution chain
+    events = d["events"]
+    assert events, "event timeline empty with attached pipeline"
+    required_evt = ("timestamp", "severity", "source", "type", "text")
+    for e in events:
+        for key in required_evt:
+            assert key in e, f"event row missing {key}"
+        assert e["severity"] in ("INFO", "WARNING", "ERROR")
+    types = {e["type"] for e in events}
+    assert "ORDER_CREATED" in types       # signal generated
+    assert "TRADE_EXECUTED" in types     # execution / fill (derived read model)
+    assert "ORDER_REJECTED" in types     # TSLA risk rejection
+    # rejected events surface as ERROR severity
+    assert any(e["type"] == "ORDER_REJECTED" and e["severity"] == "ERROR"
+               for e in events)
+    # events are newest-first
+    stamps = [e["timestamp"] for e in events]
+    assert stamps == sorted(stamps, reverse=True)
+
+    # infra: host metrics (or the explicit unavailable marker)
+    assert "infra" in d
+    assert "available" in d["infra"]
+
+
+def test_d31_monitoring_api_access():
+    """Integration 014: RBAC and the auth gate."""
+    # unauthenticated -> 401
+    assert client.get(
+        "/api/dashboard/monitoring/center").status_code == 401
+
+    # readonly can view the monitoring center (view-only role)
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/monitoring/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert body["overview"]["services_total"] == 10
+    assert "services" in body and "trading" in body

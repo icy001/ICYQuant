@@ -7297,85 +7297,90 @@
   // ── System (Monitoring) + Settings ────────────────────────────
 
   /* ==================================================================
-   * Monitoring module — Commit 018
+   * Monitoring module — Integration 014
    * System Monitoring & Observability Center: overview → services →
-   * infrastructure → trading system → events. UI-only; does NOT modify
-   * Prometheus, monitoring service, Docker, health checks, risk engine,
-   * execution engine, or event bus.
+   * trading runtime → metrics → infrastructure → events.
+   * Every number comes from GET /dashboard/monitoring/center — a
+   * read-only aggregation of the existing HealthRegistry +
+   * TradingPipeline state. No Prometheus metrics, no alert rules
+   * (that is 015 Alerts), no engine edits.
    * ================================================================== */
 
-  // ── System overview ────────────────────────────────────────────
-  var MO_HEALTH = {
-    status: "OPERATIONAL", services: "10 / 10", critical: 0, warning: 0, uptime: "99.98%",
-    lastCheck: "10:32:18", nextCheck: "10:32:28",
-  };
+  // ── Monitoring state (Integration 014) ────────────────────────
+  var MO_STATE = { data: null, error: null, selectedId: null, eventFilter: "ALL" };
 
-  // ── Services (10 services: API → Monitoring) ──────────────────
-  var MO_SERVICES = [
-    { id: "api",              name: "icyquant-api",    status: "RUNNING",  cpu: 2.1, mem: 184, uptime: "4d 12h 32m", requests: 18421, errors: 3,   p50: 8,  p95: 24, p99: 41, restart: "2026-08-24 03:12" },
-    { id: "database",         name: "database",        status: "RUNNING",  cpu: 3.4, mem: 412, uptime: "4d 12h 32m", requests: 24108, errors: 0,   p50: 2,  p95: 11, p99: 18, restart: "2026-08-24 03:12" },
-    { id: "event-bus",        name: "event-bus",       status: "RUNNING",  cpu: 1.2, mem: 126, uptime: "4d 12h 32m", requests: 41280, errors: 0,   p50: 1,  p95: 3,  p99: 7,  restart: "2026-08-24 03:12" },
-    { id: "order-engine",     name: "order-engine",    status: "RUNNING",  cpu: 1.8, mem: 148, uptime: "4d 12h 32m", requests: 1842,  errors: 1,   p50: 5,  p95: 19, p99: 33, restart: "2026-08-24 03:12" },
-    { id: "execution-engine", name: "execution-engine",status: "DEGRADED", cpu: 2.4, mem: 172, uptime: "4d 12h 32m", requests: 1280,  errors: 2,   p50: 12, p95: 38, p99: 68, restart: "2026-08-24 03:12" },
-    { id: "risk-engine",      name: "risk-engine",     status: "RUNNING",  cpu: 1.5, mem: 139, uptime: "4d 12h 32m", requests: 18421, errors: 3,   p50: 8,  p95: 24, p99: 41, restart: "2026-08-24 03:12" },
-    { id: "position-ledger",  name: "position-ledger", status: "RUNNING",  cpu: 1.1, mem: 121, uptime: "4d 12h 32m", requests: 9842,  errors: 0,   p50: 3,  p95: 9,  p99: 15, restart: "2026-08-24 03:12" },
-    { id: "reconciliation",   name: "reconciliation",  status: "RUNNING",  cpu: 0.8, mem: 115, uptime: "4d 12h 31m", requests: 24,    errors: 0,   p50: 120,p95: 320,p99: 480,restart: "2026-08-24 03:13" },
-    { id: "strategy-runtime", name: "strategy-runtime",status: "RUNNING",  cpu: 1.7, mem: 157, uptime: "4d 12h 31m", requests: 4128,  errors: 1,   p50: 6,  p95: 22, p99: 38, restart: "2026-08-24 03:13" },
-    { id: "monitoring",       name: "monitoring",      status: "RUNNING",  cpu: 0.9, mem: 110, uptime: "4d 12h 31m", requests: 8602,  errors: 0,   p50: 1,  p95: 4,  p99: 9,  restart: "2026-08-24 03:13" },
-  ];
-  var MO_STATE = { selectedId: "api", eventFilter: "ALL" };
+  async function monLoadCenter(force) {
+    if (MO_STATE.data && !force) return;
+    try {
+      var data = await api.monitoringCenter();
+      MO_STATE.data = data;
+      MO_STATE.error = null;
+      if (!MO_STATE.selectedId && data.services && data.services.length) {
+        MO_STATE.selectedId = data.services[0].id;
+      }
+    } catch (err) {
+      MO_STATE.error = (err && err.message) || "Failed to load monitoring center";
+    }
+  }
 
-  // ── Infrastructure ────────────────────────────────────────────
-  var MO_INFRA = [
-    { name: "CPU",       value: "28%", status: "NORMAL", statusCls: "healthy" },
-    { name: "Memory",    value: "62%", status: "NORMAL", statusCls: "healthy" },
-    { name: "Disk",      value: "41%", status: "NORMAL", statusCls: "healthy" },
-    { name: "Network",   value: "18 MB/s", status: "NORMAL", statusCls: "healthy" },
-  ];
-
-  // ── Trading system monitoring ─────────────────────────────────
-  var MO_TRADE = [
-    { label: "Orders Today",       value: "128",    sub: "" },
-    { label: "Events Today",       value: "1,842",  sub: "" },
-    { label: "Execution Errors",   value: "2",     sub: "· last 1h: 1", neg: true },
-    { label: "Risk Rejects",       value: "15",    sub: "· 1.17% of orders", neg: true },
-    { label: "Reconciliation",     value: "✓",      sub: "All matched", pos: true },
-    { label: "Position Sync",      value: "✓",      sub: "All in sync", pos: true },
-  ];
-
-  // ── System events ─────────────────────────────────────────────
-  var MO_EVENTS = [
-    { time: "10:31:42", sev: "INFO",    text: "Order Engine heartbeat OK" },
-    { time: "10:29:18", sev: "INFO",    text: "NVDA order filled — 100 shares @ $842.30" },
-    { time: "10:24:51", sev: "WARNING", text: "Execution latency above threshold (P95 38ms > 25ms)" },
-    { time: "10:21:33", sev: "INFO",    text: "Risk Engine health check passed" },
-    { time: "10:18:09", sev: "ERROR",   text: "Order rejected: risk limit breach (daily loss exceeded $3,200)" },
-    { time: "10:15:42", sev: "INFO",    text: "Database replication sync OK" },
-    { time: "10:12:08", sev: "WARNING", text: "Data feed minor gap: NVDA D1 missing 3 bars (2026-07-21 → 07-23)" },
-    { time: "10:08:22", sev: "INFO",    text: "Strategy runtime: Alpha021 cycle completed in 124ms" },
-    { time: "10:05:11", sev: "ERROR",   text: "Execution engine: partial fill on order #ORD-2026-12842" },
-    { time: "10:02:47", sev: "INFO",    text: "Event bus: 256 messages processed in queue" },
-  ];
+  function monData() {
+    return MO_STATE.data || {
+      overview: { status: "—", services_up: 0, services_down: 0,
+                  services_unknown: 0, services_total: 0, version: "",
+                  app: "", checked_at: null, pipeline_attached: false },
+      services: [],
+      trading: { strategies: 0, strategy_ids: [], active_orders: 0,
+                 open_positions: 0, paper_accounts: 0, execution_queue: 0,
+                 events: 0, pipeline_attached: false, attached_at: null },
+      metrics: { orders: 0, executions: 0, fill_rate: 0, reject_rate: 0,
+                 risk_decisions: 0, risk_rejected: 0, today_pnl: 0,
+                 equity: 0, exposure: 0 },
+      alpha: null,
+      events: [],
+      infra: { available: false },
+    };
+  }
 
   // ── Helpers ──────────────────────────────────────────────────
   function moSvcFind(id) {
-    for (var i = 0; i < MO_SERVICES.length; i++) {
-      if (MO_SERVICES[i].id === id) return MO_SERVICES[i];
+    var svc = monData().services || [];
+    for (var i = 0; i < svc.length; i++) {
+      if (svc[i].id === id) return svc[i];
     }
-    return MO_SERVICES[0];
+    return svc[0] || null;
   }
   function moSvcBadge(status) {
-    var cls = status === "RUNNING" ? "running" : (status === "DEGRADED" ? "degraded" : "down");
+    var cls = status === "UP" ? "running" : (status === "DOWN" ? "down" : "degraded");
     return '<span class="mo-svc-status mo-svc-' + cls + '">' + esc(status) + "</span>";
   }
-  function moInfraBadge(status, cls) {
-    return '<span class="mo-infra-status ' + (cls === "healthy" ? "mo-svc-running" : (cls === "degraded" ? "mo-svc-degraded" : "mo-svc-down")) + '">' + esc(status) + "</span>";
+  function moInfraBadge(status) {
+    var cls = status === "NORMAL" ? "running" : "degraded";
+    return '<span class="mo-svc-status mo-svc-' + cls + '">' + esc(status) + "</span>";
+  }
+  function moFmtClock(ts) {
+    if (!ts) return "—";
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    function p2(n) { return (n < 10 ? "0" : "") + n; }
+    return p2(d.getHours()) + ":" + p2(d.getMinutes()) + ":" + p2(d.getSeconds());
+  }
+  function moHeartbeatAge(epoch) {
+    if (!epoch) return "—";
+    var age = Math.max(0, Math.round(Date.now() / 1000 - epoch));
+    if (age < 60) return age + " sec ago";
+    if (age < 3600) return Math.round(age / 60) + " min ago";
+    return Math.round(age / 3600) + " h ago";
+  }
+  function moPct(x) {
+    var v = Number(x);
+    if (isNaN(v)) return "0.0%";
+    return (v * 100).toFixed(1) + "%";
   }
 
   // ── System health bar ─────────────────────────────────────────
   function renderMoHealthBar() {
-    var h = MO_HEALTH;
-    var statusCls = h.status === "OPERATIONAL" ? "operational" : (h.status === "DEGRADED" ? "degraded" : "down");
+    var h = monData().overview;
+    var statusCls = h.status === "READY" ? "operational" : (h.status === "DEGRADED" ? "degraded" : "down");
     return (
       '<div class="mo-health-bar">' +
       '<div>' +
@@ -7383,15 +7388,15 @@
       '<div class="mo-health-status mo-health-' + statusCls + '">' + esc(h.status) + "</div>" +
       "</div>" +
       '<div class="mo-health-meta">' +
-      "<span>Services <b>" + esc(h.services) + "</b></span>" +
-      "<span>Critical <b>" + h.critical + "</b></span>" +
-      "<span>Warning <b>" + h.warning + "</b></span>" +
-      "<span>Uptime <b>" + esc(h.uptime) + "</b></span>" +
+      "<span>Services <b>" + h.services_up + " / " + h.services_total + "</b></span>" +
+      "<span>Critical <b>" + h.services_down + "</b></span>" +
+      "<span>Warning <b>" + h.services_unknown + "</b></span>" +
+      "<span>Pipeline <b>" + (h.pipeline_attached ? "Attached" : "Detached") + "</b></span>" +
       "</div>" +
       "</div>" +
       '<div class="mo-health-right">' +
-      '<div class="mo-health-check">Last Check <b>' + esc(h.lastCheck) + "</b></div>" +
-      '<div class="mo-health-check">Next Check <b>' + esc(h.nextCheck) + "</b></div>" +
+      '<div class="mo-health-check">Version <b>' + esc(h.version || "—") + "</b></div>" +
+      '<div class="mo-health-check">Last Check <b>' + esc(moHeartbeatAge(h.checked_at)) + "</b></div>" +
       "</div>" +
       "</div>"
     );
@@ -7399,14 +7404,14 @@
 
   // ── Service table ─────────────────────────────────────────────
   function renderMoSvcRows() {
-    return MO_SERVICES.map(function (s) {
+    return (monData().services || []).map(function (s) {
       var sel = s.id === MO_STATE.selectedId ? " mo-svc-row-selected" : "";
       return (
         '<tr class="mo-svc-row' + sel + '" data-mo-id="' + esc(s.id) + '">' +
         '<td style="font-family:var(--ds-num-font);font-weight:var(--ds-font-semibold);">' + esc(s.name) + "</td>" +
         "<td>" + moSvcBadge(s.status) + "</td>" +
-        '<td class="num">' + s.cpu.toFixed(1) + "%</td>" +
-        '<td class="num">' + s.mem + " MB</td>" +
+        '<td class="num">' + (s.latency_ms == null ? "—" : s.latency_ms + " ms") + "</td>" +
+        '<td class="num">' + esc(moHeartbeatAge(s.last_heartbeat)) + "</td>" +
         "</tr>"
       );
     }).join("");
@@ -7416,7 +7421,7 @@
       '<table class="ds-table mo-svc-table">' +
       "<thead><tr>" +
       "<th>Service</th><th>Status</th>" +
-      '<th class="num">CPU</th><th class="num">Memory</th>' +
+      '<th class="num">Latency</th><th class="num">Heartbeat</th>' +
       "</tr></thead>" +
       '<tbody id="mo-svc-tbody">' + renderMoSvcRows() + "</tbody>" +
       "</table>"
@@ -7429,19 +7434,18 @@
     function cell(lbl, val) {
       return '<div class="mo-svc-detail-cell"><div class="mo-svc-detail-label">' + esc(lbl) + '</div><div class="mo-svc-detail-value">' + esc(val) + "</div></div>";
     }
+    if (!s) {
+      return '<div class="empty" style="padding:var(--ds-space-4);">No services registered / 暂无服务</div>';
+    }
     return (
       '<div class="mo-svc-detail">' +
       cell("Service", s.name) +
       cell("Status", s.status) +
-      cell("Uptime", s.uptime) +
-      cell("Requests", s.requests.toLocaleString("en-US")) +
-      cell("Errors", String(s.errors)) +
-      cell("CPU", s.cpu.toFixed(1) + "%") +
-      cell("Memory", s.mem + " MB") +
-      cell("Latency P50", s.p50 + " ms") +
-      cell("Latency P95", s.p95 + " ms") +
-      cell("Latency P99", s.p99 + " ms") +
-      cell("Last Restart", s.restart) +
+      cell("Version", s.version || "—") +
+      cell("Uptime (pipeline)", s.uptime ? moFmtClock(s.uptime) : "—") +
+      cell("Latency", s.latency_ms == null ? "—" : s.latency_ms + " ms") +
+      cell("Heartbeat", moHeartbeatAge(s.last_heartbeat)) +
+      cell("Detail", s.detail || "—") +
       cell("", "") +
       "</div>"
     );
@@ -7453,29 +7457,95 @@
 
   // ── Infrastructure cards ──────────────────────────────────────
   function renderMoInfra() {
-    var cards = MO_INFRA.map(function (m) {
+    var infra = monData().infra || {};
+    if (!infra.available) {
+      return '<div class="empty" style="padding:var(--ds-space-4);">Host metrics unavailable (psutil not installed) / 主机指标不可用</div>';
+    }
+    var items = [
+      { name: "CPU",    m: infra.cpu },
+      { name: "Memory", m: infra.memory },
+      { name: "Disk",   m: infra.disk },
+    ];
+    var cards = items.filter(function (it) { return it.m; }).map(function (it) {
       return (
         '<div class="mo-infra-card">' +
         '<div class="mo-infra-top">' +
-        '<span class="mo-infra-name">' + esc(m.name) + "</span>" +
-        moInfraBadge(m.status, m.statusCls) +
+        '<span class="mo-infra-name">' + esc(it.name) + "</span>" +
+        moInfraBadge(it.m.status) +
         "</div>" +
-        '<div class="mo-infra-value">' + esc(m.value) + "</div>" +
+        '<div class="mo-infra-value">' + esc(it.m.value) + "</div>" +
         "</div>"
       );
     }).join("");
     return '<div class="mo-infra-row">' + cards + "</div>";
   }
 
-  // ── Trading system cards ──────────────────────────────────────
+  // ── Trading runtime cards ─────────────────────────────────────
   function renderMoTrade() {
-    var cards = MO_TRADE.map(function (t) {
-      var valCls = t.neg ? " style='color:var(--ds-loss);'" : (t.pos ? " style='color:var(--ds-profit);'" : "");
+    var t = monData().trading;
+    var ids = (t.strategy_ids || []).join(", ");
+    var cards = [
+      { label: "Strategies",     value: t.strategies,     sub: ids || "—" },
+      { label: "Active Orders",  value: t.active_orders,  sub: "" },
+      { label: "Open Positions", value: t.open_positions, sub: "" },
+      { label: "Paper Accounts", value: t.paper_accounts, sub: t.pipeline_attached ? "pipeline attached" : "detached" },
+      { label: "Execution Queue", value: t.execution_queue, sub: "" },
+      { label: "Event Bus",      value: t.events,         sub: "total events" },
+    ].map(function (c) {
       return (
         '<div class="mo-trade-card">' +
-        '<span class="mo-trade-label">' + esc(t.label) + "</span>" +
-        '<span class="mo-trade-value"' + valCls + ">" + esc(t.value) + "</span>" +
-        (t.sub ? '<span class="mo-trade-sub">' + esc(t.sub) + "</span>" : "") +
+        '<span class="mo-trade-label">' + esc(c.label) + "</span>" +
+        '<span class="mo-trade-value">' + esc(String(c.value)) + "</span>" +
+        (c.sub ? '<span class="mo-trade-sub">' + esc(c.sub) + "</span>" : "") +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="mo-trade-grid">' + cards + "</div>";
+  }
+
+  // ── Execution / risk metrics cards ─────────────────────────────
+  function renderMoMetrics() {
+    var m = monData().metrics;
+    var cards = [
+      { label: "Orders",         value: m.orders,         sub: "" },
+      { label: "Executions",     value: m.executions,     sub: "" },
+      { label: "Fill Rate",      value: moPct(m.fill_rate),   sub: "" },
+      { label: "Reject Rate",    value: moPct(m.reject_rate), sub: "", neg: m.reject_rate > 0 },
+      { label: "Risk Decisions", value: m.risk_decisions, sub: "" },
+      { label: "Risk Rejected",  value: m.risk_rejected,  sub: "", neg: m.risk_rejected > 0 },
+    ].map(function (c) {
+      var valCls = c.neg ? " style='color:var(--ds-loss);'" : "";
+      return (
+        '<div class="mo-trade-card">' +
+        '<span class="mo-trade-label">' + esc(c.label) + "</span>" +
+        '<span class="mo-trade-value"' + valCls + ">" + esc(String(c.value)) + "</span>" +
+        (c.sub ? '<span class="mo-trade-sub">' + esc(c.sub) + "</span>" : "") +
+        "</div>"
+      );
+    }).join("");
+    return '<div class="mo-trade-grid">' + cards + "</div>";
+  }
+
+  // ── Alpha021 paper trading KPI cards ──────────────────────────
+  function renderMoAlpha() {
+    var a = monData().alpha;
+    if (!a) {
+      return '<div class="empty" style="padding:var(--ds-space-4);">Alpha021 paper data unavailable (sync data/real/d1) / 回放数据不可用</div>';
+    }
+    var cards = [
+      { label: "Signals", value: a.signals, sub: a.alpha_id || "" },
+      { label: "Fills",    value: a.fills,   sub: "" },
+      { label: "Rejects",  value: a.rejects, sub: "", neg: a.rejects > 0 },
+      { label: "Errors",   value: a.errors,  sub: "", neg: a.errors > 0 },
+      { label: "Win Rate", value: (Number(a.win_rate) || 0).toFixed(1) + "%", sub: "" },
+      { label: "Return",   value: (Number(a.return_pct) || 0).toFixed(2) + "%", sub: "", neg: Number(a.return_pct) < 0 },
+    ].map(function (c) {
+      var valCls = c.neg ? " style='color:var(--ds-loss);'" : "";
+      return (
+        '<div class="mo-trade-card">' +
+        '<span class="mo-trade-label">' + esc(c.label) + "</span>" +
+        '<span class="mo-trade-value"' + valCls + ">" + esc(String(c.value)) + "</span>" +
+        (c.sub ? '<span class="mo-trade-sub">' + esc(c.sub) + "</span>" : "") +
         "</div>"
       );
     }).join("");
@@ -7484,8 +7554,9 @@
 
   // ── Events list (with filter) ──────────────────────────────────
   function moFilteredEvents() {
-    if (MO_STATE.eventFilter === "ALL") return MO_EVENTS;
-    return MO_EVENTS.filter(function (e) { return e.sev === MO_STATE.eventFilter; });
+    var evts = monData().events || [];
+    if (MO_STATE.eventFilter === "ALL") return evts;
+    return evts.filter(function (e) { return e.severity === MO_STATE.eventFilter; });
   }
   function renderMoEventFilter() {
     var filters = ["ALL", "ERROR", "WARNING", "INFO"];
@@ -7502,9 +7573,9 @@
     var list = moFilteredEvents().map(function (e) {
       return (
         '<div class="mo-event-item">' +
-        '<span class="mo-event-time">' + esc(e.time) + "</span>" +
-        '<span class="mo-event-sev ' + esc(e.sev) + '">' + esc(e.sev) + "</span>" +
-        '<span class="mo-event-text">' + esc(e.text) + "</span>" +
+        '<span class="mo-event-time">' + esc(moFmtClock(e.timestamp)) + "</span>" +
+        '<span class="mo-event-sev ' + esc(e.severity) + '">' + esc(e.severity) + "</span>" +
+        '<span class="mo-event-text">' + esc("[" + (e.source || "system") + "] " + (e.text || "")) + "</span>" +
         "</div>"
       );
     }).join("");
@@ -7540,24 +7611,62 @@
       });
     }
     bindMoEventFilter();
+    var refresh = document.getElementById("mo-refresh");
+    if (refresh) {
+      refresh.addEventListener("click", function () {
+        monLoadCenter(true).then(function () { renderMonPageInto(); });
+      });
+    }
   }
 
-  // ── Monitoring page (Commit 018) — uses the system route ──────
-  PAGE_FRAMEWORK["system"] = function () {
+  function renderMonPageInto() {
+    var host = document.getElementById("mo-page");
+    if (!host) return;
+    host.innerHTML = renderMonPage();
+    bindMonitoringPage();
+  }
+
+  function renderMonPage() {
+    if (MO_STATE.error) {
+      return UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
+        '<div class="ds-error">' + esc(MO_STATE.error) + "</div>";
+    }
+    var o = monData().overview;
     return (
       UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
+      '<div class="ds-toolbar">' +
+        '<button id="mo-refresh" class="btn btn-secondary btn-sm">Refresh</button>' +
+        '<span class="ds-toolbar-meta">Last check: ' + esc(moHeartbeatAge(o.checked_at)) + "</span>" +
+      "</div>" +
       UI.sectionHeading("System Health") +
       renderMoHealthBar() +
       UI.sectionHeading("Service Status") +
-      UI.panel("10 Services", renderMoSvcTable()) +
+      UI.panel(o.services_total + " Services", renderMoSvcTable()) +
       UI.sectionHeading("Service Details") +
       '<div id="mo-svc-detail">' + renderMoSvcDetail() + "</div>" +
+      UI.sectionHeading("Trading Runtime") +
+      UI.panel("What the trading system is doing now", renderMoTrade()) +
+      UI.sectionHeading("Execution Metrics") +
+      UI.panel("Orders · Fills · Rejects · Risk", renderMoMetrics()) +
+      UI.sectionHeading("Alpha021 Paper Trading") +
+      UI.panel("Observation stage", renderMoAlpha()) +
       UI.sectionHeading("Infrastructure") +
-      UI.panel("CPU / Memory / Disk / Network", renderMoInfra()) +
-      UI.sectionHeading("Trading System") +
-      UI.panel("Orders · Events · Execution · Risk · Positions", renderMoTrade()) +
+      UI.panel("CPU / Memory / Disk", renderMoInfra()) +
       UI.sectionHeading("System Events") +
       UI.panel("Event Log", '<div id="mo-event-host">' + renderMoEvents() + "</div>")
+    );
+  }
+
+  // ── Monitoring page (Integration 014) — async hydrate ─────────
+  PAGE_FRAMEWORK["system"] = function () {
+    if (!MO_STATE.data && !MO_STATE.error) {
+      monLoadCenter().then(function () { renderMonPageInto(); });
+    }
+    return (
+      '<div id="mo-page">' +
+      (UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
+       '<div class="ds-loading">Loading monitoring center…</div>') +
+      "</div>"
     );
   };
 

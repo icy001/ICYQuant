@@ -477,6 +477,15 @@
       return this.get("/dashboard/data/center");
     },
 
+    // ── Monitoring API (Integration 014) ───────────────────────
+    /** Monitoring Control Center: system overview → service health →
+     *  trading runtime → execution/risk metrics → Alpha021 paper KPIs →
+     *  event timeline → host infrastructure. Read-only aggregation of
+     *  the existing HealthRegistry + TradingPipeline state. */
+    monitoringCenter: async function () {
+      return this.get("/dashboard/monitoring/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.
