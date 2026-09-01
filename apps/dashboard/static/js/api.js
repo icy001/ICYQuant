@@ -366,6 +366,51 @@
      *  Returns the raw health snapshot ``{status, version, timestamp,
      *  services, bootstrap}``.
      */
+    // ── Research API (Integration 007) ──────────────────────────
+    /** Research overview: all experiment runs with their funnels. */
+    researchOverview: async function () {
+      return this.get("/dashboard/research/overview");
+    },
+
+    /** List of experiment runs (summary). */
+    researchRuns: async function () {
+      return this.get("/dashboard/research/runs");
+    },
+
+    /** Single run detail (spec + split + funnel). */
+    researchRun: async function (runId) {
+      return this.get("/dashboard/research/runs/" + encodeURIComponent(runId));
+    },
+
+    /** Alpha list from a run (alpha_ranking). */
+    researchAlphas: async function (runId) {
+      return this.get("/dashboard/research/alphas",
+                      { run_id: runId || "factor-real-d1" });
+    },
+
+    /** Alpha detail: summary + ranked pairs + decorrelation family. */
+    researchAlphaDetail: async function (alphaId, runId) {
+      var params = runId ? { run_id: runId } : null;
+      return this.get("/dashboard/research/alphas/" + encodeURIComponent(alphaId),
+                      params);
+    },
+
+    /** Funnel for a specific run. */
+    researchFunnel: async function (runId) {
+      return this.get("/dashboard/research/funnel/" + encodeURIComponent(runId));
+    },
+
+    /** De-correlation families for a run. */
+    researchDecorrelation: async function (runId) {
+      return this.get("/dashboard/research/decorrelation/" + encodeURIComponent(runId));
+    },
+
+    /** Raw research report for a run (report.md — View Report source). */
+    researchReport: async function (runId) {
+      return this.get("/dashboard/research/runs/" + encodeURIComponent(runId)
+                      + "/report");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

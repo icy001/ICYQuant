@@ -732,6 +732,388 @@ def factor_candidates(principal: Principal = Depends(require_roles())) -> dict:
             "decorrelation_threshold": dec.get("threshold")}
 
 
+# ---------------------------------------------------------------------------
+# Research API (Integration 007) — read-only views of Factor Discovery v2
+# reports.  Reads from research/discovery/output/{run_id}/report.json.
+# Does NOT modify Factor Engine, Gate, De-correlation, Alpha021, or Paper
+# Trading — these endpoints only "read out" existing research results.
+# ---------------------------------------------------------------------------
+
+_RESEARCH_OUTPUT_DIR = (Path(__file__).resolve().parents[2]
+                        / "research" / "discovery" / "output")
+
+# Alpha101 formula strings — extracted read-only from
+# research/discovery/factor/formulas.py (the sealed WorldQuant 101
+# transcription).  Each alpha_* function carries the paper expression as
+# leading comments; alphas that delegate (e.g. alpha_009/010) resolve their
+# helper's comments.  Display-only: never re-implements the engine.
+_ALPHA_FORMULA_CACHE: dict[str, str] | None = None
+
+
+def _extract_formula(source: str) -> str:
+    """Leading contiguous comment lines of a function, joined to one line."""
+    lines: list[str] = []
+    for line in source.splitlines()[1:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            lines.append(stripped.lstrip("# ").rstrip())
+        elif stripped:
+            break
+    return " ".join(l for l in lines if l)
+
+
+def _alpha_formulas() -> dict[str, str]:
+    """Return {alpha_id: formula string} for all 101 alphas (read-only)."""
+    global _ALPHA_FORMULA_CACHE
+    if _ALPHA_FORMULA_CACHE is not None:
+        return _ALPHA_FORMULA_CACHE
+    formulas: dict[str, str] = {}
+    try:
+        import inspect
+        import re
+
+        from research.discovery.factor import formulas as formulas_mod
+
+        for alpha_id, func in formulas_mod.ALPHA_FUNCS.items():
+            formula = _extract_formula(inspect.getsource(func))
+            if not formula:
+                # delegated alpha (e.g. alpha_009/010) -> find helpers
+                # *defined in formulas.py* in the return line and take the
+                # first one carrying comments (operators like rank() are
+                # skipped via the __module__ check)
+                return_line = next(
+                    (l for l in inspect.getsource(func).splitlines()
+                     if "return" in l), "")
+                for name in re.findall(r"\b(\w+)\s*\(", return_line):
+                    helper = getattr(formulas_mod, name, None)
+                    if (callable(helper)
+                            and getattr(helper, "__module__", None)
+                            == formulas_mod.__name__):
+                        formula = _extract_formula(
+                            inspect.getsource(helper))
+                        if formula:
+                            break
+            formulas[alpha_id] = formula
+    except Exception as exc:  # noqa: BLE001 — display-only, degrade softly
+        logger.warning("alpha formula extraction failed: %s", exc)
+    _ALPHA_FORMULA_CACHE = formulas
+    return formulas
+
+
+def _load_research_report(run_id: str) -> dict:
+    """Load a Factor Discovery report.json (read-only)."""
+    import json
+    path = _RESEARCH_OUTPUT_DIR / run_id / "report.json"
+    if not path.exists():
+        raise HTTPException(status_code=404,
+                            detail=f"report not found: {run_id}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"report unreadable: {exc}") from exc
+
+
+def _normalize_funnel(raw: dict) -> dict:
+    """Normalize the funnel schema across experiment tracks.
+
+    The Factor Discovery v2 reports use ``alphas_total`` / ``pairs_backtested``
+    / ``final_alphas`` / ``decorrelated_alphas``; older tracks use
+    ``candidates_total`` / ``candidates_backtested`` / ``final_candidates``
+    without a de-correlation stage. The UI expects a single shape — this
+    helper merges both into a canonical schema (missing fields → 0).
+    """
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        "alphas_total":         raw.get("alphas_total")
+                                or raw.get("candidates_total") or 0,
+        "pairs_backtested":     raw.get("pairs_backtested")
+                                or raw.get("candidates_backtested") or 0,
+        "validation_passed":   raw.get("validation_passed") or 0,
+        "oos_passed":          raw.get("oos_passed") or 0,
+        "robustness_passed":   raw.get("robustness_passed") or 0,
+        "final_alphas":         raw.get("final_alphas")
+                                or raw.get("final_candidates") or 0,
+        "decorrelated_alphas": raw.get("decorrelated_alphas") or 0,
+    }
+
+
+@router.get("/dashboard/research/overview")
+def research_overview(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Research overview: all experiment runs with their funnels."""
+    runs = []
+    if _RESEARCH_OUTPUT_DIR.exists():
+        for d in sorted(_RESEARCH_OUTPUT_DIR.iterdir()):
+            if not (d.is_dir() and (d / "report.json").exists()):
+                continue
+            try:
+                report = _load_research_report(d.name)
+            except HTTPException:
+                continue
+            spec = report.get("spec", {})
+            funnel = _normalize_funnel(report.get("funnel", {}))
+            runs.append({
+                "run_id": d.name,
+                "experiment_id": report.get("experiment_id", d.name),
+                "dataset": "Real" if "real" in d.name else "Synthetic",
+                "timeframe": spec.get("timeframe", ""),
+                "universe": spec.get("universe", []),
+                "funnel": funnel,
+                "report_generated_at": report.get("report_generated_at", ""),
+            })
+    return {"runs": runs}
+
+
+@router.get("/dashboard/research/runs")
+def research_runs(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """List of experiment runs (summary)."""
+    runs = []
+    if _RESEARCH_OUTPUT_DIR.exists():
+        for d in sorted(_RESEARCH_OUTPUT_DIR.iterdir()):
+            if not (d.is_dir() and (d / "report.json").exists()):
+                continue
+            try:
+                report = _load_research_report(d.name)
+            except HTTPException:
+                continue
+            spec = report.get("spec", {})
+            funnel = _normalize_funnel(report.get("funnel", {}))
+            runs.append({
+                "run_id": d.name,
+                "experiment_id": report.get("experiment_id", d.name),
+                "dataset": "Real" if "real" in d.name else "Synthetic",
+                "timeframe": spec.get("timeframe", ""),
+                "alphas": spec.get("alphas_total", 0),
+                "candidates": funnel.get("final_alphas", 0),
+                "decorrelated": funnel.get("decorrelated_alphas", 0),
+                "status": "Completed",
+                "report_generated_at": report.get("report_generated_at", ""),
+            })
+    return {"runs": runs}
+
+
+@router.get("/dashboard/research/runs/{run_id}")
+def research_run_detail(
+    run_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Single run detail (spec + split + funnel)."""
+    report = _load_research_report(run_id)
+    return {
+        "run_id": run_id,
+        "experiment_id": report.get("experiment_id", run_id),
+        "spec": report.get("spec", {}),
+        "split": report.get("split", {}),
+        "funnel": _normalize_funnel(report.get("funnel", {})),
+        "report_generated_at": report.get("report_generated_at", ""),
+        "runtime_seconds": report.get("runtime_seconds", 0),
+    }
+
+
+def _research_stage_flags(report: dict) -> dict[str, dict]:
+    """Replay the engine's funnel stage logic per alpha (read-only).
+
+    Mirrors FactorEngine.run() exactly: an alpha passes a stage when the
+    number of assets whose checks pass *through* that stage reaches
+    spec.thresholds.min_assets_passed.
+    """
+    thresholds = (report.get("spec") or {}).get("thresholds") or {}
+    min_assets = thresholds.get("min_assets_passed", 3)
+    flags: dict[str, dict] = {}
+    outcomes = report.get("outcomes") or {}
+    for alpha_id, per_asset in outcomes.items():
+        def _count_through(check_name: str) -> int:
+            n = 0
+            for od in per_asset.values():
+                ok = True
+                for chk in od.get("checks", []):
+                    if not chk.get("passed"):
+                        ok = False
+                        break
+                    if chk.get("name") == check_name:
+                        break
+                if ok:
+                    n += 1
+            return n
+        flags[alpha_id] = {
+            "validation_passed":
+                _count_through("validation_performance") >= min_assets,
+            "oos_passed":
+                _count_through("oos_performance") >= min_assets,
+            "robustness_passed":
+                sum(1 for od in per_asset.values() if od.get("passed"))
+                >= min_assets,
+        }
+    return flags
+
+
+def _research_pair_aggregates(report: dict) -> dict[str, dict]:
+    """Mean OOS return / max drawdown per alpha over gate-passing pairs."""
+    agg: dict[str, dict] = {}
+    for p in report.get("ranked_pairs", []):
+        aid = p.get("alpha_id", "")
+        st = agg.setdefault(
+            aid, {"n": 0, "oos_return": 0.0, "max_drawdown": 0.0})
+        st["n"] += 1
+        st["oos_return"] += p.get("oos_return") or 0.0
+        st["max_drawdown"] += p.get("max_drawdown") or 0.0
+    for st in agg.values():
+        if st["n"]:
+            st["oos_return"] = round(st["oos_return"] / st["n"], 6)
+            st["max_drawdown"] = round(st["max_drawdown"] / st["n"], 6)
+    return agg
+
+
+def _research_family_index(report: dict) -> dict[str, dict]:
+    """Map alpha_id -> decorrelation family (read-only)."""
+    index: dict[str, dict] = {}
+    for fam in ((report.get("decorrelation") or {}).get("families") or []):
+        for member in fam.get("members", []) or []:
+            index[member] = fam
+    return index
+
+
+@router.get("/dashboard/research/alphas")
+def research_alphas(
+    run_id: str = "factor-real-d1",
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Alpha list from a run (alpha_ranking)."""
+    report = _load_research_report(run_id)
+    dec = report.get("decorrelation", {})
+    reps = set(dec.get("representatives", []))
+    stages = _research_stage_flags(report)
+    pairs = _research_pair_aggregates(report)
+    families = _research_family_index(report)
+    formulas = _alpha_formulas()
+    alphas = []
+    for row in report.get("alpha_ranking", []):
+        aid = row.get("alpha_id", "")
+        stage = stages.get(aid, {})
+        agg = pairs.get(aid, {})
+        fam = families.get(aid, {})
+        alphas.append({
+            "alpha_id": aid,
+            "status": row.get("status", ""),
+            "score": row.get("score", 0),
+            "rank": row.get("rank", 0),
+            "mean_oos_ic": row.get("mean_oos_ic"),
+            "mean_oos_rank_ic": row.get("mean_oos_rank_ic"),
+            "mean_oos_icir": row.get("mean_oos_icir"),
+            "mean_oos_sharpe": row.get("mean_oos_sharpe"),
+            "mean_oos_return": agg.get("oos_return"),
+            "mean_max_drawdown": agg.get("max_drawdown"),
+            "mean_turnover": row.get("mean_turnover"),
+            "breadth": row.get("breadth"),
+            "assets_passed": row.get("assets_passed", []),
+            "assets_passed_count": row.get("assets_passed_count", 0),
+            "validation_passed": stage.get("validation_passed"),
+            "oos_passed": stage.get("oos_passed"),
+            "robustness_passed": stage.get("robustness_passed"),
+            "is_representative": aid in reps,
+            "family": fam.get("family"),
+            "formula": formulas.get(aid, ""),
+        })
+    return {"run_id": run_id, "alphas": alphas, "total": len(alphas)}
+
+
+@router.get("/dashboard/research/alphas/{alpha_id}")
+def research_alpha_detail(
+    alpha_id: str,
+    run_id: str = "factor-real-d1",
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Alpha detail: summary + ranked pairs + decorrelation family."""
+    report = _load_research_report(run_id)
+    summary = None
+    for row in report.get("alpha_summary", []):
+        if row.get("alpha_id") == alpha_id:
+            summary = row
+            break
+    pairs = [p for p in report.get("ranked_pairs", [])
+             if p.get("alpha_id") == alpha_id]
+    dec = report.get("decorrelation", {})
+    family = None
+    for fam in dec.get("families", []):
+        if alpha_id in fam.get("members", []) or \
+                alpha_id == fam.get("representative"):
+            family = fam
+            break
+    stage = _research_stage_flags(report).get(alpha_id, {})
+    agg = _research_pair_aggregates(report).get(alpha_id, {})
+    return {
+        "alpha_id": alpha_id,
+        "run_id": run_id,
+        "formula": _alpha_formulas().get(alpha_id, ""),
+        "summary": summary,
+        "pairs": pairs,
+        "family": family,
+        "decorrelation_threshold": dec.get("threshold"),
+        "validation_passed": stage.get("validation_passed"),
+        "oos_passed": stage.get("oos_passed"),
+        "robustness_passed": stage.get("robustness_passed"),
+        "mean_oos_return": agg.get("oos_return"),
+        "mean_max_drawdown": agg.get("max_drawdown"),
+    }
+
+
+@router.get("/dashboard/research/runs/{run_id}/report")
+def research_run_report(
+    run_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Raw research report for a run — the UI's View Report source."""
+    base = _RESEARCH_OUTPUT_DIR / run_id
+    for name, fmt in (("report.md", "markdown"), ("report.html", "html")):
+        path = base / name
+        if path.exists():
+            try:
+                return {
+                    "run_id": run_id,
+                    "format": fmt,
+                    "content": path.read_text(encoding="utf-8"),
+                }
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"report unreadable: {exc}") from exc
+    raise HTTPException(status_code=404,
+                        detail=f"report not found: {run_id}")
+
+
+@router.get("/dashboard/research/funnel/{run_id}")
+def research_funnel(
+    run_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Funnel for a specific run."""
+    report = _load_research_report(run_id)
+    return {"run_id": run_id, "funnel": _normalize_funnel(report.get("funnel", {}))}
+
+
+@router.get("/dashboard/research/decorrelation/{run_id}")
+def research_decorrelation(
+    run_id: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """De-correlation families for a run."""
+    report = _load_research_report(run_id)
+    dec = report.get("decorrelation", {})
+    return {
+        "run_id": run_id,
+        "threshold": dec.get("threshold"),
+        "n_families": dec.get("n_families", 0),
+        "families": dec.get("families", []),
+        "representatives": dec.get("representatives", []),
+    }
+
+
 @router.get("/dashboard/session")
 def session_status(principal: Principal = Depends(require_roles())) -> dict:
     return {

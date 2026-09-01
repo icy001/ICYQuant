@@ -459,11 +459,11 @@ def test_d16_factor_paper_page():
     if not (data_root / "NVDA_1d.csv").exists():
         pytest.skip("data/real/d1 not synced - factor replay unavailable")
 
-    # nav link present in the SPA
+    # nav link present in the SPA (UI V1 route: #/research/factors)
     index = (Path(apps_api_main.__file__).resolve().parent.parent
              / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
-    assert 'href="#/factor"' in index
-    assert 'data-nav="factor"' in index
+    assert 'href="#/research/factors"' in index
+    assert 'data-nav="research/factors"' in index
 
     res = client.get(
         "/api/dashboard/factor",
