@@ -1856,3 +1856,229 @@ def risk_enhanced(principal: Principal = Depends(require_roles())) -> dict:
         "trading_halted": len(breaches) > 0,
         "positions": positions_list,
     }
+
+
+# ---------------------------------------------------------------------------
+# Risk Control Center (Integration 010)
+#
+# One read-only endpoint that aggregates the already-integrated risk
+# capabilities for the Risk / Exposure pages:
+#   - runtime.positions() / orders() / risk_decisions() / alerts()
+#   - engine limits (RISK_POSITION_LIMIT / RISK_ORDER_LIMIT)
+#   - UI-configured limits (max_daily_loss_pct / max_drawdown_pct)
+#
+# Honest-data boundary: every number is measured or configured upstream —
+# no invented exposures, sectors or limits. Position → strategy attribution
+# reads position.account_id (the pipeline stores order.strategy_id there).
+# ---------------------------------------------------------------------------
+
+_RK_INFO_PROXY_VOL = 0.02  # same 2% daily-vol proxy as /dashboard/risk-enhanced
+
+
+def _rk_zone(pct: Optional[float]) -> str:
+    """Utilisation zone — breach only when a limit is actually exceeded."""
+    if pct is None:
+        return "NORMAL"
+    if pct >= 1.0:
+        return "BREACH"
+    if pct >= 0.8:
+        return "WATCH"
+    return "NORMAL"
+
+
+def _rk_limit_row(name: str, current: float, limit: float, fmt: str) -> dict:
+    pct = (current / limit) if limit else None
+    return {
+        "name": name,
+        "current": current,
+        "limit": limit,
+        "fmt": fmt,
+        "pct": round(pct, 4) if pct is not None else None,
+        "status": _rk_zone(pct),
+    }
+
+
+@router.get("/dashboard/risk/center")
+def risk_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Risk Control Center: live exposure + limits + event log (read-only)."""
+    from apps.dashboard import runtime as rt
+
+    cfg = _load_ui_config()
+    risk_cfg = cfg.get("risk") or {}
+    initial = float((cfg.get("account") or {}).get("initial_capital", 1_000_000.0))
+    max_loss_pct = float(risk_cfg.get("max_daily_loss_pct", 3.0))
+    max_dd_pct = float(risk_cfg.get("max_drawdown_pct", 6.0))
+
+    positions = rt.positions()
+    orders = rt.orders()
+    decisions = rt.risk_decisions()
+    alerts = rt.alerts()
+    services = rt.system_health().get("services", {})
+
+    # ── engine status ────────────────────────────────────────────
+    attached = rt.attached()
+    risk_engine_up = (services.get("risk-engine") or {}).get("status") == "UP"
+    if not attached:
+        engine_status = "OFFLINE"
+    elif risk_engine_up:
+        engine_status = "ONLINE"
+    else:
+        engine_status = "DEGRADED"
+
+    # ── exposure (positions are the single source of truth) ──────
+    long_exp = sum(p["exposure"] for p in positions if p["side"] == "BUY")
+    short_exp = sum(p["exposure"] for p in positions if p["side"] == "SELL")
+    gross = long_exp + short_exp
+    net = long_exp - short_exp
+    unrealized = sum(p["unrealized_pnl"] for p in positions)
+    equity = initial + unrealized
+    cash = equity - gross
+
+    def _weight(v: float) -> float:
+        return round(v / gross, 4) if gross else 0.0
+
+    by_asset = sorted(
+        (
+            {
+                "symbol": p["symbol"],
+                "side": "Long" if p["side"] == "BUY" else "Short",
+                "exposure": p["exposure"],
+                "weight": _weight(p["exposure"]),
+            }
+            for p in positions
+        ),
+        key=lambda r: -r["exposure"],
+    )
+
+    # by-side breakdown (gross split)
+    by_side = [
+        {"label": "Long", "side": "Long", "exposure": long_exp, "weight": _weight(long_exp)},
+        {"label": "Short", "side": "Short", "exposure": short_exp, "weight": _weight(short_exp)},
+    ]
+
+    # by-strategy breakdown — position.account_id carries the strategy
+    strat_map: dict[str, dict] = {}
+    for p in positions:
+        key = p.get("account_id") or "—"
+        row = strat_map.setdefault(key, {"label": key, "exposure": 0.0})
+        row["exposure"] += p["exposure"]
+    by_strategy = sorted(
+        ({**r, "weight": _weight(r["exposure"])} for r in strat_map.values()),
+        key=lambda r: -r["exposure"],
+    )
+
+    # concentration — HHI over gross-exposure weights (0..10000)
+    hhi = round(sum((a["exposure"] / gross) ** 2 for a in by_asset) * 10_000, 1) if gross else 0.0
+    concentration = {
+        "hhi": hhi,
+        "holdings": [{"symbol": t["symbol"], "weight": t["weight"]} for t in by_asset[:3]],
+    }
+
+    # ── limits (engine + UI-configured) ───────────────────────────
+    total_qty = sum(p["quantity"] for p in positions)
+    var95 = gross * _RK_INFO_PROXY_VOL * 1.65
+    daily_loss = max(0.0, -unrealized)          # positive when losing
+    dd_pct = daily_loss / equity * 100.0 if equity else 0.0
+    loss_limit_amt = equity * max_loss_pct / 100.0
+    dd_limit_amt = equity * max_dd_pct / 100.0
+    limits = [
+        _rk_limit_row("Position Limit", total_qty, rt.RISK_POSITION_LIMIT, "count"),
+        _rk_limit_row("Daily Loss Limit", daily_loss, loss_limit_amt, "money"),
+        _rk_limit_row("Drawdown Limit", dd_pct, max_dd_pct, "pct"),
+        _rk_limit_row("Order Rate Limit", len(orders), rt.RISK_ORDER_LIMIT, "count"),
+    ]
+
+    # ── KPI table (informational rows carry NORMAL status) ───────
+    kpi = [
+        {"metric": "Net Exposure", "fmt": "pct", "value": round(net / equity, 6) if equity else 0.0,
+         "status": "NORMAL"},
+        {"metric": "Gross Exposure", "fmt": "pct", "value": round(gross / equity, 6) if equity else 0.0,
+         "status": "NORMAL"},
+        {"metric": "Daily P&L", "fmt": "signedPct", "value": round(unrealized / equity, 6) if equity else 0.0,
+         "status": _rk_zone(daily_loss / loss_limit_amt) if loss_limit_amt else "NORMAL"},
+        {"metric": "Max Drawdown", "fmt": "pct", "value": round(dd_pct / 100.0, 6),
+         "status": _rk_zone(dd_pct / max_dd_pct) if max_dd_pct else "NORMAL"},
+        {"metric": "VaR (95%)", "fmt": "pct", "value": round(var95 / equity, 6) if equity else 0.0,
+         "status": "NORMAL"},
+        {"metric": "Position Quantity", "fmt": "count", "value": total_qty,
+         "status": _rk_zone(total_qty / rt.RISK_POSITION_LIMIT) if rt.RISK_POSITION_LIMIT else "NORMAL"},
+        {"metric": "Open Positions", "fmt": "count", "value": len(positions), "status": "NORMAL"},
+    ]
+    approved = sum(1 for d in decisions if d.get("decision") == "APPROVED")
+    rejected = sum(1 for d in decisions if d.get("decision") == "REJECTED")
+    kpi.append({
+        "metric": "Risk Decisions",
+        "fmt": "text",
+        "value": "{0} approved · {1} rejected".format(approved, rejected),
+        "status": "NORMAL",
+    })
+
+    # ── event log (alerts + rejected decisions, newest first) ────
+    events: list[dict] = []
+    for a in alerts:
+        level = str(a.get("level", "INFO")).upper()
+        sev = "BREACH" if level in ("CRITICAL", "HIGH") else (level if level in ("WARNING", "INFO") else "INFO")
+        src = str(a.get("source", "system"))
+        title = {
+            "risk": "Risk engine notice",
+            "reconciliation": "Reconciliation",
+            "system": "System",
+        }.get(src, src.replace("_", " ").title())
+        events.append({
+            "time": a.get("timestamp", ""),
+            "severity": sev,
+            "title": title,
+            "detail": a.get("message", ""),
+        })
+    for d in decisions:
+        if d.get("decision") != "REJECTED":
+            continue
+        events.append({
+            "time": d.get("timestamp", ""),
+            "severity": "WARNING",
+            "title": "Order rejected: {0} {1} {2}".format(
+                d.get("side", ""), d.get("symbol", ""), d.get("quantity", "")),
+            "detail": d.get("reason", "risk engine reject"),
+        })
+    events.append({
+        "time": "",
+        "severity": "INFO",
+        "title": "Risk engine snapshot",
+        "detail": "{0} open positions · gross exposure {1:,.0f} · net {2:,.0f}".format(
+            len(positions), gross, net),
+    })
+    if not attached:
+        events.append({
+            "time": "",
+            "severity": "WARNING",
+            "title": "No trading pipeline attached",
+            "detail": "Start a paper session to populate live risk metrics. / 未挂载交易管道，启动 Paper Session 后显示实时风控数据。",
+        })
+
+    return {
+        "engine": {
+            "status": engine_status,
+            "attached": attached,
+            "services": {k: v.get("status") for k, v in services.items()},
+            "last_update": _utc_now().isoformat(timespec="seconds"),
+        },
+        "exposure": {
+            "long": round(long_exp, 2),
+            "short": round(short_exp, 2),
+            "gross": round(gross, 2),
+            "net": round(net, 2),
+            "cash": round(cash, 2),
+            "equity": round(equity, 2),
+            "unrealized_pnl": round(unrealized, 2),
+            "margin_usage": round(gross / equity, 4) if equity else 0.0,
+            "position_count": len(positions),
+            "by_asset": by_asset,
+            "by_side": by_side,
+            "by_strategy": by_strategy,
+        },
+        "concentration": concentration,
+        "kpi": kpi,
+        "limits": limits,
+        "decisions": {"total": len(decisions), "approved": approved, "rejected": rejected},
+        "events": events,
+    }

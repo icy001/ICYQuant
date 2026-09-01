@@ -447,6 +447,12 @@
                       null, { timeoutMs: 180000 });
     },
 
+    // ── Risk API (Integration 010) ──────────────────────────────
+    /** Risk Control Center: live exposure + limits + event log. */
+    riskCenter: async function () {
+      return this.get("/dashboard/risk/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

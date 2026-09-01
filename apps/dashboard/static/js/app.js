@@ -6448,77 +6448,68 @@
   };
 
   /* ==================================================================
-   * Risk module — Commit 013
+   * Risk module — Integration 010 (real Risk API)
    * Risk Control Center: engine status → KPI table → exposure → limits
-   * → risk events. UI-only mock data; does NOT modify the Risk Engine,
-   * strategy runtime, order engine, position ledger, or risk rules.
+   * → risk events. Reads GET /dashboard/risk/center, which aggregates
+   * the live pipeline (positions / orders / risk decisions / alerts),
+   * the official Risk Engine limits and the UI-configured loss limits.
+   * Read-only: does NOT modify the Risk Engine, strategy runtime,
+   * order engine, position ledger, or risk rules.
    * ================================================================== */
 
-  // ── Risk data ──────────────────────────────────────────────────
-  var RK_ENGINE = { status: "ONLINE", lastUpdate: "09:08:32" };
-
-  var RK_KPI = [
-    { metric: "Net Exposure",       value: "26.4%",  status: "NORMAL" },
-    { metric: "Gross Exposure",     value: "42.8%",  status: "NORMAL" },
-    { metric: "Margin Usage",       value: "18.7%",  status: "NORMAL" },
-    { metric: "Daily P&L",          value: "+0.42%", status: "NORMAL" },
-    { metric: "Max Drawdown",       value: "-5.5%",  status: "WATCH" },
-    { metric: "Portfolio Volatility", value: "12.4%", status: "NORMAL" },
-    { metric: "VaR (95%)",          value: "-1.8%",  status: "NORMAL" },
-    { metric: "Risk Budget",        value: "64.0%",  status: "NORMAL" },
-  ];
-
-  var RK_OVERVIEW = {
-    totalExposure: 428000, netExposure: 264000, grossExposure: 428000,
-    cash: 572000, marginUsage: 0.187,
+  // ── Risk state (Integration 010) ──────────────────────────────
+  var RK_STATE = {
+    data: null,        // payload from GET /dashboard/risk/center
+    error: null,       // message from the last failed load
   };
 
-  // equity = $1,000,000 · Long $346k · Short $82k · Gross $428k · Net $264k
-  var RK_ASSET_EXPOSURE = [
-    { symbol: "NVDA", exposure: 128000, weight: 0.299, side: "Long" },
-    { symbol: "QQQ",  exposure: 118000, weight: 0.276, side: "Long" },
-    { symbol: "SPY",  exposure: 100000, weight: 0.234, side: "Long" },
-    { symbol: "AAPL", exposure: 42000,  weight: 0.098, side: "Short" },
-    { symbol: "TSLA", exposure: 40000,  weight: 0.093, side: "Short" },
-  ];
+  // Load the Risk Control Center payload (cached until forced).
+  async function rkLoadCenter(force) {
+    if (RK_STATE.data && !force) return;
+    var data = await api.riskCenter();
+    RK_STATE.data = data;
+    RK_STATE.error = null;
+  }
 
-  var RK_SECTOR_EXPOSURE = [
-    { sector: "Technology", exposure: 288000, weight: 0.673 },
-    { sector: "Broad Market", exposure: 100000, weight: 0.234 },
-    { sector: "Consumer Discretionary", exposure: 40000, weight: 0.093 },
-  ];
+  // Safe accessor: returns the cached payload or an empty skeleton so
+  // renderers never crash when the API has not answered yet.
+  function rkData() {
+    return RK_STATE.data || {
+      engine: { status: "—", last_update: "" },
+      exposure: { long: 0, short: 0, gross: 0, net: 0, cash: 0, equity: 0,
+                  unrealized_pnl: 0, margin_usage: 0, position_count: 0,
+                  by_asset: [], by_side: [], by_strategy: [] },
+      concentration: { hhi: 0, holdings: [] },
+      kpi: [], limits: [],
+      decisions: { total: 0, approved: 0, rejected: 0 },
+      events: [],
+    };
+  }
 
-  var RK_STRATEGY_EXPOSURE = [
-    { strategy: "Alpha021",        exposure: 228000, weight: 0.533 },
-    { strategy: "Momentum S001",   exposure: 109380, weight: 0.256 },
-    { strategy: "Cross-Section Q", exposure: 90620,  weight: 0.212 },
-  ];
+  // Format a KPI row value by its backend-provided fmt hint.
+  function rkFmtVal(k) {
+    var v = k.value;
+    if (k.fmt === "pct") return (v * 100).toFixed(2) + "%";
+    if (k.fmt === "signedPct") return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%";
+    if (k.fmt === "count") return String(v);
+    return String(v); // text
+  }
 
-  var RK_CONCENTRATION = {
-    hhi: 2386,
-    holdings: [
-      { symbol: "QQQ",  weight: 0.276 },
-      { symbol: "NVDA", weight: 0.299 },
-      { symbol: "SPY",  weight: 0.234 },
-    ],
-  };
+  // Event timestamps arrive as ISO strings (or "" for synthetic rows).
+  function rkFmtTime(t) {
+    if (!t) return "—";
+    var d = new Date(t);
+    if (isNaN(d.getTime())) return t;
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " +
+      p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
 
-  var RK_LIMITS = [
-    { name: "Position Limit",   current: 3,    limit: 1000,  fmt: "count" },
-    { name: "Daily Loss Limit", current: 720,   limit: 4000,  fmt: "money" },
-    { name: "Drawdown Limit",   current: 5.5,  limit: 10.0,  fmt: "pct" },
-    { name: "Leverage Limit",    current: 1.43, limit: 2.00,  fmt: "x" },
-    { name: "Order Rate Limit",  current: 12,   limit: 100,   fmt: "count" },
-  ];
-
-  var RK_EVENTS = [
-    { time: "09:08:32",  severity: "INFO",    title: "Risk engine snapshot", detail: "All metrics within budget" },
-    { time: "08:42:00",  severity: "WARNING",  title: "Leverage above target", detail: "1.43x / 2.00x (71%)" },
-    { time: "08:15:00",  severity: "INFO",    title: "Paper session started", detail: "Alpha021 paper trading active" },
-    { time: "07:58:30",  severity: "WARNING",  title: "Drawdown approaching limit", detail: "-5.5% / -10.0% (55%)" },
-    { time: "06:00:00",  severity: "INFO",    title: "Risk engine started", detail: "Engine ONLINE, all limits loaded" },
-    { time: "Yesterday", severity: "BREACH",  title: "Daily loss limit breached", detail: "-$4,200 > -$4,000 (auto-halt triggered)" },
-  ];
+  // Muted empty-state line for panels with no rows (e.g. no pipeline).
+  function rkEmpty(msg) {
+    return '<div class="ds-text-muted" style="padding:var(--ds-space-3);font-size:var(--ds-text-sm);">' +
+      esc(msg) + "</div>";
+  }
 
   function rkStatusBadge(status) {
     var key = (status || "").toLowerCase();
@@ -6544,37 +6535,45 @@
 
   // ── Engine status bar ─────────────────────────────────────────
   function renderRkStatusBar() {
-    var eng = RK_ENGINE.status.toLowerCase();
+    var eng = rkData().engine;
+    var status = eng.status || "—";
+    var key = status.toLowerCase();
     return (
       '<div class="rk-status-bar">' +
-      '<div class="rk-engine-status rk-engine-' + eng + '">' +
+      '<div class="rk-engine-status rk-engine-' + key + '">' +
       '<span class="rk-engine-dot"></span>' +
       '<span>Risk Engine: </span>' +
-      '<span class="rk-engine-text ' + eng + '">' + esc(RK_ENGINE.status) + "</span>" +
+      '<span class="rk-engine-text ' + key + '">' + esc(status) + "</span>" +
       "</div>" +
-      '<div class="rk-last-update">Last Update: ' + esc(RK_ENGINE.lastUpdate) + "</div>" +
+      '<div class="rk-last-update">Last Update: ' + esc(rkFmtTime(eng.last_update)) + "</div>" +
       "</div>"
     );
   }
 
   // ── Overview KPI cards ────────────────────────────────────────
   function renderRkOverview() {
-    var o = RK_OVERVIEW;
+    var e = rkData().exposure;
+    var eq = e.equity || 1;
+    var pct = function (v) { return ((v / eq) * 100).toFixed(1) + "%"; };
     return UI.kpiGrid(
-      UI.metricCard("Total Exposure", UI.money(o.totalExposure, 0), "42.8%", "info") +
-      UI.metricCard("Net Exposure", UI.money(o.netExposure, 0), "26.4%", "info") +
-      UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "42.8%", "info") +
-      UI.metricCard("Cash", UI.money(o.cash, 0), "57.2%", "") +
-      UI.metricCard("Margin Usage", (o.marginUsage * 100).toFixed(1) + "%", "", "")
+      UI.metricCard("Gross Exposure", UI.money(e.gross, 0), pct(e.gross), "info") +
+      UI.metricCard("Net Exposure", UI.money(e.net, 0), pct(e.net), e.net >= 0 ? "info" : "neg") +
+      UI.metricCard("Long Exposure", UI.money(e.long, 0), pct(e.long), "pos") +
+      UI.metricCard("Short Exposure", UI.money(e.short, 0), pct(e.short), "neg") +
+      UI.metricCard("Cash", UI.money(e.cash, 0), pct(e.cash), "")
     );
   }
 
   // ── KPI status table ──────────────────────────────────────────
   function renderRkKpiTable() {
-    var rows = RK_KPI.map(function (k) {
+    var kpi = rkData().kpi;
+    if (!kpi.length) {
+      return rkEmpty("No risk metrics yet — start a paper session to populate the KPI table. / 暂无风控指标，启动 Paper Session 后显示。");
+    }
+    var rows = kpi.map(function (k) {
       return "<tr>" +
         '<td class="rk-metric">' + esc(k.metric) + "</td>" +
-        '<td class="rk-value">' + esc(k.value) + "</td>" +
+        '<td class="rk-value">' + esc(rkFmtVal(k)) + "</td>" +
         "<td>" + rkStatusBadge(k.status) + "</td>" +
         "</tr>";
     }).join("");
@@ -6588,6 +6587,9 @@
 
   // ── Exposure bars ─────────────────────────────────────────────
   function renderRkExposureBars(items, labelKey, expKey) {
+    if (!items.length) {
+      return rkEmpty("No exposure — no open positions. / 暂无敞口，当前无持仓。");
+    }
     return items.map(function (it) {
       var side = it.side || "";
       var fillCls = side === "Short" ? "short" : side === "Long" ? "long" : "neutral";
@@ -6605,8 +6607,12 @@
 
   // ── Limits with progress bars ─────────────────────────────────
   function renderRkLimits() {
-    return RK_LIMITS.map(function (l) {
-      var pct = l.current / l.limit;
+    var limits = rkData().limits;
+    if (!limits.length) {
+      return rkEmpty("No limits loaded. / 未加载限额。");
+    }
+    return limits.map(function (l) {
+      var pct = l.pct == null ? 0 : l.pct;
       var zone = rkLimitZone(pct);
       var status = rkLimitStatus(pct);
       var w = (pct * 100).toFixed(1);
@@ -6625,11 +6631,15 @@
 
   // ── Risk events log ───────────────────────────────────────────
   function renderRkEvents() {
-    return RK_EVENTS.map(function (e) {
-      var sevCls = "rk-sev-" + e.severity.toLowerCase();
+    var events = rkData().events;
+    if (!events.length) {
+      return rkEmpty("No risk events. / 暂无风控事件。");
+    }
+    return events.map(function (e) {
+      var sevCls = "rk-sev-" + String(e.severity || "info").toLowerCase();
       return (
         '<div class="rk-event-item ' + sevCls + '">' +
-        '<span class="rk-event-time">' + esc(e.time) + "</span>" +
+        '<span class="rk-event-time">' + esc(rkFmtTime(e.time)) + "</span>" +
         '<span class="rk-sev-badge ' + sevCls + '">' + esc(e.severity) + "</span>" +
         '<span class="rk-event-detail"><strong>' + esc(e.title) + "</strong> · " + esc(e.detail) + "</span>" +
         "</div>"
@@ -6638,17 +6648,18 @@
   }
 
   function renderRkConcentration() {
-    var rows = RK_CONCENTRATION.holdings.map(function (h) {
+    var c = rkData().concentration;
+    var rows = (c.holdings || []).map(function (h) {
       return "<tr><td>" + esc(h.symbol) + "</td>" +
         '<td class="num">' + (h.weight * 100).toFixed(1) + "%</td></tr>";
     }).join("");
     return (
       '<table class="ds-table rk-kpi-table">' +
       "<thead><tr><th>Top Holding</th><th style=\"text-align:right;\">Weight</th></tr></thead>" +
-      "<tbody>" + rows + "</tbody></table>" +
+      "<tbody>" + (rows || '<tr><td colspan="2" class="ds-text-muted">—</td></tr>') + "</tbody></table>" +
       '<div style="margin-top:var(--ds-space-3);display:flex;justify-content:space-between;align-items:center;">' +
       '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);text-transform:uppercase;letter-spacing:var(--ds-tracking-wider);">HHI Concentration</span>' +
-      '<span class="ds-num-font" style="font-weight:var(--ds-font-bold);font-family:var(--ds-num-font);">' + RK_CONCENTRATION.hhi + "</span>" +
+      '<span class="ds-num-font" style="font-weight:var(--ds-font-bold);font-family:var(--ds-num-font);">' + esc(String(c.hhi)) + "</span>" +
       "</div>"
     );
   }
@@ -6660,18 +6671,16 @@
       refreshBtn.addEventListener("click", function () {
         refreshBtn.disabled = true;
         refreshBtn.textContent = "Refreshing…";
-        setTimeout(function () {
-          var now = new Date();
-          var hh = (now.getHours() < 10 ? "0" : "") + now.getHours();
-          var mm = (now.getMinutes() < 10 ? "0" : "") + now.getMinutes();
-          var ss = (now.getSeconds() < 10 ? "0" : "") + now.getSeconds();
-          RK_ENGINE.lastUpdate = hh + ":" + mm + ":" + ss;
-          var bar = document.querySelector(".rk-status-bar");
-          if (bar) bar.outerHTML = renderRkStatusBar();
+        rkLoadCenter(true).then(function () {
+          return render();
+        }).catch(function (err) {
+          showToast("Failed to refresh risk data / 风控数据刷新失败: " +
+            ((err && err.message) || err), "error");
+        }).then(function () {
           refreshBtn.disabled = false;
           refreshBtn.textContent = "Refresh";
-          showToast("Risk snapshot updated / 风控快照已更新 (UI only)", "ok");
-        }, 800);
+          showToast("Risk snapshot updated / 风控快照已更新", "ok");
+        });
       });
     }
     var reportBtn = document.querySelector('[data-action="rk:report"]');
@@ -6688,8 +6697,10 @@
     });
   }
 
-  // ── Risk Control Center (Commit 013) ──────────────────────────
-  PAGE_FRAMEWORK["risk"] = function () {
+  // ── Risk Control Center (Integration 010: real Risk API) ────────
+  PAGE_FRAMEWORK["risk"] = async function () {
+    await rkLoadCenter();
+    var d = rkData();
     return (
       UI.pageHeader("Risk Control Center", "Risk monitoring, exposure, and limits · 风控中心",
         UI.button("Refresh", "ghost", { sm: true, action: "rk:refresh" }) +
@@ -6701,9 +6712,9 @@
       UI.panel("KPI Status", renderRkKpiTable()) +
       UI.sectionHeading("Exposure") +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ds-space-4);">' +
-      UI.panel("Asset Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_ASSET_EXPOSURE, "symbol", "exposure") + "</div>") +
-      UI.panel("Sector Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_SECTOR_EXPOSURE, "sector", "exposure") + "</div>") +
-      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_STRATEGY_EXPOSURE, "strategy", "exposure") + "</div>") +
+      UI.panel("Asset Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(d.exposure.by_asset, "symbol", "exposure") + "</div>") +
+      UI.panel("Side Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(d.exposure.by_side, "label", "exposure") + "</div>") +
+      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(d.exposure.by_strategy, "label", "exposure") + "</div>") +
       UI.panel("Concentration", renderRkConcentration()) +
       "</div>" +
       UI.sectionHeading("Limits") +
@@ -6713,18 +6724,22 @@
     );
   };
 
-  // ── Exposure page (Commit 013 — enhanced) ────────────────────
-  PAGE_FRAMEWORK["risk/exposure"] = function () {
-    var o = RK_OVERVIEW;
+  // ── Exposure page (Integration 010: real Risk API) ────────────
+  PAGE_FRAMEWORK["risk/exposure"] = async function () {
+    await rkLoadCenter();
+    var d = rkData();
+    var e = d.exposure;
+    var eq = e.equity || 1;
+    var pct = function (v) { return ((v / eq) * 100).toFixed(1) + "%"; };
     return (
       UI.pageHeader("Exposure", "Exposure breakdown and analysis · 敞口分析",
         UI.button("Refresh", "ghost", { sm: true, action: "rk:refresh" })) +
       renderRkStatusBar() +
       UI.kpiGrid(
-        UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "42.8%", "info") +
-        UI.metricCard("Net Exposure", UI.money(o.netExposure, 0), "26.4%", "info") +
-        UI.metricCard("Long Exposure", "$346,000", "34.6%", "pos") +
-        UI.metricCard("Short Exposure", "$82,000", "8.2%", "neg")
+        UI.metricCard("Gross Exposure", UI.money(e.gross, 0), pct(e.gross), "info") +
+        UI.metricCard("Net Exposure", UI.money(e.net, 0), pct(e.net), e.net >= 0 ? "info" : "neg") +
+        UI.metricCard("Long Exposure", UI.money(e.long, 0), pct(e.long), "pos") +
+        UI.metricCard("Short Exposure", UI.money(e.short, 0), pct(e.short), "neg")
       ) +
       UI.sectionHeading("By Asset") +
       UI.panel("Exposure Breakdown", UI.table({
@@ -6734,12 +6749,12 @@
           { key: "weight", label: "Weight", numeric: true, format: function (v) { return (v * 100).toFixed(1) + "%"; } },
           { key: "side", label: "Side" },
         ],
-        rows: RK_ASSET_EXPOSURE,
+        rows: e.by_asset,
       })) +
-      UI.sectionHeading("By Sector") +
-      UI.panel("Sector Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_SECTOR_EXPOSURE, "sector", "exposure") + "</div>") +
+      UI.sectionHeading("By Side") +
+      UI.panel("Side Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(e.by_side, "label", "exposure") + "</div>") +
       UI.sectionHeading("By Strategy") +
-      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(RK_STRATEGY_EXPOSURE, "strategy", "exposure") + "</div>") +
+      UI.panel("Strategy Exposure", '<div class="rk-exp-list">' + renderRkExposureBars(e.by_strategy, "label", "exposure") + "</div>") +
       UI.sectionHeading("Concentration") +
       UI.panel("Top Holdings & HHI", renderRkConcentration())
     );
