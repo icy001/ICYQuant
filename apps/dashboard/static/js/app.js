@@ -4486,90 +4486,64 @@
   };
 
   /* ==================================================================
-   * Backtest module — Commit 011
-   * Professional backtest workbench: config → KPIs → equity/drawdown/
-   * monthly returns → trades → summary. Mock data designed for future
-   * real-API swap. State machine: idle | running | done | error.
-   * Display-only — does NOT invoke the backtest engine, Factor Discovery,
-   * Alpha021, paper trading, or any trading API.
+   * Backtest module — Integration 008 (real Backtest API)
+   * Professional backtest workbench wired to the real replay engine:
+   * config → POST /dashboard/backtest/run → KPIs → equity/drawdown/
+   * monthly returns → trades → summary → run history.
+   * The quant core stays frozen (Alpha021 / FACTOR_SPEC_REAL_D1); this
+   * layer only parameterises the replay window, universe and initial
+   * capital. State machine: idle | running | done | error.
    * ================================================================== */
   function btPad2(n) { return (n < 10 ? "0" : "") + n; }
 
-  // Equity curve (44 monthly points, 2023-01 → 2026-08).
-  // Local peak at month 6 (1,045,000), trough at month 12 (987,725) → -5.5%
-  // max drawdown; final 1,081,200 = +8.12% total return.
-  var BT_EQUITY = [
-    1000000, 1010000, 1020000, 1030000, 1040000, 1045000,
-    1035000, 1025000, 1015000, 1005000, 995000, 987725,
-    1000000, 1010000, 1018000, 1024000, 1030000, 1035000,
-    1040000, 1042000, 1045000, 1048000, 1050000, 1052000,
-    1054000, 1056000, 1058000, 1060000, 1061000, 1062000,
-    1063000, 1064000, 1065000, 1066000, 1067000, 1068000,
-    1069000, 1071000, 1072000, 1074000, 1075000, 1077000,
-    1079000, 1081200,
-  ];
-  var BT_START = { year: 2023, month: 1 };
-
-  var BT_KPI = {
-    totalReturn: 0.0812,
-    cagr: 0.124,
-    sharpe: 1.38,
-    maxDD: -0.055,
-    winRate: 0.68,
-    turnover: 1.24,
+  // Module state (Integration 008): last result + run history + universe.
+  var BT_STATE = {
+    status: "idle",       // "idle" | "running" | "done" | "error"
+    error: null,          // message from the last failed run
+    result: null,         // last completed payload (Backtest API)
+    runs: [],             // run history (GET /dashboard/backtest/runs)
+    universe: null,       // symbols + frozen strategy metadata
   };
 
-  var BT_TRADES = [
-    { date: "2023-02-14", symbol: "NVDA", side: "BUY", qty: 100, price: 230.50, pnl: null },
-    { date: "2023-03-10", symbol: "NVDA", side: "SELL", qty: 100, price: 248.20, pnl: 1770.00 },
-    { date: "2023-04-05", symbol: "QQQ", side: "BUY", qty: 200, price: 320.10, pnl: null },
-    { date: "2023-05-12", symbol: "QQQ", side: "SELL", qty: 200, price: 312.40, pnl: -1540.00 },
-    { date: "2023-06-20", symbol: "SPY", side: "BUY", qty: 150, price: 440.30, pnl: null },
-    { date: "2023-08-15", symbol: "SPY", side: "SELL", qty: 150, price: 430.80, pnl: -1425.00 },
-    { date: "2023-09-02", symbol: "NVDA", side: "BUY", qty: 120, price: 410.25, pnl: null },
-    { date: "2023-11-30", symbol: "NVDA", side: "SELL", qty: 120, price: 460.50, pnl: 6030.00 },
-    { date: "2024-01-18", symbol: "QQQ", side: "BUY", qty: 180, price: 380.50, pnl: null },
-    { date: "2024-03-22", symbol: "QQQ", side: "SELL", qty: 180, price: 410.20, pnl: 5346.00 },
-    { date: "2024-05-10", symbol: "SPY", side: "BUY", qty: 130, price: 480.60, pnl: null },
-    { date: "2024-07-15", symbol: "SPY", side: "SELL", qty: 130, price: 495.10, pnl: 1885.00 },
-    { date: "2025-02-14", symbol: "NVDA", side: "BUY", qty: 90, price: 720.30, pnl: null },
-    { date: "2025-04-20", symbol: "NVDA", side: "SELL", qty: 90, price: 738.90, pnl: 1674.00 },
-  ];
-
-  // ── Derived series ────────────────────────────────────────────
-  function buildBtEquityPoints(eq, start) {
+  // ── Derived series (built from BT_STATE.result) ───────────────
+  function btDateParts(date) {
+    var parts = String(date || "").split("-");
+    return { year: Number(parts[0]) || 0, month: Number(parts[1]) || 0 };
+  }
+  function btEquityPoints() {
+    var eq = (BT_STATE.result && BT_STATE.result.equity) || [];
+    return eq.map(function (r) {
+      var p = btDateParts(r.date);
+      return { value: r.equity, label: r.date, year: p.year, month: p.month };
+    });
+  }
+  function btDrawdownPoints() {
+    var eq = (BT_STATE.result && BT_STATE.result.equity) || [];
+    var dd = (BT_STATE.result && BT_STATE.result.drawdown_series) || [];
     var pts = [];
-    var y = start.year, m = start.month;
-    for (var i = 0; i < eq.length; i++) {
-      pts.push({ value: eq[i], label: y + "-" + btPad2(m), year: y, month: m });
-      m++; if (m > 12) { m = 1; y++; }
+    for (var i = 0; i < Math.min(eq.length, dd.length); i++) {
+      var p = btDateParts(eq[i].date);
+      // drawdown_series is in percent (-5.5 == -5.5%) — normalise to fraction
+      pts.push({ value: (dd[i] || 0) / 100, label: eq[i].date, year: p.year, month: p.month });
     }
     return pts;
   }
-  function buildBtDrawdownPoints(eqPts) {
-    var pts = [], max = eqPts[0].value;
-    for (var i = 0; i < eqPts.length; i++) {
-      var v = eqPts[i].value;
-      if (v > max) max = v;
-      pts.push({ value: (v - max) / max, label: eqPts[i].label, year: eqPts[i].year, month: eqPts[i].month });
-    }
-    return pts;
-  }
-  function buildBtMonthlyReturns(eqPts) {
+  function btMonthlyReturns() {
+    // API shape: [{month: "YYYY-MM", return_pct: 0.11}] (percent) —
+    // normalised to {years, cells{year{month: fraction}}}.
+    var rows = (BT_STATE.result && BT_STATE.result.monthly_returns) || [];
     var cells = {};
-    for (var i = 0; i < eqPts.length; i++) {
-      var p = eqPts[i];
-      var r = i === 0 ? 0 : p.value / eqPts[i - 1].value - 1;
+    rows.forEach(function (r) {
+      var p = btDateParts(r.month);
+      if (!p.year || !p.month) return;
       if (!cells[p.year]) cells[p.year] = {};
-      cells[p.year][p.month] = r;
-    }
-    return { years: Object.keys(cells).map(Number).sort(function (a, b) { return a - b; }), cells: cells };
+      cells[p.year][p.month] = (r.return_pct || 0) / 100;
+    });
+    return {
+      years: Object.keys(cells).map(Number).sort(function (a, b) { return a - b; }),
+      cells: cells,
+    };
   }
-
-  var BT_EQUITY_PTS = buildBtEquityPoints(BT_EQUITY, BT_START);
-  var BT_DRAWDOWN_PTS = buildBtDrawdownPoints(BT_EQUITY_PTS);
-  var BT_MONTHLY = buildBtMonthlyReturns(BT_EQUITY_PTS);
-  var BT_STATE = "done"; // "idle" | "running" | "done" | "error"
 
   function btPct(x) { return (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%"; }
   function btFmtPct(r) { return (r >= 0 ? "+" : "") + (r * 100).toFixed(2) + "%"; }
@@ -4592,47 +4566,80 @@
     return (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Strategy is frozen to the sealed FACTOR_SPEC_REAL_D1 replay — the select
+  // is informational (single option), not an engine knob.
   function renderBtConfig() {
+    var strategy = (BT_STATE.universe && BT_STATE.universe.strategy) || {};
+    var strat = strategy.alpha_id || "Alpha021";
     var form =
-      UI.field("Strategy", UI.select({ id: "bt-strategy", value: "Alpha021", options: [
-        { value: "Alpha021", label: "Alpha021" },
-        { value: "Momentum-Q", label: "Momentum-Q" },
-        { value: "MeanRevert", label: "Mean Reversion" },
-        { value: "factor-v1", label: "factor-v1 (Synthetic)" },
+      UI.field("Strategy", UI.select({ id: "bt-strategy", value: strat, options: [
+        { value: strat, label: strat + (strategy.frozen ? " (frozen)" : "") },
       ] })) +
-      UI.field("Factor", UI.select({ id: "bt-factor", value: "Alpha021", options: [
-        { value: "Alpha021", label: "Alpha021" },
-        { value: "Alpha008", label: "Alpha008" },
-        { value: "Alpha060", label: "Alpha060" },
-        { value: "Alpha047", label: "Alpha047" },
+      UI.field("Universe", '<div class="form-checks">' + btUniverseChecks() + "</div>") +
+      UI.field("Timeframe", UI.select({ id: "bt-tf", value: strategy.timeframe || "1D", options: [
+        { value: "1D", label: "1D (real daily data)" },
       ] })) +
-      UI.field("Universe", UI.input({ id: "bt-universe", value: "NVDA QQQ SPY" })) +
-      UI.field("Timeframe", UI.select({ id: "bt-tf", value: "1D", options: [
-        { value: "1D", label: "1D" }, { value: "1H", label: "1H" },
-        { value: "15m", label: "15m" }, { value: "5m", label: "5m" },
-      ] })) +
-      UI.field("Start", UI.input({ id: "bt-start", type: "date", value: "2023-01-01" })) +
-      UI.field("End", UI.input({ id: "bt-end", type: "date", value: "2026-08-24" })) +
-      UI.field("Initial Capital", UI.input({ id: "bt-capital", type: "number", value: "1000000", step: "1000" })) +
-      UI.field("Commission (%)", UI.input({ id: "bt-commission", type: "number", value: "0.00", step: "0.01" })) +
-      UI.field("Slippage (bps)", UI.input({ id: "bt-slippage", type: "number", value: "3", step: "1" }));
-    return '<div class="bt-config-grid">' + form + "</div>";
+      UI.field("Start", UI.input({ id: "bt-start", type: "date", placeholder: "Full history" })) +
+      UI.field("End", UI.input({ id: "bt-end", type: "date", placeholder: "Full history" })) +
+      UI.field("Initial Capital", UI.input({ id: "bt-capital", type: "number", value: "1000000", step: "1000" }));
+    return '<div class="bt-config-grid">' + form + "</div>" +
+      '<div class="ds-text-muted" style="font-size:var(--ds-text-xs);margin-top:var(--ds-space-3);">' +
+      "Quant core frozen in Factor Discovery v2 (formula / windows / orientation sealed). " +
+      "Execution model: real close ± " + (strategy.slippage_bps != null ? strategy.slippage_bps : 3) +
+      " bps · source run " + esc(strategy.source_run || "factor-real-d1") + ".</div>";
   }
 
+  function btUniverseChecks() {
+    var symbols = (BT_STATE.universe && BT_STATE.universe.symbols) || [];
+    if (!symbols.length) symbols = [{ symbol: "NVDA", gate_passed: true, data_available: true }];
+    return symbols.map(function (u) {
+      var disabled = u.data_available === false ? " disabled" : "";
+      var note = u.data_available === false
+        ? '<span class="chk-note">no data</span>'
+        : (u.gate_passed ? '<span class="chk-note">gate ✓</span>' : "");
+      return (
+        '<label class="form-check"><input type="checkbox" name="bt-sym" value="' +
+        esc(u.symbol) + '"' + (u.gate_passed && u.data_available !== false ? " checked" : "") +
+        disabled + "> " + esc(u.symbol) + " " + note + "</label>"
+      );
+    }).join("");
+  }
+
+  // API meta stores percentages as numbers (7.49 == 7.49%); btPct expects
+  // fractions, hence the /100 normalisation.
   function renderBtKpis() {
+    var m = (BT_STATE.result && BT_STATE.result.meta) || {};
     return (
-      UI.metricCard("Total Return", btPct(BT_KPI.totalReturn), "", "pos") +
-      UI.metricCard("CAGR", btPct(BT_KPI.cagr), "", "pos") +
-      UI.metricCard("Sharpe", BT_KPI.sharpe.toFixed(2), "", "pos") +
-      UI.metricCard("Max Drawdown", btPct(BT_KPI.maxDD), "", "neg") +
-      UI.metricCard("Win Rate", btPct(BT_KPI.winRate), "", "pos") +
-      UI.metricCard("Turnover", BT_KPI.turnover.toFixed(2) + "x", "", "")
+      UI.metricCard("Total Return",
+        m.return_pct == null ? "—" : btPct(m.return_pct / 100), "",
+        (m.return_pct || 0) >= 0 ? "pos" : "neg") +
+      UI.metricCard("CAGR",
+        m.cagr == null ? "—" : btPct(m.cagr / 100), "",
+        (m.cagr || 0) >= 0 ? "pos" : "neg") +
+      UI.metricCard("Sharpe",
+        m.sharpe == null ? "—" : m.sharpe.toFixed(2), "",
+        (m.sharpe || 0) >= 0 ? "pos" : "neg") +
+      UI.metricCard("Max Drawdown",
+        m.maxdd_pct == null ? "—" : btPct(-Math.abs(m.maxdd_pct) / 100), "", "neg") +
+      UI.metricCard("Win Rate",
+        m.win_rate == null ? "—" : btPct(m.win_rate / 100), "", "pos") +
+      UI.metricCard("Profit Factor",
+        m.profit_factor == null ? "—" : m.profit_factor.toFixed(2), "",
+        (m.profit_factor || 0) >= 1 ? "pos" : "neg")
     );
   }
 
+  // Daily points from the replay — label only the first point of each year so
+  // the x axis stays readable.
   function renderBtEquity() {
-    var xLabels = BT_EQUITY_PTS.map(function (p) { return p.month === 1 ? String(p.year) : ""; });
-    return UI.equityCurve(BT_EQUITY_PTS, {
+    var pts = btEquityPoints();
+    if (!pts.length) return UI.empty("No data", "Equity curve unavailable.");
+    var lastYear = null;
+    var xLabels = pts.map(function (p) {
+      if (p.year && p.year !== lastYear) { lastYear = p.year; return String(p.year); }
+      return "";
+    });
+    return UI.equityCurve(pts, {
       height: 300,
       color: "var(--ds-profit)",
       yFormat: function (v) { return UI.money(v, 0); },
@@ -4642,7 +4649,8 @@
 
   // Custom drawdown chart: fill from zero baseline (top) down to the line.
   function renderBtDrawdown() {
-    var dd = BT_DRAWDOWN_PTS;
+    var dd = btDrawdownPoints();
+    if (!dd.length) return UI.empty("No data", "Drawdown series unavailable.");
     var W = 880, H = 220, pad = { top: 16, right: 16, bottom: 28, left: 64 };
     var w = W - pad.left - pad.right, h = H - pad.top - pad.bottom;
     var vals = dd.map(function (d) { return d.value; });
@@ -4664,8 +4672,10 @@
     }).join("");
     var zeroLine = '<line x1="' + pad.left + '" y1="' + pad.top.toFixed(1) + '" x2="' + (pad.left + w) + '" y2="' + pad.top.toFixed(1) + '" stroke="var(--ds-border-default)" stroke-width="1" />';
     var xTickHtml = "";
+    var lastYear = null;
     dd.forEach(function (d, i) {
-      if (d.month === 1) {
+      if (d.year && d.year !== lastYear) {
+        lastYear = d.year;
         var x = pad.left + i * xStep;
         xTickHtml += '<text x="' + x.toFixed(1) + '" y="' + (pad.top + h + 18) + '" text-anchor="middle" class="eqc-axis-label">' + esc(String(d.year)) + "</text>";
       }
@@ -4681,15 +4691,17 @@
   }
 
   function renderBtMonthly() {
+    var monthly = btMonthlyReturns();
+    if (!monthly.years.length) return UI.empty("No data", "Monthly returns unavailable.");
     var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     var header = '<tr><th class="bt-m-year">Year</th>' +
       months.map(function (mo) { return '<th class="bt-m-month">' + mo + "</th>"; }).join("") +
       '<th class="bt-m-ytd">YTD</th></tr>';
-    var rows = BT_MONTHLY.years.map(function (y) {
+    var rows = monthly.years.map(function (y) {
       var yearProduct = 1;
       var tds = "";
       for (var mo = 1; mo <= 12; mo++) {
-        var r = BT_MONTHLY.cells[y][mo];
+        var r = (monthly.cells[y] || {})[mo];
         if (r == null) {
           tds += '<td class="bt-m-cell bt-m-empty">—</td>';
         } else {
@@ -4705,35 +4717,58 @@
     return '<table class="bt-monthly-table">' + header + rows + "</table>";
   }
 
+  function btOutcomeBadge(v) {
+    if (v === "FILLED") return '<span class="bt-side bt-side-buy">' + esc(v) + "</span>";
+    if (v === "REJECTED") return '<span class="bt-side bt-side-sell">' + esc(v) + "</span>";
+    return '<span class="bt-side">' + esc(v || "—") + "</span>";
+  }
+
+  // Replay trades are chronological; newest-first reads better in the table.
   function renderBtTrades() {
+    var trades = (BT_STATE.result && BT_STATE.result.trades) || [];
+    var rows = trades.slice().reverse().map(function (t) {
+      return {
+        date: t.date,
+        symbol: t.symbol,
+        side: t.side,
+        outcome: t.outcome,
+        qty: t.quantity,
+        price: Number(t.exec_price || t.ref_price_real_close),
+        pnl: t.side === "SELL" && t.realized_pnl != null ? t.realized_pnl : null,
+      };
+    });
     return UI.table({
       columns: [
         { key: "date", label: "Date", sortable: false },
         { key: "symbol", label: "Symbol", sortable: false },
         { key: "side", label: "Side", sortable: false, format: function (v) { return btSideBadge(v); } },
-        { key: "qty", label: "Qty", numeric: true, format: function (v) { return v.toLocaleString(); } },
-        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + v.toFixed(2); } },
+        { key: "outcome", label: "Outcome", sortable: false, format: function (v) { return btOutcomeBadge(v); } },
+        { key: "qty", label: "Qty", numeric: true, format: function (v) { return v == null ? "—" : v.toLocaleString(); } },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return v == null ? "—" : "$" + v.toFixed(2); } },
         { key: "pnl", label: "P&L", numeric: true, format: function (v) { return v == null ? "—" : btFmtMoney(v); }, color: function (v) { return v == null ? "" : v >= 0 ? "pos" : "neg"; } },
       ],
-      rows: BT_TRADES,
+      rows: rows,
       emptyDesc: "No trades recorded for this backtest.",
     });
   }
 
   function renderBtSummary() {
+    var m = (BT_STATE.result && BT_STATE.result.meta) || {};
+    var strategy = (BT_STATE.universe && BT_STATE.universe.strategy) || {};
+    var trades = (BT_STATE.result && BT_STATE.result.trades) || [];
     var cells =
-      btSummaryCell("Strategy", "Alpha021") +
-      btSummaryCell("Universe", "NVDA QQQ SPY") +
-      btSummaryCell("Timeframe", "1D") +
-      btSummaryCell("Period", "2023-01 → 2026-08") +
-      btSummaryCell("Initial Capital", "$1,000,000") +
-      btSummaryCell("Commission", "0.00%") +
-      btSummaryCell("Slippage", "3 bps") +
-      btSummaryCell("Trades", String(BT_TRADES.length)) +
-      btSummaryCell("Total Return", btPct(BT_KPI.totalReturn), "pos") +
-      btSummaryCell("Sharpe", BT_KPI.sharpe.toFixed(2)) +
-      btSummaryCell("Max Drawdown", btPct(BT_KPI.maxDD), "neg") +
-      btSummaryCell("Win Rate", btPct(BT_KPI.winRate), "pos");
+      btSummaryCell("Strategy", m.alpha_id || strategy.alpha_id || "Alpha021") +
+      btSummaryCell("Source Run", strategy.source_run || "factor-real-d1") +
+      btSummaryCell("Universe", (m.symbols || []).join(" ")) +
+      btSummaryCell("Timeframe", strategy.timeframe || "1D") +
+      btSummaryCell("Period", m.period || "—") +
+      btSummaryCell("Initial Capital", "$" + Number(m.initial_capital || 0).toLocaleString()) +
+      btSummaryCell("Slippage", (strategy.slippage_bps != null ? strategy.slippage_bps : 3) + " bps") +
+      btSummaryCell("Trades", String(trades.length)) +
+      btSummaryCell("Total Return", m.return_pct == null ? "—" : btPct(m.return_pct / 100), m.return_pct >= 0 ? "pos" : "neg") +
+      btSummaryCell("Sharpe", m.sharpe == null ? "—" : m.sharpe.toFixed(2)) +
+      btSummaryCell("Max Drawdown", m.maxdd_pct == null ? "—" : btPct(-Math.abs(m.maxdd_pct) / 100), "neg") +
+      btSummaryCell("Win Rate", m.win_rate == null ? "—" : btPct(m.win_rate / 100), "pos");
     return '<div class="bt-summary-grid">' + cells + "</div>";
   }
   function btSummaryCell(label, value, cls) {
@@ -4741,20 +4776,80 @@
       '<div class="bt-summary-value' + (cls ? " " + cls : "") + '">' + esc(value) + "</div></div>";
   }
 
+  // Advanced multi-panel chart (Price+Signals / Z-Score / Position / Equity)
+  // with per-symbol tabs — reuses the legacy page's multiPanelChart renderer.
+  function renderBtChartPanels() {
+    var panels = (BT_STATE.result && BT_STATE.result.chart_panels) || [];
+    if (!panels.length) return UI.empty("No data", "Advanced chart unavailable.");
+    var tabs = panels.map(function (p, i) {
+      return '<button class="sym-tab' + (i === 0 ? " active" : "") + '" data-sym="' + esc(p.symbol) + '">' + esc(p.symbol) + "</button>";
+    }).join("");
+    return '<div class="chart-sym-tabs">' + tabs + "</div>" +
+      '<div id="chart-panel-container">' + multiPanelChart(panels.slice(0, 1)) + "</div>";
+  }
+
   function renderBtResultsHtml() {
-    if (BT_STATE === "running") return UI.loading("Running backtest…");
-    if (BT_STATE === "error") return UI.empty("Backtest failed", "Check parameters and retry. / 请检查参数后重试。", "⚠");
-    if (BT_STATE === "idle") return UI.empty("No backtest results", "Configure parameters and click Run Backtest to see results.", "⌖");
-    var range = BT_EQUITY_PTS[0].label + " → " + BT_EQUITY_PTS[BT_EQUITY_PTS.length - 1].label;
+    if (BT_STATE.status === "running")
+      return UI.stateLoading("Running backtest…",
+        "Replaying Alpha021 over real daily data — this typically takes ~20s. / 正在回放真实日线数据…");
+    if (BT_STATE.status === "error")
+      return UI.stateError("Backtest failed / 回测失败",
+        esc(BT_STATE.error || "Check parameters and retry."),
+        "Retry / 重试", "bt:retry");
+    if (BT_STATE.status !== "done" || !BT_STATE.result)
+      return UI.empty("No backtest results", "Configure parameters and click Run Backtest to see results.", "⌖");
+    var m = (BT_STATE.result.meta) || {};
+    var pts = btEquityPoints();
+    var range = pts.length ? pts[0].label + " → " + pts[pts.length - 1].label : (m.period || "—");
+    var trades = BT_STATE.result.trades || [];
+    var researchNote =
+      '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">From Research: ' +
+      esc(m.alpha_id || "Alpha021") + " · " +
+      esc(((BT_STATE.universe && BT_STATE.universe.strategy) || {}).source_run || "factor-real-d1") + "</span>" +
+      UI.button("View Research", "ghost", { sm: true, action: "bt:view-research" });
     return (
       UI.sectionHeading("Performance") +
       '<div class="bt-kpi-grid">' + renderBtKpis() + "</div>" +
       UI.panel("Equity Curve", renderBtEquity(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' + esc(range) + "</span>" }) +
-      UI.panel("Drawdown", renderBtDrawdown(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Max DD ' + btPct(BT_KPI.maxDD) + "</span>" }) +
+      UI.panel("Drawdown", renderBtDrawdown(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Max DD ' + (m.maxdd_pct == null ? "—" : btPct(-Math.abs(m.maxdd_pct) / 100)) + "</span>" }) +
       UI.panel("Monthly Returns", renderBtMonthly()) +
-      UI.panel("Trades", renderBtTrades(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' + BT_TRADES.length + " trades</span>" }) +
-      UI.panel("Backtest Summary", renderBtSummary())
+      UI.panel("Advanced Chart — Price / Z-Score / Position / Equity", renderBtChartPanels()) +
+      UI.panel("Trades", renderBtTrades(), { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' + trades.length + " trades</span>" }) +
+      UI.panel("Backtest Summary", renderBtSummary(), { actions: researchNote })
     );
+  }
+
+  // Run history table — clicking a row re-opens that run's cached result.
+  function btRunStatusBadge(status) {
+    if (status === "completed") return '<span class="rs-stage rs-stage-pass">COMPLETED</span>';
+    return '<span class="rs-stage rs-stage-fail">' + esc(String(status || "FAILED").toUpperCase()) + "</span>";
+  }
+
+  function renderBtRunsHtml() {
+    var runs = BT_STATE.runs || [];
+    if (!runs.length)
+      return UI.empty("No runs yet", "Completed backtests will be listed here. / 完成的回测会显示在这里。");
+    var rows = runs.map(function (r) {
+      var m = r.metrics || {};
+      var cfg = r.config || {};
+      return (
+        '<tr data-bt-run="' + esc(r.run_id) + '" title="Click to open this run\'s cached result">' +
+        '<td class="ds-text-mono">' + esc(r.run_id) + "</td>" +
+        '<td class="ds-text-mono">' + esc(String(r.created_at || "").replace("T", " ")) + "</td>" +
+        '<td>' + esc((cfg.symbols || []).join(" ")) + "</td>" +
+        '<td class="ds-text-mono">' + esc(r.period || "—") + "</td>" +
+        '<td class="num ds-text-mono ' + ((m.return_pct || 0) >= 0 ? "pos" : "neg") + '">' +
+        (m.return_pct == null ? "—" : btPct(m.return_pct / 100)) + "</td>" +
+        '<td class="num ds-text-mono">' + (m.sharpe == null ? "—" : m.sharpe.toFixed(2)) + "</td>" +
+        '<td class="num ds-text-mono">' + (r.trades || 0) + "</td>" +
+        "<td>" + btRunStatusBadge(r.status) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    return '<div class="table-wrap"><table class="ds-table"><thead><tr>' +
+      "<th>Run ID</th><th>Created</th><th>Universe</th><th>Period</th>" +
+      '<th class="num">Return</th><th class="num">Sharpe</th><th class="num">Trades</th><th>Status</th>' +
+      "</tr></thead><tbody>" + rows + "</tbody></table></div>";
   }
 
   function updateBtResults() {
@@ -4771,39 +4866,132 @@
     });
   }
 
-  function runBacktest() {
-    var uni = document.getElementById("bt-universe");
-    if (uni && !uni.value.trim()) {
-      BT_STATE = "error";
-      updateBtResults();
+  // Read the config form into a POST /dashboard/backtest/run body. Empty
+  // start/end means "full history" (omitted — the engine defaults).
+  function btReadConfig() {
+    var syms = Array.prototype.slice
+      .call(document.querySelectorAll('input[name="bt-sym"]:checked'))
+      .map(function (c) { return c.value; });
+    var capEl = document.getElementById("bt-capital");
+    var startEl = document.getElementById("bt-start");
+    var endEl = document.getElementById("bt-end");
+    var body = {
+      symbols: syms,
+      initial_capital: parseFloat(capEl && capEl.value) || 1000000,
+    };
+    if (startEl && startEl.value) body.start = startEl.value;
+    if (endEl && endEl.value) body.end = endEl.value;
+    return body;
+  }
+
+  async function runBacktest() {
+    var body = btReadConfig();
+    if (!body.symbols.length) {
       showToast("Universe cannot be empty / 标的池不能为空", "error");
       return;
     }
-    BT_STATE = "running";
+    BT_STATE.status = "running";
+    BT_STATE.error = null;
     setBtRunState(true);
     updateBtResults();
-    setTimeout(function () {
-      BT_STATE = "done";
+    try {
+      var data = await api.backtestRun(body);
+      BT_STATE.result = data;
+      BT_STATE.status = "done";
+      window.__backtestData = data;   // per-symbol panel switching
+      showToast("Backtest complete / 回测完成", "ok");
+      await btRefreshRuns();          // history now includes this run
+    } catch (err) {
+      BT_STATE.status = "error";
+      BT_STATE.error = (err && err.message) ? err.message : String(err);
+      showToast("Backtest failed / 回测失败: " + BT_STATE.error, "error");
+    } finally {
       setBtRunState(false);
       updateBtResults();
-      showToast("Backtest complete / 回测完成", "ok");
-    }, 900);
+    }
   }
 
+  async function btRefreshRuns() {
+    try {
+      var data = await api.backtestRuns();
+      BT_STATE.runs = (data && data.runs) || [];
+    } catch (err) { /* keep the old list on transient failure */ }
+    var host = document.getElementById("bt-runs");
+    if (host) host.innerHTML = renderBtRunsHtml();
+  }
+
+  // Re-open a recorded run's cached result (no engine re-run).
+  async function btLoadRun(runId) {
+    BT_STATE.status = "running";
+    updateBtResults();
+    try {
+      var data = await api.backtestRunResult(runId);
+      BT_STATE.result = data;
+      BT_STATE.status = "done";
+      window.__backtestData = data;
+      showToast("Run loaded / 已加载回测 " + runId, "ok");
+    } catch (err) {
+      BT_STATE.status = BT_STATE.result ? "done" : "error";
+      BT_STATE.error = (err && err.message) ? err.message : String(err);
+      showToast("Failed to load run / 加载失败: " + BT_STATE.error, "error");
+    }
+    updateBtResults();
+  }
+
+  // One delegated listener on #bt-root covers run/retry/view-research buttons,
+  // per-symbol chart tabs and run-history rows — survives innerHTML updates.
   function bindBacktestPage() {
-    document.querySelectorAll('[data-action="bt:run"]').forEach(function (b) {
-      b.addEventListener("click", runBacktest);
+    var root = document.getElementById("bt-root");
+    if (!root) return;
+    root.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (btn) {
+        var action = btn.getAttribute("data-action");
+        if (action === "bt:run" || action === "bt:retry") { runBacktest(); return; }
+        if (action === "bt:view-research") { location.hash = "#/research"; return; }
+        if (action === "bt:runs-refresh") { btRefreshRuns(); return; }
+        return;
+      }
+      var tab = e.target.closest(".sym-tab");
+      if (tab) {
+        var sym = tab.getAttribute("data-sym");
+        root.querySelectorAll(".sym-tab").forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        var container = document.getElementById("chart-panel-container");
+        var panels = (window.__backtestData && window.__backtestData.chart_panels) || [];
+        var panel = panels.filter(function (p) { return p.symbol === sym; })[0];
+        if (container && panel) container.innerHTML = multiPanelChart([panel]);
+        return;
+      }
+      var row = e.target.closest("tr[data-bt-run]");
+      if (row) {
+        var runId = row.getAttribute("data-bt-run");
+        if (runId) btLoadRun(runId);
+      }
     });
   }
 
-  // ── Backtest (Commit 011 — professional backtest workbench) ──────
-  PAGE_FRAMEWORK["research/backtest"] = function () {
+  // ── Backtest (Integration 008 — real Backtest API) ──────────────
+  PAGE_FRAMEWORK["research/backtest"] = async function () {
+    // Initial load — a rejection here bubbles up to render()'s stateError.
+    var results = await Promise.all([
+      api.backtestUniverse(),
+      api.backtestRuns(),
+    ]);
+    BT_STATE.universe = results[0];
+    BT_STATE.runs = results[1].runs || [];
+
     var runBtn = UI.button("Run New Backtest", "primary", { sm: true, action: "bt:run" });
     var configRun = UI.button("Run Backtest", "primary", { sm: true, action: "bt:run" });
+    var refreshRuns = UI.button("Refresh", "ghost", { sm: true, action: "bt:runs-refresh" });
     return (
+      '<div id="bt-root">' +
       UI.pageHeader("Backtest", "Strategy backtesting workspace · 研究 → 回测 → 验证", runBtn) +
       UI.panel("Configuration", renderBtConfig(), { actions: configRun }) +
-      '<div id="bt-results" class="bt-results">' + renderBtResultsHtml() + "</div>"
+      '<div id="bt-results" class="bt-results">' + renderBtResultsHtml() + "</div>" +
+      UI.sectionHeading("Run History") +
+      UI.panel("Backtest Runs", '<div id="bt-runs">' + renderBtRunsHtml() + "</div>", { actions: refreshRuns }) +
+      "</div>"
     );
   };
 

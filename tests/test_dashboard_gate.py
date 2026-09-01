@@ -509,8 +509,8 @@ def test_d17_backtest_page():
 
     index = (Path(apps_api_main.__file__).resolve().parent.parent
              / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
-    assert 'href="#/backtest"' in index
-    assert 'data-nav="backtest"' in index
+    assert 'href="#/research/backtest"' in index
+    assert 'data-nav="research/backtest"' in index
 
     token = _login("admin", "admin123")
 
@@ -848,3 +848,109 @@ def test_d24_monthly_returns():
     monthly_sum = sum(m["return_pct"] for m in mr)
     assert abs(monthly_sum - total_ret) < 5.0, (
         f"monthly sum {monthly_sum} ~= total {total_ret}")
+
+
+# --- D-25 Backtest API integration (Integration 008) -----------------------
+
+def test_d25_backtest_api_integration():
+    """Integration 008: universe / run history / cached result endpoints.
+
+    The Backtest workbench reads its config from GET /backtest/universe,
+    submits via POST /backtest/run, and re-opens past runs through
+    GET /backtest/runs + GET /backtest/runs/{run_id} without re-running
+    the engine.  Frozen-core boundary: no engine knobs are exposed.
+    """
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    data_root = (
+        Path(__file__).resolve().parent.parent / "data" / "real" / "d1"
+    )
+    if not (data_root / "NVDA_1d.csv").exists():
+        pytest.skip("data/real/d1 not synced - backtest replay unavailable")
+
+    # SPA: the workbench route is registered in the nav
+    index = (Path(apps_api_main.__file__).resolve().parent.parent
+             / "dashboard" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/research/backtest"' in index
+    assert 'data-nav="research/backtest"' in index
+
+    # API client bundle exposes the four Integration-008 methods
+    api_js = (Path(apps_api_main.__file__).resolve().parent.parent
+              / "dashboard" / "static" / "js" / "api.js").read_text(encoding="utf-8")
+    for method in ("backtestUniverse", "backtestRun", "backtestRuns",
+                   "backtestRunResult"):
+        assert method in api_js, f"api.js missing client method {method}"
+
+    token = _login("admin", "admin123")
+
+    # --- universe: frozen strategy metadata + gated symbols ---------------
+    res = client.get(
+        "/api/dashboard/backtest/universe", headers=_headers(token))
+    assert res.status_code == 200
+    univ = res.json()
+    strat = univ["strategy"]
+    assert strat["alpha_id"] == "Alpha021"
+    assert strat["frozen"] is True          # quant core is sealed
+    assert strat["timeframe"] == "1D"
+    assert strat["slippage_bps"] > 0
+    syms = {s["symbol"]: s for s in univ["symbols"]}
+    assert set(syms) >= {"NVDA", "QQQ", "SPY", "EURUSD"}
+    for s in syms.values():                # honest data availability
+        assert isinstance(s["gate_passed"], bool)
+        assert isinstance(s["data_available"], bool)
+    assert syms["NVDA"]["data_available"] is True
+    assert syms["NVDA"]["gate_passed"] is True
+
+    # --- run + history + cached result -----------------------------------
+    res = client.post(
+        "/api/dashboard/backtest/run",
+        json={"symbols": ["NVDA"], "start": "2025-01-01",
+              "end": "2025-12-31", "initial_capital": 500_000.0},
+        headers=_headers(token),
+    )
+    assert res.status_code == 200
+    payload = res.json()
+    run_id = payload["run_id"]
+    assert run_id.startswith("bt-")
+
+    res = client.get("/api/dashboard/backtest/runs", headers=_headers(token))
+    assert res.status_code == 200
+    history = res.json()["runs"]
+    assert history, "the run just submitted must be recorded"
+    latest = history[0]                      # newest first
+    assert latest["run_id"] == run_id
+    assert latest["status"] == "completed"
+    assert latest["config"]["symbols"] == ["NVDA"]
+    assert latest["config"]["initial_capital"] == 500_000.0
+    assert latest["metrics"]["return_pct"] == pytest.approx(
+        payload["meta"]["return_pct"], abs=1e-6)
+    assert latest["trades"] == len(payload["trades"])
+    # the run-list payload itself must not embed the full result
+    assert "result" not in latest
+
+    # cached result is byte-identical to the POST payload (minus run_id)
+    res = client.get(
+        f"/api/dashboard/backtest/runs/{run_id}", headers=_headers(token))
+    assert res.status_code == 200
+    cached = res.json()
+    assert cached == {k: v for k, v in payload.items() if k != "run_id"}
+
+    # unknown run -> 404
+    assert client.get(
+        "/api/dashboard/backtest/runs/bt-does-not-exist",
+        headers=_headers(token)).status_code == 404
+
+    # --- RBAC: readonly may view universe/history (read-only replay) -----
+    ro_token = _login("readonly", "readonly123")
+    assert client.get(
+        "/api/dashboard/backtest/universe",
+        headers=_headers(ro_token)).status_code == 200
+    assert client.get(
+        "/api/dashboard/backtest/runs",
+        headers=_headers(ro_token)).status_code == 200
+
+    # --- unauthenticated -> 401 ------------------------------------------
+    assert client.get("/api/dashboard/backtest/universe").status_code == 401
+    assert client.get("/api/dashboard/backtest/runs").status_code == 401

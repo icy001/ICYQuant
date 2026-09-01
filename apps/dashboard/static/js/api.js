@@ -411,6 +411,28 @@
                       + "/report");
     },
 
+    // ── Backtest API (Integration 008) ──────────────────────────
+    /** Available instruments + frozen strategy metadata (config form). */
+    backtestUniverse: async function () {
+      return this.get("/dashboard/backtest/universe");
+    },
+
+    /** Submit a backtest. Replays take ~20s on real data, so the default
+     *  5s timeout is raised — the request is the run's "running" state. */
+    backtestRun: async function (body) {
+      return this.post("/dashboard/backtest/run", body, { timeoutMs: 180000 });
+    },
+
+    /** Backtest run history (newest first). */
+    backtestRuns: async function () {
+      return this.get("/dashboard/backtest/runs");
+    },
+
+    /** Cached result payload for a recorded run. */
+    backtestRunResult: async function (runId) {
+      return this.get("/dashboard/backtest/runs/" + encodeURIComponent(runId));
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.
