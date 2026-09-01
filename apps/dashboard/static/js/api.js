@@ -460,6 +460,14 @@
       return this.get("/dashboard/execution/center");
     },
 
+    // ── Accounts API (Integration 012) ──────────────────────────
+    /** Accounts Control Center: overview KPI (USD-normalised),
+     *  multi-account list with balances / connection / capabilities,
+     *  market breakdown, and adapter health. Read-only. */
+    accountsCenter: async function () {
+      return this.get("/dashboard/accounts/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

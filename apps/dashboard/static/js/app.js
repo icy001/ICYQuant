@@ -6762,94 +6762,111 @@
 
   // ── Operations ───────────────────────────────────────────────────
   /* ==================================================================
-   * Accounts module — Commit 015
-   * Account & Broker Management Center: overview → list → detail →
-   * permissions → add-account form. UI-only mock data; does NOT save
-   * real secrets, modify the multi-account adapter, or any API/db.
+   * Accounts module — Integration 012
+   * Accounts Control Center: overview KPI → multi-account list →
+   * account detail (balance / connection / capabilities) → market
+   * breakdown → broker health. All data from
+   * GET /dashboard/accounts/center; no mock data. Read-only.
    * ================================================================== */
 
-  // ── Account data ──────────────────────────────────────────────
-  var ACCOUNTS = [
-    {
-      id: "us-001", name: "US-001", type: "US Stocks",
-      broker: "Interactive Brokers", currency: "USD",
-      equity: 536590, buyingPower: 536590, marginUsed: 0.184,
-      status: "CONNECTED", heartbeat: "10:31:58", latency: 24,
-      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: true },
-    },
-    {
-      id: "fut-001", name: "FUT-001", type: "Futures",
-      broker: "CQG", currency: "CNY",
-      equity: 186590, buyingPower: 373180, marginUsed: 0.221,
-      status: "CONNECTED", heartbeat: "10:31:55", latency: 31,
-      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: false },
-    },
-    {
-      id: "fx-001", name: "FX-001", type: "Forex",
-      broker: "Interactive Brokers", currency: "USD",
-      equity: 261800, buyingPower: 523600, marginUsed: 0.092,
-      status: "CONNECTED", heartbeat: "10:31:59", latency: 18,
-      permissions: { marketData: true, trading: true, cancelOrder: true, shortSelling: false },
-    },
-    {
-      id: "cn-001", name: "CN-001", type: "A-Share",
-      broker: "XTS", currency: "CNY",
-      equity: 88000, buyingPower: 176000, marginUsed: 0.0,
-      status: "OFFLINE", heartbeat: "—", latency: null,
-      permissions: { marketData: false, trading: false, cancelOrder: false, shortSelling: false },
-    },
-  ];
-
-  var AC_OVERVIEW = {
-    totalEquity: 1073181, availableCash: 806000, grossExposure: 266181,
-    marginUsed: 187200, unrealizedPnL: 6212,
+  // ── Accounts state (Integration 012) ─────────────────────────
+  var AC_STATE = {
+    data: null,
+    error: null,
+    selectedId: null,
   };
-  var AC_STATE = { selectedId: "us-001" };
+
+  async function acLoadCenter(force) {
+    if (AC_STATE.data && !force) return;
+    try {
+      var data = await api.accountsCenter();
+      AC_STATE.data = data;
+      AC_STATE.error = null;
+      // default selection: first connected account, else first account
+      if (!AC_STATE.selectedId && data.accounts && data.accounts.length) {
+        var firstUp = data.accounts.find(function (a) { return a.connection === "CONNECTED"; });
+        AC_STATE.selectedId = (firstUp || data.accounts[0]).account_id;
+      }
+    } catch (err) {
+      AC_STATE.error = (err && err.message) || "Failed to load accounts data";
+    }
+  }
+
+  function acData() {
+    return AC_STATE.data || {
+      overview: { total_equity: 0, available_cash: 0, gross_exposure: 0,
+                  margin_used: 0, unrealized_pnl: 0, realized_pnl: 0, currency: "USD" },
+      status: { total: 0, connected: 0, degraded: 0, offline: 0, last_update: "" },
+      accounts: [],
+      markets: [],
+      brokers: [],
+      health: [],
+    };
+  }
 
   function acMoney(amount, currency) {
-    if (currency === "CNY") return "¥" + amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    return UI.money(amount, 0);
+    var n = Number(amount);
+    if (!isFinite(n)) return "—";
+    if (currency === "CNY") return "¥" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return UI.money(n, 0);
   }
+
   function acConnBadge(status) {
-    var key = status === "CONNECTED" ? "connected" : "offline";
-    return '<span class="ac-conn-badge ac-conn-' + key + '">' + esc(status) + "</span>";
+    var key = String(status).toLowerCase();
+    return '<span class="ac-conn-badge ac-conn-' + esc(key) + '">' + esc(status) + "</span>";
   }
+
   function acFind(id) {
-    for (var i = 0; i < ACCOUNTS.length; i++) {
-      if (ACCOUNTS[i].id === id) return ACCOUNTS[i];
+    var list = acData().accounts || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].account_id === id) return list[i];
     }
-    return ACCOUNTS[0];
+    return list[0] || null;
   }
 
   // ── Overview KPI ──────────────────────────────────────────────
   function renderAcOverview() {
-    var o = AC_OVERVIEW;
+    var o = acData().overview;
     return UI.kpiGrid(
-      UI.metricCard("Total Equity", UI.money(o.totalEquity, 0), "", "") +
-      UI.metricCard("Available Cash", UI.money(o.availableCash, 0), "", "") +
-      UI.metricCard("Gross Exposure", UI.money(o.grossExposure, 0), "", "info") +
-      UI.metricCard("Margin Used", UI.money(o.marginUsed, 0), "", "") +
-      UI.metricCard("Unrealized P&L", UI.signedMoney(o.unrealizedPnL), "", "pos")
+      UI.metricCard("Total Equity", UI.money(o.total_equity, 0), "", "") +
+      UI.metricCard("Available Cash", UI.money(o.available_cash, 0), "", "") +
+      UI.metricCard("Gross Exposure", UI.money(o.gross_exposure, 0), "", "info") +
+      UI.metricCard("Margin Used", UI.money(o.margin_used, 0), "", "") +
+      UI.metricCard("Unrealized P&L", UI.signedMoney(o.unrealized_pnl), "", o.unrealized_pnl >= 0 ? "pos" : "neg")
     , 5);
+  }
+
+  // ── Status summary bar ───────────────────────────────────────
+  function renderAcStatusBar() {
+    var s = acData().status;
+    return '<div class="ac-status-bar">' +
+      '<span class="ac-status-item">Total <b>' + s.total + "</b></span>" +
+      '<span class="ac-status-item ac-status-connected">Connected <b>' + s.connected + "</b></span>" +
+      '<span class="ac-status-item ac-status-degraded">Degraded <b>' + s.degraded + "</b></span>" +
+      '<span class="ac-status-item ac-status-offline">Offline <b>' + s.offline + "</b></span>" +
+      '<span class="ac-last-update">Last Update: ' + esc(s.last_update || "—") + "</span>" +
+      "</div>";
   }
 
   // ── Account list (clickable rows) ────────────────────────────
   function renderAcRows() {
-    return ACCOUNTS.map(function (a) {
-      var sel = a.id === AC_STATE.selectedId ? " ac-row-selected" : "";
+    return (acData().accounts || []).map(function (a) {
+      var sel = a.account_id === AC_STATE.selectedId ? " ac-row-selected" : "";
       return (
-        '<tr class="ac-row' + sel + '" data-ac-id="' + esc(a.id) + '">' +
+        '<tr class="ac-row' + sel + '" data-ac-id="' + esc(a.account_id) + '">' +
         '<td class="ac-col-name">' + esc(a.name) + "</td>" +
         "<td>" + esc(a.type) + "</td>" +
         '<td class="num">' + esc(a.currency) + "</td>" +
         '<td class="num">' + acMoney(a.equity, a.currency) + "</td>" +
-        "<td>" + acConnBadge(a.status) + "</td>" +
+        "<td>" + acConnBadge(a.connection) + "</td>" +
         "</tr>"
       );
     }).join("");
   }
 
   function renderAcList() {
+    var rows = acData().accounts || [];
+    if (!rows.length) return UI.empty("No Accounts", "No accounts registered with the adapter layer.");
     return (
       '<table class="ds-table ac-list-table">' +
       "<thead><tr>" +
@@ -6872,11 +6889,12 @@
   }
 
   function renderAcPerms(perms) {
+    if (!perms) return '<div class="empty">No permissions reported</div>';
     var items = [
-      { label: "Market Data", ok: perms.marketData },
+      { label: "Market Data", ok: perms.market_data },
       { label: "Trading", ok: perms.trading },
-      { label: "Cancel Orders", ok: perms.cancelOrder },
-      { label: "Short Selling", ok: perms.shortSelling },
+      { label: "Cancel Orders", ok: perms.cancel_order },
+      { label: "Short Selling", ok: perms.short_selling },
     ];
     return items.map(function (p) {
       var cls = p.ok ? "ac-perm-yes" : "ac-perm-no";
@@ -6892,20 +6910,29 @@
 
   function renderAcDetail() {
     var a = acFind(AC_STATE.selectedId);
-    var latency = a.latency != null ? a.latency + " ms" : "—";
-    var marginPct = (a.marginUsed * 100).toFixed(1) + "%";
+    if (!a) return UI.empty("No Account Selected", "Select an account to see its details.");
+    var marginPct = a.margin && a.equity ? (a.margin / a.equity * 100).toFixed(1) + "%" : "—";
+    var connCls = a.connection === "CONNECTED" ? "pos" : (a.connection === "DISCONNECTED" ? "neg" : "");
     return (
       '<div class="ac-detail-grid">' +
-      acDetailCell("Account ID", a.id) +
-      acDetailCell("Broker", a.broker) +
+      acDetailCell("Account ID", a.account_id) +
+      acDetailCell("Broker", a.broker_name) +
       acDetailCell("Account Type", a.type) +
+      acDetailCell("Market", a.market_label) +
       acDetailCell("Currency", a.currency) +
+      acDetailCell("Trading Mode", a.trading_mode) +
       acDetailCell("Equity", acMoney(a.equity, a.currency)) +
-      acDetailCell("Buying Power", acMoney(a.buyingPower, a.currency)) +
+      acDetailCell("Cash", acMoney(a.cash, a.currency)) +
+      acDetailCell("Buying Power", acMoney(a.buying_power, a.currency)) +
+      acDetailCell("Margin", acMoney(a.margin, a.currency)) +
       acDetailCell("Margin Used", marginPct) +
-      acDetailCell("Connection", a.status, a.status === "CONNECTED" ? "pos" : "") +
-      acDetailCell("Last Heartbeat", a.heartbeat) +
-      acDetailCell("Latency", latency) +
+      acDetailCell("Daily P&L", UI.signedMoney(a.daily_pnl)) +
+      acDetailCell("Total P&L", UI.signedMoney(a.total_pnl)) +
+      acDetailCell("Drawdown", UI.signedMoney(a.drawdown)) +
+      acDetailCell("Positions", String(a.positions)) +
+      acDetailCell("Orders", String(a.orders)) +
+      acDetailCell("Executions", String(a.executions)) +
+      acDetailCell("Connection", a.connection, connCls) +
       "</div>" +
       UI.sectionHeading("Trading Permissions") +
       '<div class="ac-perm-list">' + renderAcPerms(a.permissions) + "</div>"
@@ -6915,6 +6942,22 @@
   function updateAcDetail() {
     var host = document.getElementById("ac-detail");
     if (host) host.innerHTML = renderAcDetail();
+  }
+
+  // ── Market breakdown ─────────────────────────────────────────
+  function renderAcMarkets() {
+    var rows = acData().markets || [];
+    if (!rows.length) return UI.empty("No Markets", "No market breakdown available.");
+    return UI.table({
+      columns: [
+        { key: "market_label", label: "Market" },
+        { key: "currency", label: "Currency" },
+        { key: "accounts", label: "Accounts", numeric: true },
+        { key: "connected", label: "Connected", numeric: true },
+        { key: "equity", label: "Equity (USD)", numeric: true, format: function (v) { return UI.money(v, 0); } },
+      ],
+      rows: rows,
+    });
   }
 
   // ── Add account form body ────────────────────────────────────
@@ -6945,8 +6988,28 @@
     );
   }
 
-  // ── Bindings (row select, add account, test connection) ──────
+  // ── Bindings (refresh, row select, add account) ──────────────
   function bindAccountsPage() {
+    var refreshBtn = document.querySelector('[data-action="ac:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", async function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        await acLoadCenter(true);
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = "Refresh";
+        if (AC_STATE.error) {
+          showToast("Accounts refresh failed: " + AC_STATE.error, "error");
+        } else {
+          var tbody = document.getElementById("ac-list-tbody");
+          if (tbody) tbody.innerHTML = renderAcRows();
+          var bar = document.querySelector(".ac-status-bar");
+          if (bar) bar.outerHTML = renderAcStatusBar();
+          updateAcDetail();
+          showToast("Accounts snapshot updated · 执行快照已更新", "ok");
+        }
+      });
+    }
     var tbody = document.getElementById("ac-list-tbody");
     if (tbody) {
       tbody.addEventListener("click", function (e) {
@@ -6993,17 +7056,28 @@
     }
   }
 
-  // ── Accounts page (Commit 015) ────────────────────────────────
-  PAGE_FRAMEWORK["operations/accounts"] = function () {
+  // ── Accounts page (Integration 012) ──────────────────────────
+  PAGE_FRAMEWORK["operations/accounts"] = async function () {
+    await acLoadCenter();
+    if (AC_STATE.error) {
+      return UI.pageHeader("Accounts", "Account & broker management · 多账户管理",
+        UI.button("Refresh", "ghost", { sm: true, action: "ac:refresh" }) +
+        UI.button("Add Account", "primary", { sm: true, action: "ac:add" })) +
+        UI.panel("Error", '<div class="empty">Failed to load: ' + esc(AC_STATE.error) + "</div>");
+    }
     return (
       UI.pageHeader("Accounts", "Account & broker management · 多账户管理",
+        UI.button("Refresh", "ghost", { sm: true, action: "ac:refresh" }) +
         UI.button("Add Account", "primary", { sm: true, action: "ac:add" })) +
+      renderAcStatusBar() +
       UI.sectionHeading("Account Overview") +
       renderAcOverview() +
       UI.sectionHeading("Connected Accounts") +
       UI.panel("Accounts", renderAcList()) +
       UI.sectionHeading("Account Details") +
-      '<div id="ac-detail">' + renderAcDetail() + "</div>"
+      '<div id="ac-detail">' + renderAcDetail() + "</div>" +
+      UI.sectionHeading("Market Breakdown") +
+      UI.panel("Markets", renderAcMarkets())
     );
   };
 
