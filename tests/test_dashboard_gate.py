@@ -1440,3 +1440,137 @@ def test_d29_accounts_api_access():
     res = client.get("/api/dashboard/accounts/center", headers=_headers(token))
     assert res.status_code == 200
     assert res.json()["status"]["total"] == 4
+
+
+# ============================================================================
+# Integration 013 — Data API
+# ============================================================================
+
+def test_d30_data_api_integration():
+    """Integration 013: Data Control Center reads the on-disk data layer
+    (data/real/d1 + data/processed/manifests + data/lakehouse/_state.json)."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: mock DT_OVERVIEW / DT_MARKETS / DT_DATASETS / DT_QUALITY /
+    # DT_PIPELINE arrays are gone; the page is API-driven via DT_STATE.
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("var DT_OVERVIEW = {", "var DT_MARKETS = [",
+                 "var DT_DATASETS = [", "var DT_QUALITY = [",
+                 "var DT_PIPELINE = ["):
+        assert gone not in app_js, f"mock data still present: {gone}"
+    assert "DT_STATE" in app_js and "dataCenter" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "dataCenter" in api_js, "api.js missing dataCenter"
+
+    token = _login("trader", "trader123")
+
+    # --- live snapshot ----------------------------------------------------
+    res = client.get("/api/dashboard/data/center", headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # overview KPI: reads the real on-disk manifests
+    ov = d["overview"]
+    assert ov["datasets"] >= 1
+    assert ov["symbols"] >= 1
+    assert ov["records"] >= 1
+    assert ov["data_service"] in ("HEALTHY", "EMPTY", "DEGRADED")
+    assert ov["last_update"]  # fetched_at present from real manifest
+
+    # datasets: every row carries the unified schema
+    datasets = d["datasets"]
+    assert datasets, "datasets list empty"
+    required_ds = ("id", "name", "type", "tf", "assets", "bars",
+                   "status", "date_range", "missing", "duplicates",
+                   "last_update", "source")
+    for ds in datasets:
+        for key in required_ds:
+            assert key in ds, f"dataset row missing {key}"
+        assert ds["status"] in ("READY", "STALE", "DEGRADED")
+        assert ds["tf"] in ("D1", "1H", "15m")
+
+    # real-d1 dataset is present and aggregated from the real manifest
+    real_ds = next((x for x in datasets if x["id"] == "real-d1"), None)
+    assert real_ds is not None, "Real Daily dataset missing"
+    assert real_ds["type"] == "Real"
+    assert real_ds["assets"] == 3  # NVDA, QQQ, SPY
+    assert real_ds["bars"] == 665 * 3  # 665 rows each per manifest
+
+    # symbols: every symbol has asset_class / exchange / market / tf / range
+    symbols = d["symbols"]
+    assert symbols, "symbols list empty"
+    sym_ids = {s["symbol"] for s in symbols}
+    # the 9-asset research universe must all appear
+    expected = {"NVDA", "QQQ", "SPY", "000688.SH", "HSTECH",
+                "EURUSD", "XAUUSD", "AU", "AG"}
+    assert expected.issubset(sym_ids), f"missing symbols: {expected - sym_ids}"
+    for s in symbols:
+        for key in ("symbol", "asset_class", "exchange", "market",
+                    "first_date", "last_date", "bars", "timeframes",
+                    "status"):
+            assert key in s, f"symbol row missing {key}"
+        assert s["status"] in ("READY", "STALE", "DEGRADED")
+
+    # NVDA / QQQ / SPY are flagged real (sourced from data/real/d1).
+    # Date range is the union of processed (2023-01-02 → 2025-12-31)
+    # and real (2024-01-02 → 2026-08-26) manifests.
+    for sym in ("NVDA", "QQQ", "SPY"):
+        row = next(s for s in symbols if s["symbol"] == sym)
+        assert row["real"] is True
+        assert row["bars"] >= 665
+        assert row["first_date"] == "2023-01-02"  # processed manifest start
+        assert row["last_date"] == "2026-08-26"   # real manifest end
+
+    # quality: aggregates over the processed manifests' quality_gate
+    q = d["quality"]
+    assert q["datasets_total"] == 27  # 9 symbols × 3 timeframes
+    assert q["datasets_pass"] >= 1
+    assert q["datasets_pass"] + q["datasets_fail"] == q["datasets_total"]
+    assert q["checks"]
+    for c in q["checks"]:
+        assert c["pass"] <= c["total"]
+
+    # pipeline: stages derived from the on-disk state
+    p = d["pipeline"]
+    assert p["status"] in ("HEALTHY", "EMPTY", "DEGRADED")
+    assert len(p["stages"]) == 5
+    stage_labels = [s["label"] for s in p["stages"]]
+    assert stage_labels == ["Fetch", "Normalize", "Validate", "Store", "Ready"]
+    # fetch + normalize + validate must be 'done' (real + processed exist)
+    assert p["stages"][0]["state"] == "done"  # Fetch
+    assert p["stages"][1]["state"] == "done"  # Normalize
+    assert p["stages"][2]["state"] == "done"  # Validate
+
+    # markets: grouped by market label, every market has at least one symbol
+    markets = d["markets"]
+    assert markets
+    market_labels = {s["market"] for s in symbols}
+    assert {m["market"] for m in markets} == market_labels
+    for m in markets:
+        assert m["symbols"] >= 1
+        assert m["status"] in ("healthy", "degraded", "down")
+
+    # real_daily mirrors the on-disk manifest
+    rd = d["real_daily"]
+    assert rd["fetched_at"]
+    assert rd["range"] == ["2024-01-01", "2026-08-27"]
+    assert len(rd["rows"]) == 3
+    for r in rd["rows"]:
+        assert r["status"] == "READY"
+        assert r["bars"] == 665
+
+
+def test_d30_data_api_access():
+    """Integration 013: RBAC and the auth gate."""
+    # unauthenticated -> 401
+    assert client.get("/api/dashboard/data/center").status_code == 401
+
+    # readonly can read the data center (view-only role)
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/data/center", headers=_headers(token))
+    assert res.status_code == 200
+    assert res.json()["overview"]["datasets"] >= 1

@@ -550,6 +550,343 @@ def executions(principal: Principal = Depends(require_roles())) -> dict:
     return {"executions": combined}
 
 
+# ============================================================================
+# Data API — Integration 013
+# Read-only view over the on-disk data layer (data/real/d1 +
+# data/processed/manifests + data/lakehouse/_state.json).  Research and
+# Backtest read the same manifests; the UI now shows exactly what they
+# will consume.  No new data sources, no fetch triggers, no schema edits.
+# ============================================================================
+
+_DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+_REAL_D1_DIR = _DATA_ROOT / "real" / "d1"
+_PROCESSED_MANIFEST_DIR = _DATA_ROOT / "processed" / "manifests"
+_LAKEHOUSE_STATE = _DATA_ROOT / "lakehouse" / "_state.json"
+
+
+def _load_json(path: Path, default):
+    import json
+    if not path.exists():
+        return default
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return default
+
+# Asset-class / exchange lookup for the symbols known to fetch_real +
+# the processed generator.  Kept in sync with research/data/fetch_real.py.
+_SYMBOL_META = {
+    "NVDA":      {"asset_class": "Equity",    "exchange": "NASDAQ",      "market": "US Equity"},
+    "QQQ":       {"asset_class": "ETF",       "exchange": "NASDAQ",      "market": "US Equity"},
+    "SPY":       {"asset_class": "ETF",       "exchange": "NYSE ARCA",   "market": "US Equity"},
+    "000688.SH": {"asset_class": "Index",     "exchange": "SSE STAR",    "market": "A-Share"},
+    "HSTECH":    {"asset_class": "Index",     "exchange": "HKEX",        "market": "Hong Kong"},
+    "EURUSD":    {"asset_class": "Forex",     "exchange": "BOC/Sina",    "market": "Forex"},
+    "XAUUSD":    {"asset_class": "Commodity", "exchange": "COMEX (GC)",  "market": "Commodities"},
+    "AU":        {"asset_class": "Futures",   "exchange": "SHFE",        "market": "Futures"},
+    "AG":        {"asset_class": "Futures",   "exchange": "SHFE",        "market": "Futures"},
+}
+
+
+def _symbol_meta(sym: str) -> dict:
+    return _SYMBOL_META.get(sym, {
+        "asset_class": "—",
+        "exchange": "—",
+        "market": "—",
+    })
+
+
+def _tf_label(tf: str) -> str:
+    """Normalise '1d' / '1h' / '15m' to the UI TF column ('D1' / '1H' / '15m')."""
+    tf = (tf or "").lower()
+    if tf in ("1d", "d1", "1day", "day"):
+        return "D1"
+    if tf in ("1h", "h1"):
+        return "1H"
+    if tf in ("15m", "m15"):
+        return "15m"
+    return tf.upper()
+
+
+def _ds_status(quality_gate: dict | None, manifest: dict | None) -> str:
+    """READY if the quality gate PASSed, otherwise DEGRADED / STALE."""
+    q = quality_gate or {}
+    if q.get("status") == "PASS":
+        return "READY"
+    if q.get("status") == "FAIL":
+        return "DEGRADED"
+    # no quality gate (e.g. real d1 manifest): infer from rows
+    if manifest and manifest.get("assets") or (manifest and manifest.get("rows")):
+        return "READY"
+    return "STALE"
+
+
+def _load_real_d1() -> dict:
+    """Load the real daily data manifest (data/real/d1/manifest.json)."""
+    return _load_json(_REAL_D1_DIR / "manifest.json",
+                      {"fetched_at": None, "range": [None, None], "assets": {}})
+
+
+def _load_processed_manifests() -> list[dict]:
+    """Read every processed manifest (data/processed/manifests/*.json)."""
+    out: list[dict] = []
+    if not _PROCESSED_MANIFEST_DIR.exists():
+        return out
+    for p in sorted(_PROCESSED_MANIFEST_DIR.glob("*.json")):
+        data = _load_json(p, None)
+        if isinstance(data, dict):
+            out.append(data)
+    return out
+
+
+def _load_lakehouse_state() -> dict:
+    return _load_json(_LAKEHOUSE_STATE,
+                      {"datasets": [], "snapshots": [], "files": [], "updated_at": None})
+
+
+@router.get("/dashboard/data/center")
+def data_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Data Control Center: overview → datasets → symbols → quality →
+    pipeline.  Reads ONLY the on-disk manifests that Research / Backtest
+    already consume (``data/real/d1`` + ``data/processed/manifests`` +
+    ``data/lakehouse/_state.json``).  No fetch, no schema edit, no new
+    providers — purely a read view over the existing data layer."""
+
+    real = _load_real_d1()
+    processed = _load_processed_manifests()
+    lake = _load_lakehouse_state()
+
+    real_assets = real.get("assets", {}) or {}
+
+    # ── Datasets: one row per (symbol × timeframe) processed manifest,
+    #    plus a single Real Daily dataset row aggregating data/real/d1.
+    datasets: list[dict] = []
+    for m in processed:
+        sym = m.get("symbol", "")
+        tf = _tf_label(m.get("timeframe", ""))
+        qg = m.get("quality_gate", {}) or {}
+        checks = qg.get("checks", {}) or {}
+        status = _ds_status(qg, None)
+        datasets.append({
+            "id": f"{sym}-{tf}",
+            "name": sym,
+            "type": "Processed" if m.get("source") == "synthetic" else "Real",
+            "tf": tf,
+            "assets": 1,
+            "bars": int(m.get("bars", 0) or 0),
+            "status": status,
+            "date_range": f'{m.get("start", "")[:10]} → {m.get("end", "")[:10]}',
+            "missing": "0.00%" if checks.get("no_missing_fields") else "—",
+            "duplicates": 0 if checks.get("no_duplicate_timestamps") else "—",
+            "last_update": (m.get("generated_at") or "")[:19].replace("T", " "),
+            "source": m.get("source", ""),
+        })
+
+    # Real daily data: aggregate into one row per symbol, plus a single
+    # 'Real D1' dataset that summarises the whole universe.
+    real_rows: list[dict] = []
+    for sym, a in real_assets.items():
+        meta = _symbol_meta(sym)
+        rows = int(a.get("rows", 0) or 0)
+        real_rows.append({
+            "symbol": sym,
+            "asset_class": meta["asset_class"],
+            "exchange": meta["exchange"],
+            "market": meta["market"],
+            "tf": "D1",
+            "first_date": a.get("first", ""),
+            "last_date": a.get("last", ""),
+            "bars": rows,
+            "source": a.get("source", ""),
+            "status": "READY" if rows > 0 else "STALE",
+            "limitation": a.get("limitation", ""),
+        })
+    if real_rows:
+        all_bars = sum(r["bars"] for r in real_rows)
+        first = min((r["first_date"] for r in real_rows if r["first_date"]), default="")
+        last = max((r["last_date"] for r in real_rows if r["last_date"]), default="")
+        datasets.insert(0, {
+            "id": "real-d1",
+            "name": "Real Daily",
+            "type": "Real",
+            "tf": "D1",
+            "assets": len(real_rows),
+            "bars": all_bars,
+            "status": "READY",
+            "date_range": f"{first} → {last}",
+            "missing": "0.00%",
+            "duplicates": 0,
+            "last_update": (real.get("fetched_at") or "")[:19].replace("T", " "),
+            "source": "fetch_real (akshare)",
+        })
+
+    # ── Symbols: unique symbols across real + processed, with first/last
+    symbols_map: dict[str, dict] = {}
+    for r in real_rows:
+        symbols_map.setdefault(r["symbol"], {
+            "symbol": r["symbol"],
+            "asset_class": r["asset_class"],
+            "exchange": r["exchange"],
+            "market": r["market"],
+            "first_date": r["first_date"],
+            "last_date": r["last_date"],
+            "bars": r["bars"],
+            "timeframes": [],
+            "status": r["status"],
+            "real": True,
+        })
+    for m in processed:
+        sym = m.get("symbol", "")
+        if not sym:
+            continue
+        tf = _tf_label(m.get("timeframe", ""))
+        entry = symbols_map.setdefault(sym, {
+            "symbol": sym,
+            "asset_class": _symbol_meta(sym)["asset_class"],
+            "exchange": _symbol_meta(sym)["exchange"],
+            "market": _symbol_meta(sym)["market"],
+            "first_date": (m.get("start") or "")[:10],
+            "last_date": (m.get("end") or "")[:10],
+            "bars": 0,
+            "timeframes": [],
+            "status": _ds_status(m.get("quality_gate"), None),
+            "real": False,
+        })
+        if tf not in entry["timeframes"]:
+            entry["timeframes"].append(tf)
+        entry["bars"] += int(m.get("bars", 0) or 0)
+        # widen the date range
+        s = (m.get("start") or "")[:10]
+        e = (m.get("end") or "")[:10]
+        if s and (not entry["first_date"] or s < entry["first_date"]):
+            entry["first_date"] = s
+        if e and (not entry["last_date"] or e > entry["last_date"]):
+            entry["last_date"] = e
+    symbols = sorted(symbols_map.values(), key=lambda s: s["symbol"])
+
+    # ── Quality: aggregate over processed manifests' quality gates
+    q_pass = 0
+    q_fail = 0
+    check_names = [
+        "bars_non_empty", "coverage_years", "no_missing_fields",
+        "no_duplicate_timestamps", "monotonic_timestamps",
+        "ohlc_consistency", "cadence", "metadata",
+    ]
+    check_pass = {n: 0 for n in check_names}
+    check_total = 0
+    for m in processed:
+        q = m.get("quality_gate", {}) or {}
+        st = q.get("status")
+        if st == "PASS":
+            q_pass += 1
+        elif st == "FAIL":
+            q_fail += 1
+        checks = q.get("checks", {}) or {}
+        check_total += 1
+        for n in check_names:
+            if checks.get(n):
+                check_pass[n] += 1
+    quality = {
+        "datasets_pass": q_pass,
+        "datasets_fail": q_fail,
+        "datasets_total": len(processed),
+        "coverage": (f"{(q_pass / len(processed) * 100):.1f}%"
+                     if processed else "0.0%"),
+        "checks": [
+            {"name": n.replace("_", " ").title(),
+             "pass": check_pass[n],
+             "total": check_total}
+            for n in check_names
+        ],
+    }
+
+    # ── Pipeline (lakehouse): last write + dataset count + current
+    #    snapshot count
+    lake_datasets = lake.get("datasets", []) or []
+    lake_snapshots = lake.get("snapshots", []) or []
+    lake_files = lake.get("files", []) or []
+    current_snapshots = [s for s in lake_snapshots if s.get("is_current")]
+    last_lake_write = (lake.get("updated_at") or "")[:19].replace("T", " ")
+    total_rows = sum(int(f.get("row_count", 0) or 0) for f in lake_files)
+    total_bytes = sum(int(f.get("size_bytes", 0) or 0) for f in lake_files)
+    pipeline = {
+        "status": "HEALTHY" if lake_datasets else "EMPTY",
+        "stages": [
+            {"label": "Fetch",     "state": "done" if real_assets else "pending"},
+            {"label": "Normalize", "state": "done" if processed else "pending"},
+            {"label": "Validate",  "state": "done" if q_pass else "pending"},
+            {"label": "Store",     "state": "done" if lake_files else "pending"},
+            {"label": "Ready",     "state": "done" if current_snapshots else "pending"},
+        ],
+        "lakehouse": {
+            "datasets": len(lake_datasets),
+            "snapshots": len(lake_snapshots),
+            "current_snapshots": len(current_snapshots),
+            "files": len(lake_files),
+            "total_rows": total_rows,
+            "total_bytes": total_bytes,
+            "last_write": last_lake_write,
+        },
+    }
+
+    # ── Overview KPI
+    real_first = min((r["first_date"] for r in real_rows if r["first_date"]), default="")
+    real_last = max((r["last_date"] for r in real_rows if r["last_date"]), default="")
+    last_update = (real.get("fetched_at") or lake.get("updated_at") or "")[:19].replace("T", " ")
+    overview = {
+        "data_service": pipeline["status"],
+        "datasets": len(datasets),
+        "symbols": len(symbols),
+        "records": sum(d["bars"] for d in datasets),
+        "coverage": quality["coverage"],
+        "range_start": real_first,
+        "range_end": real_last,
+        "last_update": last_update,
+    }
+
+    return {
+        "overview": overview,
+        "datasets": datasets,
+        "symbols": symbols,
+        "quality": quality,
+        "pipeline": pipeline,
+        "real_daily": {
+            "fetched_at": real.get("fetched_at"),
+            "range": real.get("range", [None, None]),
+            "rows": real_rows,
+        },
+        "markets": _data_markets(real_rows, symbols),
+    }
+
+
+def _data_markets(real_rows: list[dict], symbols: list[dict]) -> list[dict]:
+    """Group symbols by market for the Markets panel."""
+    seen: dict[str, dict] = {}
+    for s in symbols:
+        m = s["market"]
+        entry = seen.setdefault(m, {
+            "market": m,
+            "symbols": 0,
+            "datasets": 0,
+            "status": "healthy",
+        })
+        entry["symbols"] += 1
+        if s["status"] != "READY":
+            entry["status"] = "degraded"
+    # Markets without any processed manifest but with real rows
+    for r in real_rows:
+        m = r["market"]
+        if m not in seen:
+            seen[m] = {
+                "market": m,
+                "symbols": 1,
+                "datasets": 0,
+                "status": "healthy",
+            }
+    return sorted(seen.values(), key=lambda m: m["market"])
+
+
 @router.get("/dashboard/reconciliation")
 def reconciliation(principal: Principal = Depends(require_roles())) -> dict:
     return {

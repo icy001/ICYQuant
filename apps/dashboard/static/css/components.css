@@ -3383,8 +3383,35 @@ tr:focus-within {
 }
 
 /* ==========================================================================
- * Data module — Commit 017 ends
+ * Data module — Integration 013 additions
  * ========================================================================== */
+
+.ds-toolbar {
+  display: flex; align-items: center; gap: var(--ds-space-3);
+  padding: var(--ds-space-2) 0 var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-border);
+  margin-bottom: var(--ds-space-4);
+}
+.ds-toolbar-meta { color: var(--ds-text-muted); font-size: var(--ds-text-xs); }
+
+.dt-empty {
+  padding: var(--ds-space-6); text-align: center;
+  color: var(--ds-text-muted); font-size: var(--ds-text-sm);
+}
+
+.dt-lakehouse-summary {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: var(--ds-space-4); padding: var(--ds-space-3) var(--ds-space-4);
+  background: var(--ds-bg-surface); border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  font-size: var(--ds-text-sm); color: var(--ds-text-secondary);
+}
+.dt-lakehouse-summary b { color: var(--ds-text-primary); }
+.dt-last-write { color: var(--ds-text-muted); font-size: var(--ds-text-xs); }
+
+@media (max-width: 768px) {
+  .dt-lakehouse-summary { flex-direction: column; align-items: flex-start; gap: var(--ds-space-1); }
+}
 
 /* ==========================================================================
  * Monitoring module — Commit 018
