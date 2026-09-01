@@ -887,6 +887,250 @@ def _data_markets(real_rows: list[dict], symbols: list[dict]) -> list[dict]:
     return sorted(seen.values(), key=lambda m: m["market"])
 
 
+# ============================================================================
+# Monitoring API — Integration 014
+# Read-only aggregation of the existing runtime state: service health
+# (HealthRegistry), trading runtime (pipeline / orders / positions),
+# execution metrics, and the event timeline derived from the event bus.
+# No new Prometheus metrics, no alert rules (that is 015), no engine edits.
+# ============================================================================
+
+@router.get("/dashboard/monitoring/center")
+def monitoring_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Monitoring Control Center: system overview → service health →
+    trading runtime → metrics → event timeline.  Every number comes from
+    the existing runtime (HealthRegistry + TradingPipeline + Position /
+    Ledger state).  Read-only — no rules, no notification, no engine
+    modification."""
+
+    import time as _time
+
+    def _pnum(value) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    t0 = _time.perf_counter()
+    health = runtime.system_health()
+    avg_latency = round((_time.perf_counter() - t0) * 1000
+                        / max(len(health.get("services", {})), 1), 2)
+    ov = runtime.overview()
+
+    services_snapshot = health.get("services", {}) or {}
+
+    # ── Service rows: id / name / status / detail / latency ────────
+    # The registry re-runs each check on every snapshot(); the average
+    # probe latency is measured around that snapshot call.
+    service_rows = []
+    for sid, svc in services_snapshot.items():
+        state = svc if isinstance(svc, dict) else {"status": "UNKNOWN",
+                                                   "detail": ""}
+        service_rows.append({
+            "id": sid,
+            "name": sid.replace("-", " ").replace("_", " ").title(),
+            "status": state.get("status", "UNKNOWN"),
+            "detail": state.get("detail", ""),
+            "version": health.get("version", ""),
+            "uptime": ov["pipeline"].get("attached_at") or "",
+            "last_heartbeat": health.get("checked_at"),
+            "latency_ms": avg_latency,
+        })
+
+    up = sum(1 for s in service_rows if s["status"] == "UP")
+    down = sum(1 for s in service_rows if s["status"] == "DOWN")
+    unknown = sum(1 for s in service_rows if s["status"] == "UNKNOWN")
+
+    # ── Trading runtime: what the trading system is doing now ──────
+    order_list = runtime.orders()
+    position_list = runtime.positions()
+    decision_list = runtime.risk_decisions()
+    active_orders = [o for o in order_list if o.get("is_active")]
+    strategy_ids = sorted({o.get("strategy_id") for o in order_list
+                           if o.get("strategy_id")})
+    trading_runtime = {
+        "strategies": len(strategy_ids),
+        "strategy_ids": strategy_ids,
+        "active_orders": len(active_orders),
+        "open_positions": len([p for p in position_list
+                               if _pnum(p.get("quantity")) != 0]),
+        "paper_accounts": 1 if runtime.attached() else 0,
+        "execution_queue": len(active_orders),
+        "events": len(runtime._events()),
+        "pipeline_attached": runtime.attached(),
+        "attached_at": ov["pipeline"].get("attached_at"),
+    }
+
+    # ── Metrics (execution + risk) ─────────────────────────────────
+    m = ov["metrics"]
+    metrics = {
+        "orders": m.get("orders", 0),
+        "executions": m.get("executions", 0),
+        "fill_rate": m.get("fill_rate", 0.0),
+        "reject_rate": m.get("reject_rate", 0.0),
+        "risk_decisions": len(decision_list),
+        "risk_rejected": sum(1 for d in decision_list
+                             if d["decision"] == "REJECTED"),
+        "today_pnl": m.get("today_pnl", 0.0),
+        "equity": m.get("equity", 0.0),
+        "exposure": m.get("exposure", 0.0),
+    }
+
+    # Alpha021 paper trading snapshot (deterministic replay, cached)
+    alpha = None
+    try:
+        factor = factor_paper(principal)
+        if isinstance(factor, dict) and "error" not in factor:
+            meta = factor.get("meta", {}) or {}
+            alpha = {
+                "alpha_id": meta.get("alpha_id"),
+                "signals": meta.get("signals", 0),
+                "fills": meta.get("filled", 0),
+                "rejects": meta.get("rejected", 0),
+                "errors": meta.get("errored", 0),
+                "win_rate": meta.get("win_rate", 0.0),
+                "return_pct": meta.get("return_pct", 0.0),
+            }
+    except Exception:  # noqa: BLE001
+        alpha = None
+
+    # ── Event timeline: signal → risk → order → execution → position
+    events_out: list[dict] = []
+    for event in runtime._events():
+        etype = getattr(event, "event_type", None)
+        etype = getattr(etype, "value", etype)  # enum -> str
+        etype = str(etype) if etype is not None else ""
+        payload = getattr(event, "payload", None) or {}
+        sev = "INFO"
+        text = etype.replace("_", " ").lower()
+        if etype in ("ORDER_REJECTED", "RISK_REJECTED"):
+            sev = "ERROR"
+        elif "RISK" in etype and "CHECKED" not in etype:
+            sev = "WARNING"
+        # human-readable message from the payload
+        symbol = payload.get("symbol") or (payload.get("order") or {}).get("symbol")
+        if symbol:
+            text = f"{text} — {symbol}"
+        reason = payload.get("reason") or payload.get("rejection_reason")
+        if reason:
+            text += f" ({reason})"
+        events_out.append({
+            "timestamp": _iso_or_str(getattr(event, "timestamp", None)),
+            "severity": sev,
+            "source": _event_source(etype),
+            "type": etype,
+            "text": text,
+        })
+    # runtime alerts (risk limits, service-down) enrich the timeline
+    for alert in runtime.alerts():
+        sev = alert.get("level", "INFO")
+        sev = {"CRITICAL": "ERROR", "HIGH": "ERROR",
+               "WARNING": "WARNING"}.get(sev, "INFO")
+        events_out.append({
+            "timestamp": _iso_or_str(alert.get("timestamp")),
+            "severity": sev,
+            "source": alert.get("source", "system"),
+            "type": "ALERT",
+            "text": alert.get("message", ""),
+        })
+    # Fills / positions are applied directly to the Position & Ledger
+    # engines (not re-published on the bus), so the Execution and
+    # Position steps of the chain are derived from their official
+    # read models — still read-only, no pipeline modification.
+    for ex in runtime.executions():
+        events_out.append({
+            "timestamp": _iso_or_str(ex.get("timestamp")),
+            "severity": "INFO",
+            "source": "execution-engine",
+            "type": "TRADE_EXECUTED",
+            "text": (f"order filled — {ex.get('symbol')} "
+                     f"{_pnum(ex.get('quantity')):g} @ "
+                     f"{_pnum(ex.get('price')):.2f}"),
+        })
+    for pos in runtime.positions():
+        if _pnum(pos.get("quantity")) == 0:
+            continue
+        events_out.append({
+            "timestamp": _iso_or_str(trading_runtime.get("attached_at")),
+            "severity": "INFO",
+            "source": "position-ledger",
+            "type": "POSITION_CHANGED",
+            "text": (f"position — {pos.get('symbol')} "
+                     f"{_pnum(pos.get('quantity')):g} @ "
+                     f"{_pnum(pos.get('avg_price')):.2f}"),
+        })
+    events_out.sort(key=lambda e: e["timestamp"] or "", reverse=True)
+
+    # ── Infrastructure (host) ─────────────────────────────────────
+    infra = _host_infra()
+
+    return {
+        "overview": {
+            "status": health.get("status", "UNKNOWN"),
+            "services_up": up,
+            "services_down": down,
+            "services_unknown": unknown,
+            "services_total": len(service_rows),
+            "version": health.get("version", ""),
+            "app": health.get("app", ""),
+            "checked_at": health.get("checked_at"),
+            "pipeline_attached": runtime.attached(),
+        },
+        "services": service_rows,
+        "trading": trading_runtime,
+        "metrics": metrics,
+        "alpha": alpha,
+        "events": events_out[:50],
+        "infra": infra,
+    }
+
+
+def _iso_or_str(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return value.isoformat()
+    except Exception:  # noqa: BLE001
+        return str(value)
+
+
+def _event_source(etype: str) -> str:
+    """Map an EventType to the logical service that emitted it."""
+    if etype.startswith("RISK"):
+        return "risk-engine"
+    if etype.startswith("ORDER"):
+        return "order-engine"
+    if etype.startswith("EXECUTION") or etype.startswith("FILL"):
+        return "execution-engine"
+    if etype.startswith("POSITION"):
+        return "position-ledger"
+    if etype.startswith("STRATEGY") or etype.startswith("SIGNAL"):
+        return "strategy-runtime"
+    return "event-bus"
+
+
+def _host_infra() -> dict:
+    """Host CPU / memory / disk usage via psutil (best effort)."""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        return {
+            "cpu": {"value": f"{cpu:.0f}%", "percent": cpu,
+                    "status": "NORMAL" if cpu < 80 else "WARNING"},
+            "memory": {"value": f"{mem.percent:.0f}%", "percent": mem.percent,
+                       "status": "NORMAL" if mem.percent < 85 else "WARNING"},
+            "disk": {"value": f"{disk.percent:.0f}%", "percent": disk.percent,
+                     "status": "NORMAL" if disk.percent < 85 else "WARNING"},
+            "available": True,
+        }
+    except ImportError:
+        return {"available": False}
+
+
 @router.get("/dashboard/reconciliation")
 def reconciliation(principal: Principal = Depends(require_roles())) -> dict:
     return {
