@@ -2553,6 +2553,83 @@
   }
 
   /* ==================================================================
+   * Integration 007 — Research API Hooks
+   *
+   * useResearch* are the single entry points the Research page uses to
+   * read the frozen Factor Discovery v2 results (101 → 909 → 28 →
+   * 26 → 22 → 15) and the Alpha021 candidate (factor-real-d1).
+   *
+   * Read-only contract:
+   *   - useResearchOverview()              GET  /api/dashboard/research/overview
+   *   - useResearchRuns()                  GET  /api/dashboard/research/runs
+   *   - useResearchRun(runId)              GET  /api/dashboard/research/runs/{run_id}
+   *   - useResearchAlphas(runId)           GET  /api/dashboard/research/alphas
+   *   - useResearchAlphaDetail(id, runId)  GET  /api/dashboard/research/alphas/{alpha_id}
+   *   - useResearchFunnel(runId)           GET  /api/dashboard/research/funnel/{run_id}
+   *   - useResearchDecorrelation(runId)    GET  /api/dashboard/research/decorrelation/{run_id}
+   *
+   * The UI never fabricates research data — every funnel count, alpha
+   * metric, family member, formula comes straight from report.json. List-
+   * level errors propagate to render() outer try/catch → stateError +
+   * Retry. Detail errors are handled by the page-level handlers.
+   * ================================================================== */
+  async function useResearchOverview() {
+    var data = await api.get("/dashboard/research/overview");
+    return {
+      runs: Array.isArray(data && data.runs) ? data.runs : [],
+    };
+  }
+
+  async function useResearchRuns() {
+    var data = await api.get("/dashboard/research/runs");
+    return {
+      runs: Array.isArray(data && data.runs) ? data.runs : [],
+    };
+  }
+
+  async function useResearchRun(runId) {
+    return await api.get(
+      "/dashboard/research/runs/" + encodeURIComponent(runId)
+    );
+  }
+
+  async function useResearchAlphas(runId) {
+    var url = "/dashboard/research/alphas";
+    if (runId) url += "?run_id=" + encodeURIComponent(runId);
+    var data = await api.get(url);
+    return {
+      run_id: (data && data.run_id) || runId,
+      alphas: Array.isArray(data && data.alphas) ? data.alphas : [],
+      total: (data && data.total) || 0,
+    };
+  }
+
+  async function useResearchAlphaDetail(alphaId, runId) {
+    var url =
+      "/dashboard/research/alphas/" + encodeURIComponent(alphaId);
+    if (runId) url += "?run_id=" + encodeURIComponent(runId);
+    return await api.get(url);
+  }
+
+  async function useResearchFunnel(runId) {
+    return await api.get(
+      "/dashboard/research/funnel/" + encodeURIComponent(runId)
+    );
+  }
+
+  async function useResearchDecorrelation(runId) {
+    return await api.get(
+      "/dashboard/research/decorrelation/" + encodeURIComponent(runId)
+    );
+  }
+
+  async function useResearchReport(runId) {
+    return await api.get(
+      "/dashboard/research/runs/" + encodeURIComponent(runId) + "/report"
+    );
+  }
+
+  /* ==================================================================
    * Integration 003 — Trading API Hooks
    *
    * useQuote / useOrderPreview / useOrderSubmit are the single entry
@@ -3045,122 +3122,47 @@
   };
 
   /* ==================================================================
-   * Research module — Commit 010
-   * Mock research state designed for future real-API swap. Maps to the
-   * Factor Discovery v2 pipeline (Alphas → Pairs → Validation → OOS →
-   * Robustness → De-correlation → Paper). Research is the research entry
-   * point: discover → review results → judge candidates → verify.
-   * Display-only — does NOT advance factor status or touch Research Engine.
+   * Research module — Integration 007 (Research API)
+   *
+   * The Research page is wired to the frozen Factor Discovery v2
+   * results through seven read-only endpoints:
+   *   - GET /api/dashboard/research/overview        (all runs + funnels)
+   *   - GET /api/dashboard/research/runs            (run summaries)
+   *   - GET /api/dashboard/research/runs/{run_id}   (single run)
+   *   - GET /api/dashboard/research/alphas          (alpha_ranking list)
+   *   - GET /api/dashboard/research/alphas/{id}    (alpha detail + family)
+   *   - GET /api/dashboard/research/funnel/{id}    (funnel counts)
+   *   - GET /api/dashboard/research/decorrelation/{id} (families + reps)
+   *
+   * No mock data — every funnel count, alpha metric, formula, family
+   * member comes straight from report.json. The UI never fabricates
+   * research data, never modifies the Factor Engine, never advances
+   * factor status, never touches Paper Trading logic.
    * ================================================================== */
-  var RESEARCH_FUNNEL = [
-    { stage: "Alphas", count: 101, sub: "Alpha candidates generated", variant: "info", rate: "100%", cap: true },
-    { stage: "Pairs", count: 909, sub: "Pairwise correlations tested", variant: "info", rate: "9.0×", cap: true },
-    { stage: "Validation", count: 28, sub: "In-sample passed", variant: "warning", rate: "27.7%" },
-    { stage: "OOS", count: 26, sub: "Out-of-sample passed", variant: "warning", rate: "92.9%" },
-    { stage: "Robustness", count: 22, sub: "Survivors → Candidates", variant: "profit", rate: "84.6%" },
-    { stage: "De-correlation", count: 15, sub: "Independent families", variant: "profit", rate: "68.2%" },
-    { stage: "Paper", count: 1, sub: "Promoted to paper", variant: "purple", rate: "6.7%" },
-  ];
 
-  var EXPERIMENTS_DATA = [
-    { name: "factor-v1", dataset: "Synthetic", tf: "1H", factors: 101, candidates: 22, flow: "22 → 15", status: "Completed" },
-    { name: "factor-real-d1", dataset: "Real", tf: "D1", factors: 101, candidates: 1, flow: "1 → 1", status: "Completed" },
-    { name: "Alpha021 Paper", dataset: "Real", tf: "D1", factors: 1, candidates: 1, flow: "ACTIVE", status: "Running" },
-  ];
+  // ── Page state (populated by API; no mock data) ────────────────
+  var RESEARCH_STATE = {
+    runs: [],            // overview runs (run_id + funnel)
+    selectedRunId: "factor-real-d1",  // default to Alpha021's run
+    selectedAlphaId: "Alpha021",
+    alphas: [],          // alpha_ranking rows for the selected run
+    alphaDetail: null,   // detail payload for selected alpha
+    decorrelation: null, // decorrelation payload for the selected run
+    overview: null,       // overview payload (KPI source)
+    lastUpdated: null,
+  };
 
-  // Factor candidate status set (display-only — UI does not auto-advance):
-  // DISCOVERED → VALIDATED → OOS PASSED → ROBUST → CANDIDATE → DECORRELATED → PAPER → SHADOW → LIVE
-  var FACTOR_CANDIDATES = [
-    {
-      alpha: "Alpha021", score: 0.73, oosIc: 0.109, robustness: "PASS", correlation: "Unique",
-      status: "PAPER", family: "Alpha021",
-      detail: {
-        assets: ["NVDA", "QQQ", "SPY"],
-        icCurve: [0.082, 0.091, 0.078, 0.104, 0.096, 0.112, 0.101, 0.115, 0.108, 0.109],
-        zScore: [0.61, 0.78, 0.69, 0.88, 0.73, 0.84, 0.76, 0.82],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
-        paper: { signals: 220, fillRate: 0.8591, rejectRate: 0.1136, errorRate: 0.0273 },
-      },
-    },
-    {
-      alpha: "Alpha060", score: 0.84, oosIc: 0.051, robustness: "PASS", correlation: "Family D1",
-      status: "DECORRELATED", family: "Family D1",
-      detail: {
-        assets: ["NVDA", "QQQ"],
-        icCurve: [0.041, 0.048, 0.039, 0.055, 0.051, 0.058, 0.049, 0.051],
-        zScore: [0.72, 0.81, 0.69, 0.88, 0.84, 0.79, 0.82, 0.86],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
-      },
-    },
-    {
-      alpha: "Alpha047", score: 0.85, oosIc: 0.038, robustness: "PASS", correlation: "Family D2",
-      status: "DECORRELATED", family: "Family D2",
-      detail: {
-        assets: ["SPY", "QQQ"],
-        icCurve: [0.029, 0.035, 0.041, 0.033, 0.044, 0.038, 0.040, 0.038],
-        zScore: [0.66, 0.79, 0.72, 0.85, 0.80, 0.76, 0.83, 0.85],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PASS" },
-      },
-    },
-    {
-      alpha: "Alpha008", score: 0.96, oosIc: 0.045, robustness: "PASS", correlation: "Family D3",
-      status: "CANDIDATE", family: "Family D3",
-      detail: {
-        assets: ["NVDA"],
-        icCurve: [0.033, 0.041, 0.038, 0.050, 0.044, 0.047, 0.042, 0.045],
-        zScore: [0.74, 0.82, 0.77, 0.90, 0.96, 0.88, 0.91, 0.93],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "PEND" },
-      },
-    },
-    {
-      alpha: "Alpha031", score: 0.71, oosIc: 0.062, robustness: "PASS", correlation: "Family D2",
-      status: "OOS PASSED", family: "Family D2",
-      detail: {
-        assets: ["QQQ", "SPY"],
-        icCurve: [0.048, 0.057, 0.052, 0.066, 0.061, 0.064, 0.059, 0.062],
-        zScore: [0.58, 0.69, 0.63, 0.77, 0.71, 0.74, 0.70, 0.72],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PEND", decorrelation: "—" },
-      },
-    },
-    {
-      alpha: "Alpha013", score: 0.68, oosIc: 0.041, robustness: "PASS", correlation: "Family D1",
-      status: "ROBUST", family: "Family D1",
-      detail: {
-        assets: ["NVDA", "SPY"],
-        icCurve: [0.030, 0.038, 0.034, 0.045, 0.041, 0.043, 0.039, 0.041],
-        zScore: [0.55, 0.64, 0.59, 0.71, 0.68, 0.66, 0.70, 0.69],
-        validation: { train: "PASS", validation: "PASS", oos: "PASS", robustness: "PASS", decorrelation: "—" },
-      },
-    },
-    {
-      alpha: "Alpha077", score: 0.59, oosIc: 0.033, robustness: "PEND", correlation: "Family D3",
-      status: "VALIDATED", family: "Family D3",
-      detail: {
-        assets: ["QQQ"],
-        icCurve: [0.024, 0.031, 0.028, 0.036, 0.033, 0.035, 0.030, 0.033],
-        zScore: [0.48, 0.57, 0.52, 0.63, 0.59, 0.61, 0.58, 0.60],
-        validation: { train: "PASS", validation: "PASS", oos: "PEND", robustness: "—", decorrelation: "—" },
-      },
-    },
-    {
-      alpha: "Alpha052", score: 0.42, oosIc: 0.018, robustness: "PEND", correlation: "Unassigned",
-      status: "DISCOVERED", family: "Unassigned",
-      detail: {
-        assets: ["AG", "AU"],
-        icCurve: [0.011, 0.016, 0.014, 0.020, 0.018, 0.019, 0.015, 0.018],
-        zScore: [0.31, 0.38, 0.35, 0.46, 0.42, 0.44, 0.40, 0.43],
-        validation: { train: "PEND", validation: "—", oos: "—", robustness: "—", decorrelation: "—" },
-      },
-    },
-  ];
-
-  var RESEARCH_SELECTED_ALPHA = "Alpha021";
+  // Alpha IDs that have been promoted to Paper Trading (frozen research
+  // result; display-only — Research UI does NOT advance or read Paper
+  // state from the running session).
+  var RESEARCH_PAPER_ALPHAS = { "Alpha021": true };
 
   function factorStatusClass(status) {
     var m = {
       "DISCOVERED": "discovered", "VALIDATED": "validated", "OOS PASSED": "oos",
       "ROBUST": "robust", "CANDIDATE": "candidate", "DECORRELATED": "decorrelated",
       "PAPER": "paper", "SHADOW": "shadow", "LIVE": "live",
+      "REJECTED": "rejected",
     };
     return "rs-status rs-status-" + (m[status] || "discovered");
   }
@@ -3169,10 +3171,52 @@
     return '<span class="' + factorStatusClass(status) + '">' + esc(status) + "</span>";
   }
 
-  function renderFactorFunnel() {
+  // ── Numeric helpers (research-specific) ────────────────────────
+  function rsNum(v, digits) {
+    if (v === null || v === undefined || v === "" || isNaN(v)) return "—";
+    return Number(v).toFixed(digits == null ? 3 : digits);
+  }
+  function rsSigned(v, digits) {
+    if (v === null || v === undefined || v === "" || isNaN(v)) return "—";
+    var d = digits == null ? 3 : digits;
+    return (v >= 0 ? "+" : "") + Number(v).toFixed(d);
+  }
+  function rsPct(v, digits) {
+    if (v === null || v === undefined || v === "" || isNaN(v)) return "—";
+    return (v * 100).toFixed(digits == null ? 2 : digits) + "%";
+  }
+
+  // Derive display status from an alpha_ranking row + decorrelation info.
+  //  - PAPER        if the alpha is in the paper-trading set (frozen)
+  //  - DECORRELATED if the alpha is a family representative
+  //  - CANDIDATE    if the alpha passed all gates (status == "CANDIDATE")
+  //  - REJECTED     otherwise
+  function rsAlphaDisplayStatus(alpha) {
+    if (RESEARCH_PAPER_ALPHAS[alpha.alpha_id]) return "PAPER";
+    if (alpha.is_representative) return "DECORRELATED";
+    if (alpha.status === "CANDIDATE") return "CANDIDATE";
+    return alpha.status || "REJECTED";
+  }
+
+  // ── Funnel visualization (6 stages: Alphas → Pairs → Validation →
+  //    OOS → Robustness → De-correlation) ────────────────────────
+  function renderFactorFunnel(funnel) {
+    if (!funnel) {
+      return UI.empty("No funnel data", "Funnel metrics unavailable for this run.");
+    }
+    var alphasTotal = funnel.alphas_total || 0;
+    var stages = [
+      { stage: "Alphas",        count: alphasTotal,                       sub: "Alpha candidates generated", variant: "info",    cap: true,  rate: "100%" },
+      { stage: "Pairs",         count: funnel.pairs_backtested || 0,      sub: "Pairwise correlations tested", variant: "info",  cap: true,  rate: alphasTotal ? ((funnel.pairs_backtested / alphasTotal).toFixed(1) + "×") : "—" },
+      { stage: "Validation",   count: funnel.validation_passed || 0,     sub: "In-sample passed",            variant: "warning", rate: alphasTotal ? rsPct(funnel.validation_passed / alphasTotal, 1) : "—" },
+      { stage: "OOS",          count: funnel.oos_passed || 0,            sub: "Out-of-sample passed",         variant: "warning", rate: (funnel.validation_passed) ? rsPct(funnel.oos_passed / funnel.validation_passed, 1) : "—" },
+      { stage: "Robustness",   count: funnel.robustness_passed || 0,     sub: "Survivors → Candidates",       variant: "profit",  rate: (funnel.oos_passed) ? rsPct(funnel.robustness_passed / funnel.oos_passed, 1) : "—" },
+      { stage: "De-correlation", count: funnel.decorrelated_alphas || 0, sub: "Independent families",        variant: "profit",  rate: (funnel.robustness_passed) ? rsPct(funnel.decorrelated_alphas / funnel.robustness_passed, 1) : "—" },
+    ];
+
     var rows = "";
-    RESEARCH_FUNNEL.forEach(function (s, i) {
-      var w = s.cap ? 100 : Math.max(10, Math.round((s.count / 101) * 100));
+    stages.forEach(function (s, i) {
+      var w = s.cap ? 100 : Math.max(8, Math.round((s.count / Math.max(alphasTotal, 1)) * 100));
       rows +=
         '<div class="rs-funnel-row">' +
         '<div class="rs-funnel-label">' + esc(s.stage) +
@@ -3183,71 +3227,128 @@
         "</div></div>" +
         '<div class="rs-funnel-rate">' + esc(s.rate) + "</div>" +
         "</div>";
-      if (i < RESEARCH_FUNNEL.length - 1) {
+      if (i < stages.length - 1) {
         rows += '<div class="rs-funnel-arrow">↓</div>';
       }
     });
-    rows +=
-      '<div class="rs-funnel-arrow">↓</div>' +
-      '<div class="rs-funnel-terminal">' +
-      factorStatusBadge("PAPER") +
-      '<span class="rs-funnel-terminal-name">Alpha021</span>' +
-      "</div>";
+
+    // Terminal: paper-promoted alpha (if any in this run)
+    var paperAlpha = null;
+    for (var i = 0; i < RESEARCH_STATE.alphas.length; i++) {
+      if (RESEARCH_PAPER_ALPHAS[RESEARCH_STATE.alphas[i].alpha_id]) {
+        paperAlpha = RESEARCH_STATE.alphas[i].alpha_id;
+        break;
+      }
+    }
+    if (paperAlpha) {
+      rows +=
+        '<div class="rs-funnel-arrow">↓</div>' +
+        '<div class="rs-funnel-terminal">' +
+        factorStatusBadge("PAPER") +
+        '<span class="rs-funnel-terminal-name">' + esc(paperAlpha) + "</span>" +
+        "</div>";
+    }
     return '<div class="rs-funnel">' + rows + "</div>";
   }
 
+  // ── Experiments / Runs list ────────────────────────────────────
   function renderExperimentsList() {
+    var runs = RESEARCH_STATE.runs;
+    if (!runs || !runs.length) {
+      return UI.empty("No runs", "No experiment runs found in the research output.");
+    }
     var html = '<div class="rs-exp-list">';
-    EXPERIMENTS_DATA.forEach(function (e) {
-      var flowCls = e.status === "Running" ? " rs-exp-flow-active" : "";
+    runs.forEach(function (r) {
+      var isSel = r.run_id === RESEARCH_STATE.selectedRunId ? " rs-exp-item-selected" : "";
+      var f = r.funnel || {};
+      var candidates = f.final_alphas != null ? f.final_alphas : 0;
+      var decorrelated = f.decorrelated_alphas != null ? f.decorrelated_alphas : 0;
+      var flow = candidates + " → " + decorrelated;
       html +=
-        '<div class="rs-exp-item" data-rs-exp="' + esc(e.name) + '">' +
+        '<div class="rs-exp-item' + isSel + '" data-rs-exp="' + esc(r.run_id) + '">' +
         '<div class="rs-exp-main">' +
-        '<span class="rs-exp-name">' + esc(e.name) + "</span>" +
-        '<span class="rs-exp-meta">' + esc(e.dataset) + " · " + esc(e.tf) + " · " +
-        e.factors + " factors · " + e.candidates + " candidates</span>" +
+        '<span class="rs-exp-name">' + esc(r.run_id) + "</span>" +
+        '<span class="rs-exp-meta">' + esc(r.dataset || "—") + " · " + esc(r.timeframe || "—") +
+        " · " + (f.alphas_total || 0) + " alphas · " + candidates + " candidates</span>" +
         "</div>" +
-        '<span class="rs-exp-flow' + flowCls + '">' + esc(e.flow) + "</span>" +
+        '<span class="rs-exp-flow">' + esc(flow) + "</span>" +
         "</div>";
     });
     html += "</div>";
     return html;
   }
 
-  function renderFactorRows() {
-    return FACTOR_CANDIDATES.map(function (f) {
-      var sel = f.alpha === RESEARCH_SELECTED_ALPHA ? " rs-cand-row-selected" : "";
-      var icCls = f.oosIc >= 0 ? "pos" : "neg";
-      var icTxt = (f.oosIc >= 0 ? "+" : "") + f.oosIc.toFixed(3);
+  // ── Alpha list table (alpha_ranking) ──────────────────────────
+  function rsStageBadge(passed) {
+    if (passed === true) return '<span class="rs-stage-pass">PASS</span>';
+    if (passed === false) return '<span class="rs-stage-fail">FAIL</span>';
+    return '<span class="rs-stage-na">—</span>';
+  }
+
+  function renderAlphaRows() {
+    return RESEARCH_STATE.alphas.map(function (a) {
+      var sel = a.alpha_id === RESEARCH_STATE.selectedAlphaId ? " rs-cand-row-selected" : "";
+      var dispStatus = rsAlphaDisplayStatus(a);
+      var icCls = (a.mean_oos_ic == null) ? "" : (a.mean_oos_ic >= 0 ? "pos" : "neg");
+      var sharpeCls = (a.mean_oos_sharpe == null) ? "" : (a.mean_oos_sharpe >= 0 ? "pos" : "neg");
+      var retCls = (a.mean_oos_return == null) ? "" : (a.mean_oos_return >= 0 ? "pos" : "neg");
+      var family = RESEARCH_STATE.decorrelation && _rsLookupFamily(a.alpha_id) || "—";
       return (
-        '<tr class="rs-cand-row' + sel + '" data-rs-alpha="' + esc(f.alpha) + '">' +
-        '<td class="rs-col-alpha">' + esc(f.alpha) + "</td>" +
-        '<td class="num ds-text-mono">' + f.score.toFixed(2) + "</td>" +
-        '<td class="num ds-text-mono ' + icCls + '">' + icTxt + "</td>" +
-        '<td class="num ds-text-mono">' + esc(f.robustness) + "</td>" +
-        "<td>" + esc(f.correlation) + "</td>" +
-        "<td>" + factorStatusBadge(f.status) + "</td>" +
+        '<tr class="rs-cand-row' + sel + '" data-rs-alpha="' + esc(a.alpha_id) + '">' +
+        '<td class="rs-col-alpha">' + esc(a.alpha_id) +
+        (a.is_representative ? ' <span class="rs-rep-mark" title="Family representative">★</span>' : "") +
+        "</td>" +
+        "<td>" + factorStatusBadge(dispStatus) + "</td>" +
+        '<td class="num ds-text-mono ' + icCls + '">' + rsSigned(a.mean_oos_ic) + "</td>" +
+        '<td class="num ds-text-mono">' + rsSigned(a.mean_oos_icir) + "</td>" +
+        '<td class="num ds-text-mono ' + sharpeCls + '">' + rsNum(a.mean_oos_sharpe, 2) + "</td>" +
+        '<td class="num ds-text-mono ' + retCls + '">' + rsPct(a.mean_oos_return, 2) + "</td>" +
+        '<td class="num ds-text-mono">' + rsPct(a.mean_max_drawdown, 2) + "</td>" +
+        '<td class="num ds-text-mono">' + rsNum(a.mean_turnover, 3) + "</td>" +
+        '<td class="num ds-text-mono">' + (a.assets_passed_count != null ? a.assets_passed_count : "—") + "</td>" +
+        "<td>" + rsStageBadge(a.oos_passed) + "</td>" +
+        "<td>" + rsStageBadge(a.robustness_passed) + "</td>" +
+        "<td>" + esc(family) + "</td>" +
         "</tr>"
       );
     }).join("");
   }
 
-  function renderFactorTable() {
+  // Look up the de-correlation family name for an alpha id.
+  function _rsLookupFamily(alphaId) {
+    if (!RESEARCH_STATE.decorrelation) return "—";
+    var fams = RESEARCH_STATE.decorrelation.families || [];
+    for (var i = 0; i < fams.length; i++) {
+      var fam = fams[i];
+      if (fam.representative === alphaId) return "Family " + fam.family;
+      if ((fam.members || []).indexOf(alphaId) >= 0) return "Family " + fam.family;
+    }
+    return "—";
+  }
+
+  function renderAlphaTable() {
     return (
       '<table class="ds-table rs-cand-table">' +
       "<thead><tr>" +
-      "<th>Factor</th>" +
-      '<th class="num">Score</th>' +
-      '<th class="num">OOS IC</th>' +
-      '<th class="num">Robustness</th>' +
-      "<th>Correlation</th>" +
+      "<th>Alpha</th>" +
       "<th>Status</th>" +
+      '<th class="num">IC</th>' +
+      '<th class="num">ICIR</th>' +
+      '<th class="num">Sharpe</th>' +
+      '<th class="num">Return</th>' +
+      '<th class="num">Max DD</th>' +
+      '<th class="num">Turnover</th>' +
+      '<th class="num">Coverage</th>' +
+      "<th>OOS</th>" +
+      "<th>Robustness</th>" +
+      "<th>Family</th>" +
       "</tr></thead>" +
-      '<tbody id="rs-factor-tbody">' + renderFactorRows() + "</tbody>" +
+      '<tbody id="rs-factor-tbody">' + renderAlphaRows() + "</tbody>" +
       "</table>"
     );
   }
 
+  // ── Alpha Detail panel ────────────────────────────────────────
   function rsDetailCell(label, value, cls) {
     return (
       '<div class="rs-detail-cell"><div class="rs-detail-label">' + esc(label) + "</div>" +
@@ -3255,203 +3356,617 @@
     );
   }
 
-  function rsPerfCard(title, body) {
-    return (
-      '<div class="rs-perf-card"><div class="rs-perf-title">' + esc(title) + "</div>" +
-      '<div class="rs-perf-body">' + body + "</div></div>"
-    );
-  }
-
   function rsValidationCell(name, result) {
     var pass = result === "PASS";
+    var pend = result === "PEND" || result === "—" || !result;
+    var cls = pass ? "rs-validation-pass" : (pend ? "rs-validation-pend" : "rs-validation-fail");
     return (
       '<div class="rs-validation-cell"><div class="rs-validation-name">' + esc(name) + "</div>" +
-      '<div class="rs-validation-result ' + (pass ? "rs-validation-pass" : "rs-validation-fail") + '">' +
+      '<div class="rs-validation-result ' + cls + '">' +
       esc(result || "—") + "</div></div>"
     );
   }
 
-  function renderFactorDetail() {
-    var f = null;
-    for (var i = 0; i < FACTOR_CANDIDATES.length; i++) {
-      if (FACTOR_CANDIDATES[i].alpha === RESEARCH_SELECTED_ALPHA) {
-        f = FACTOR_CANDIDATES[i];
-        break;
-      }
+  function renderAlphaDetail() {
+    var d = RESEARCH_STATE.alphaDetail;
+    var selId = RESEARCH_STATE.selectedAlphaId;
+    if (!d) {
+      return UI.empty("No alpha selected", "Click an alpha row to inspect its detail.");
     }
-    if (!f) {
-      return UI.empty("No factor selected", "Click a factor row to inspect its detail.");
-    }
-    var d = f.detail || {};
-    var icTxt = (f.oosIc >= 0 ? "+" : "") + f.oosIc.toFixed(3);
+    var summary = d.summary || {};
+    var family = d.family || null;
+    var pairs = d.pairs || [];
+    var formula = d.formula || "—";
+    var dispStatus = rsAlphaDisplayStatus({
+      alpha_id: selId,
+      is_representative: !!(family && family.representative === selId),
+      status: summary.status || "CANDIDATE",
+    });
 
+    // Head: alpha id + status badge
     var head =
       '<div class="rs-detail-head">' +
-      '<span class="rs-detail-alpha">' + esc(f.alpha) + "</span>" +
-      factorStatusBadge(f.status) +
+      '<span class="rs-detail-alpha">' + esc(selId) + "</span>" +
+      factorStatusBadge(dispStatus) +
       "</div>";
 
+    // Formula block — show the real Alpha101 expression, not a generic label.
+    var formulaBlock =
+      UI.sectionHeading("Formula") +
+      '<pre class="rs-formula">' + esc(formula) + "</pre>";
+
+    // Validation summary grid (IC / ICIR / Coverage)
     var kpi =
+      UI.sectionHeading("Validation") +
       '<div class="rs-detail-grid">' +
-      rsDetailCell("Score", f.score.toFixed(2)) +
-      rsDetailCell("Mean OOS IC", icTxt, f.oosIc >= 0 ? "pos" : "neg") +
-      rsDetailCell("Robustness", f.robustness) +
-      rsDetailCell("Family", f.family) +
+      rsDetailCell("Mean IC", rsSigned(summary.mean_oos_ic), (summary.mean_oos_ic >= 0 ? "pos" : "neg")) +
+      rsDetailCell("Mean ICIR", rsSigned(summary.mean_oos_icir)) +
+      rsDetailCell("Coverage", String(summary.assets_passed_count != null ? summary.assets_passed_count : "—")) +
       "</div>";
 
-    var assetsHtml = (d.assets || [])
-      .map(function (a) {
-        return '<span class="rs-asset-chip">' + esc(a) + "</span>";
-      })
+    // OOS summary grid (Sharpe / Return / MaxDD)
+    var oosKpi =
+      UI.sectionHeading("OOS") +
+      '<div class="rs-detail-grid">' +
+      rsDetailCell("Sharpe", rsNum(summary.mean_oos_sharpe, 2)) +
+      rsDetailCell("Return", rsPct(d.mean_oos_return, 2)) +
+      rsDetailCell("Max DD", rsPct(d.mean_max_drawdown, 2)) +
+      "</div>";
+
+    // Assets block
+    var assetsHtml = (summary.assets_passed || [])
+      .map(function (a) { return '<span class="rs-asset-chip">' + esc(a) + "</span>"; })
       .join("");
     var assetsBlock =
       '<div style="margin-bottom:var(--ds-space-4);">' +
-      '<div class="rs-detail-label" style="margin-bottom:var(--ds-space-2);">Assets</div>' +
-      '<div class="rs-detail-assets">' + assetsHtml + "</div></div>";
+      '<div class="rs-detail-label" style="margin-bottom:var(--ds-space-2);">Assets Passed</div>' +
+      '<div class="rs-detail-assets">' + (assetsHtml || '<span class="rs-perf-empty">—</span>') + "</div></div>";
 
-    var icSpark = d.icCurve
-      ? UI.sparkline(d.icCurve, { color: "var(--ds-info)", width: 200, height: 56 })
-      : '<span class="rs-perf-empty">—</span>';
-    var zSpark = d.zScore
-      ? UI.sparkline(d.zScore, { color: "var(--ds-purple)", width: 200, height: 56 })
-      : '<span class="rs-perf-empty">—</span>';
-    var perf =
-      '<div class="rs-perf-grid">' +
-      rsPerfCard("IC Curve", icSpark) +
-      rsPerfCard("Factor Z-Score", zSpark) +
-      rsPerfCard("Position", '<span class="rs-perf-empty">Coming in UI V1</span>') +
-      rsPerfCard("Signal", '<span class="rs-perf-empty">Coming in UI V1</span>') +
-      "</div>";
+    // Per-asset OOS performance table (top pairs by score)
+    var pairsRows = pairs.slice(0, 6).map(function (p) {
+      var icCls = (p.oos_ic == null) ? "" : (p.oos_ic >= 0 ? "pos" : "neg");
+      return (
+        "<tr>" +
+        '<td class="ds-text-mono">' + esc(p.asset) + "</td>" +
+        '<td class="num ds-text-mono ' + icCls + '">' + rsSigned(p.oos_ic) + "</td>" +
+        '<td class="num ds-text-mono">' + rsNum(p.oos_sharpe, 2) + "</td>" +
+        '<td class="num ds-text-mono">' + rsNum(p.oos_return, 3) + "</td>" +
+        '<td class="num ds-text-mono">' + rsNum(p.max_drawdown, 3) + "</td>" +
+        '<td class="num ds-text-mono">' + rsNum(p.turnover_per_bar, 3) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    var pairsBlock = pairsRows
+      ? (UI.sectionHeading("OOS Performance by Asset") +
+        '<table class="ds-table rs-pairs-table">' +
+        "<thead><tr>" +
+        "<th>Asset</th>" +
+        '<th class="num">OOS IC</th>' +
+        '<th class="num">Sharpe</th>' +
+        '<th class="num">Return</th>' +
+        '<th class="num">Max DD</th>' +
+        '<th class="num">Turnover</th>' +
+        "</tr></thead><tbody>" + pairsRows + "</tbody></table>")
+      : "";
 
-    var v = d.validation || {};
-    var validationHtml =
+    // Robustness block — pass/fail per gate (derived from engine stages)
+    var robustnessHtml =
+      UI.sectionHeading("Robustness") +
       '<div class="rs-validation-grid">' +
-      rsValidationCell("Train", v.train) +
-      rsValidationCell("Val", v.validation) +
-      rsValidationCell("OOS", v.oos) +
-      rsValidationCell("Robust", v.robustness) +
-      rsValidationCell("Decorr", v.decorrelation) +
+      rsValidationCell("Validation",    d.validation_passed ? "PASS" : "FAIL") +
+      rsValidationCell("OOS",           d.oos_passed ? "PASS" : "FAIL") +
+      rsValidationCell("Robustness",    d.robustness_passed ? "PASS" : "FAIL") +
+      rsValidationCell("De-correlation", family ? "PASS" : "FAIL") +
       "</div>";
 
-    var html =
-      head + kpi + assetsBlock +
-      UI.sectionHeading("Performance") + perf +
-      UI.sectionHeading("Validation") + validationHtml;
-
-    if (f.status === "PAPER" && d.paper) {
-      var p = d.paper;
-      var paperGrid =
+    // De-correlation block
+    var decHtml = "";
+    if (family) {
+      var decThresh = RESEARCH_STATE.decorrelation && RESEARCH_STATE.decorrelation.threshold;
+      var members = (family.members || []).map(function (m) {
+        var isRep = m === family.representative;
+        return '<span class="rs-asset-chip' + (isRep ? " rs-asset-chip-rep" : "") + '">' +
+          esc(m) + (isRep ? " · REP" : "") + "</span>";
+      }).join("");
+      decHtml =
+        UI.sectionHeading("De-correlation") +
         '<div class="rs-detail-grid">' +
-        rsDetailCell("Signals", String(p.signals)) +
-        rsDetailCell("Fill Rate", (p.fillRate * 100).toFixed(2) + "%", "pos") +
-        rsDetailCell("Reject Rate", (p.rejectRate * 100).toFixed(2) + "%", "neg") +
-        rsDetailCell("Error Rate", (p.errorRate * 100).toFixed(2) + "%", "neg") +
+        rsDetailCell("Family", "Family " + family.family) +
+        rsDetailCell("Representative", family.representative || "—") +
+        rsDetailCell("Intra |ρ|", rsNum(family.intra_mean_abs_corr, 3)) +
+        rsDetailCell("Threshold", decThresh != null ? "|ρ| ≥ " + decThresh : "—") +
+        "</div>" +
+        '<div style="margin-bottom:var(--ds-space-4);">' +
+        '<div class="rs-detail-label" style="margin-bottom:var(--ds-space-2);">Members</div>' +
+        '<div class="rs-detail-assets">' + members + "</div></div>";
+    }
+
+    var html = head + formulaBlock + kpi + oosKpi + assetsBlock + pairsBlock + robustnessHtml + decHtml;
+
+    // Alpha021 Paper Status — display-only, shown only for paper-promoted alphas.
+    // Research-side gates are derived from the funnel (this alpha reached De-correlation);
+    // Paper-side state is a frozen display constant (Alpha021 is connected and
+    // generating signals per the existing factor_gate.py). The Research UI does
+    // NOT read live paper-trading state — that lives on the Trading/Paper page.
+    if (RESEARCH_PAPER_ALPHAS[selId]) {
+      html +=
+        UI.sectionHeading("Alpha021 Paper Status") +
+        '<div class="rs-paper-status">' +
+        '<div class="rs-paper-col">' +
+        '<div class="rs-paper-col-title">Research</div>' +
+        rsPaperStep("Validation",    "PASS") +
+        rsPaperStep("OOS",            "PASS") +
+        rsPaperStep("Robustness",     "PASS") +
+        rsPaperStep("De-correlation", "PASS") +
+        "</div>" +
+        '<div class="rs-paper-arrow">→</div>' +
+        '<div class="rs-paper-col">' +
+        '<div class="rs-paper-col-title">Paper</div>' +
+        rsPaperStep("Connected",         "PASS") +
+        rsPaperStep("Signals Generated",  "PASS") +
+        rsPaperStep("Execution Observed", "PASS") +
+        "</div>" +
         "</div>";
-      html += UI.sectionHeading("Paper") + paperGrid;
     }
     return html;
   }
 
-  function rsHeaderSelect(id, options) {
-    return '<div style="min-width:140px;">' + UI.select({ id: id, options: options }) + "</div>";
+  function rsPaperStep(label, state) {
+    var pass = state === "PASS";
+    return (
+      '<div class="rs-paper-step">' +
+      '<span class="rs-paper-step-icon ' + (pass ? "rs-paper-step-pass" : "rs-paper-step-fail") + '">' +
+      (pass ? "✓" : "✗") + "</span>" +
+      '<span class="rs-paper-step-label">' + esc(label) + "</span>" +
+      "</div>"
+    );
+  }
+
+  // ── De-correlation Families section ──────────────────────────
+  function renderDecorrelationFamilies() {
+    var dec = RESEARCH_STATE.decorrelation;
+    if (!dec || !dec.families || !dec.families.length) {
+      return UI.empty("No families", "No de-correlation families for this run.");
+    }
+    var threshTxt = dec.threshold != null ? ("|ρ| ≥ " + dec.threshold) : "—";
+    var header =
+      '<div class="rs-dec-header">' +
+      '<span class="rs-dec-threshold">De-correlation Gate · Threshold: ' + esc(threshTxt) + "</span>" +
+      '<span class="rs-dec-count">' + dec.n_families + " families</span>" +
+      "</div>";
+    var cards = dec.families.map(function (f) {
+      var members = (f.members || []).map(function (m) {
+        var isRep = m === f.representative;
+        return '<span class="rs-dec-member' + (isRep ? " rs-dec-member-rep" : "") + '">' +
+          esc(m) + (isRep ? ' <span class="rs-dec-rep-tag">REP</span>' : "") + "</span>";
+      }).join("");
+      return (
+        '<div class="rs-dec-card">' +
+        '<div class="rs-dec-card-head">' +
+        '<span class="rs-dec-card-title">Family ' + esc(f.family) + "</span>" +
+        '<span class="rs-dec-card-meta">|ρ| ' + rsNum(f.intra_mean_abs_corr, 3) + " · " +
+        (f.members || []).length + " members</span>" +
+        "</div>" +
+        '<div class="rs-dec-card-members">' + members + "</div>" +
+        '<div class="rs-dec-card-rep">Representative: <b>' + esc(f.representative || "—") + "</b></div>" +
+        "</div>"
+      );
+    }).join("");
+    return header + '<div class="rs-dec-grid">' + cards + "</div>";
+  }
+
+  // ── Research Runs table ───────────────────────────────────────
+  function renderResearchRunsTable() {
+    var runs = RESEARCH_STATE.runs;
+    if (!runs || !runs.length) {
+      return UI.empty("No runs", "No experiment runs available.");
+    }
+    var rows = runs.map(function (r) {
+      var f = r.funnel || {};
+      var alphas = f.alphas_total || 0;
+      var candidates = f.final_alphas != null ? f.final_alphas : 0;
+      var dec = f.decorrelated_alphas != null ? f.decorrelated_alphas : 0;
+      var ts = r.report_generated_at ? new Date(r.report_generated_at).toLocaleString() : "—";
+      var isSel = r.run_id === RESEARCH_STATE.selectedRunId ? " rs-runs-row-selected" : "";
+      return (
+        '<tr class="rs-runs-row' + isSel + '" data-rs-run="' + esc(r.run_id) + '">' +
+        '<td class="rs-col-alpha">' + esc(r.run_id) + "</td>" +
+        "<td>" + esc(r.experiment_id || "—") + "</td>" +
+        '<td class="ds-text-mono">' + esc(ts) + "</td>" +
+        "<td>" + esc((r.universe || []).join(", ") || "—") + "</td>" +
+        '<td class="num ds-text-mono">' + esc(r.timeframe || "—") + "</td>" +
+        '<td class="num ds-text-mono">' + alphas + "</td>" +
+        '<td class="num ds-text-mono">' + candidates + "</td>" +
+        '<td class="num ds-text-mono">' + dec + "</td>" +
+        "<td>" + factorStatusBadge("Completed") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    return (
+      '<table class="ds-table rs-runs-table">' +
+      "<thead><tr>" +
+      "<th>Run ID</th>" +
+      "<th>Experiment</th>" +
+      "<th>Date</th>" +
+      "<th>Universe</th>" +
+      '<th class="num">TF</th>' +
+      '<th class="num">Alphas</th>' +
+      '<th class="num">Candidates</th>' +
+      '<th class="num">De-correlated</th>' +
+      "<th>Status</th>" +
+      "</tr></thead><tbody>" + rows + "</tbody></table>"
+    );
+  }
+
+  // ── Async loaders (follows loadOrdersAsync pattern) ───────────
+  async function loadResearchAsync() {
+    var refreshBtn = document.querySelector('[data-action="rs:refresh"]');
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = "Refreshing…"; }
+    try {
+      var runId = RESEARCH_STATE.selectedRunId;
+      var results = await Promise.all([
+        useResearchOverview(),
+        useResearchAlphas(runId),
+        useResearchDecorrelation(runId),
+      ]);
+      RESEARCH_STATE.runs = results[0].runs || [];
+      RESEARCH_STATE.alphas = results[1].alphas || [];
+      RESEARCH_STATE.decorrelation = results[2] || null;
+      RESEARCH_STATE.overview = results[0];
+      RESEARCH_STATE.lastUpdated = new Date().toLocaleTimeString("en-US", { hour12: false });
+
+      // If selected alpha is not in this run, pick the first alpha.
+      var stillExists = RESEARCH_STATE.alphas.some(function (a) {
+        return a.alpha_id === RESEARCH_STATE.selectedAlphaId;
+      });
+      if (!stillExists) {
+        RESEARCH_STATE.selectedAlphaId = RESEARCH_STATE.alphas[0]
+          ? RESEARCH_STATE.alphas[0].alpha_id : null;
+        RESEARCH_STATE.alphaDetail = null;
+        if (RESEARCH_STATE.selectedAlphaId) {
+          loadResearchAlphaDetailAsync(RESEARCH_STATE.selectedAlphaId);
+        } else {
+          var d = document.getElementById("rs-factor-detail");
+          if (d) d.innerHTML = renderAlphaDetail();
+        }
+      } else {
+        loadResearchAlphaDetailAsync(RESEARCH_STATE.selectedAlphaId);
+      }
+      refreshResearchUI();
+      showToast("Research refreshed / 研究数据已刷新", "ok");
+    } catch (err) {
+      showToast("Refresh failed / 刷新失败: " + (err && err.message ? err.message : String(err)), "err");
+    } finally {
+      if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = "↻ Refresh"; }
+    }
+  }
+
+  async function loadResearchAlphaDetailAsync(alphaId) {
+    var detailEl = document.getElementById("rs-factor-detail");
+    if (detailEl) detailEl.innerHTML = UI.stateLoading("Loading alpha…", "Fetching detail, formula, and de-correlation family.");
+    try {
+      RESEARCH_STATE.alphaDetail = await useResearchAlphaDetail(
+        alphaId, RESEARCH_STATE.selectedRunId
+      );
+      if (detailEl) detailEl.innerHTML = renderAlphaDetail();
+    } catch (err) {
+      if (err && err.status === 404) {
+        RESEARCH_STATE.alphaDetail = null;
+        if (detailEl) detailEl.innerHTML = UI.empty("Alpha not found", "This alpha is not present in the selected run.");
+      } else {
+        if (detailEl) detailEl.innerHTML = UI.stateError(
+          "Failed to load alpha detail",
+          (err && err.message ? err.message : String(err)),
+          "Retry", "rs:detail-retry"
+        );
+      }
+    }
+  }
+
+  // ── View Report (loads report.md for the selected run) ────────
+  async function openResearchReport(runId) {
+    UI.openModal({
+      title: "Research Report — " + (runId || "—"),
+      body: UI.stateLoading("Loading report…", "Fetching report.md for this run."),
+      footer: UI.button("Close", "ghost", { sm: true, action: "rs:report-close" }),
+    });
+    try {
+      var report = await useResearchReport(runId);
+      var fmt = report && report.format;
+      var content = report && report.content;
+      var bodyHtml;
+      if (!content) {
+        bodyHtml = UI.empty("No report", "This run has no report.md / report.html.");
+      } else if (fmt === "html") {
+        bodyHtml = '<div class="rs-report-html">' + content + "</div>";
+      } else {
+        bodyHtml = '<pre class="rs-report-md">' + esc(content) + "</pre>";
+      }
+      UI.openModal({
+        title: "Research Report — " + (runId || "—"),
+        body: bodyHtml,
+        footer: UI.button("Close", "ghost", { sm: true, action: "rs:report-close" }),
+      });
+    } catch (err) {
+      UI.openModal({
+        title: "Research Report — " + (runId || "—"),
+        body: UI.stateError(
+          "Failed to load report",
+          (err && err.message ? err.message : String(err)),
+          "Retry", "rs:report-retry"
+        ),
+        footer: UI.button("Close", "ghost", { sm: true, action: "rs:report-close" }),
+      });
+    }
+  }
+
+  // Re-render all in-place UI pieces after a refresh / run switch.
+  function refreshResearchUI() {
+    var tbody = document.getElementById("rs-factor-tbody");
+    if (tbody) tbody.innerHTML = renderAlphaRows();
+    var detail = document.getElementById("rs-factor-detail");
+    if (detail) detail.innerHTML = renderAlphaDetail();
+    var funnelEl = document.getElementById("rs-funnel");
+    if (funnelEl) {
+      var f = _rsCurrentFunnel();
+      funnelEl.innerHTML = renderFactorFunnel(f);
+    }
+    var expEl = document.getElementById("rs-exp-list");
+    if (expEl) expEl.innerHTML = renderExperimentsList();
+    var decEl = document.getElementById("rs-dec-families");
+    if (decEl) decEl.innerHTML = renderDecorrelationFamilies();
+    var runsEl = document.getElementById("rs-runs-tbody");
+    if (runsEl) runsEl.innerHTML = renderResearchRunsTableRows();
+    var kpiEl = document.getElementById("rs-kpis");
+    if (kpiEl) kpiEl.innerHTML = renderResearchKPIs();
+    // Re-bind experiment rows (innerhtml replaced).
+    _bindExpRows();
+  }
+
+  function _rsCurrentFunnel() {
+    for (var i = 0; i < RESEARCH_STATE.runs.length; i++) {
+      if (RESEARCH_STATE.runs[i].run_id === RESEARCH_STATE.selectedRunId) {
+        return RESEARCH_STATE.runs[i].funnel || null;
+      }
+    }
+    return null;
+  }
+
+  function renderResearchRunsTableRows() {
+    // Wrapper used by refreshResearchUI — returns just the tbody rows.
+    var runs = RESEARCH_STATE.runs;
+    if (!runs || !runs.length) return "";
+    return runs.map(function (r) {
+      var f = r.funnel || {};
+      var alphas = f.alphas_total || 0;
+      var candidates = f.final_alphas != null ? f.final_alphas : 0;
+      var dec = f.decorrelated_alphas != null ? f.decorrelated_alphas : 0;
+      var ts = r.report_generated_at ? new Date(r.report_generated_at).toLocaleString() : "—";
+      var isSel = r.run_id === RESEARCH_STATE.selectedRunId ? " rs-runs-row-selected" : "";
+      return (
+        '<tr class="rs-runs-row' + isSel + '" data-rs-run="' + esc(r.run_id) + '">' +
+        '<td class="rs-col-alpha">' + esc(r.run_id) + "</td>" +
+        "<td>" + esc(r.experiment_id || "—") + "</td>" +
+        '<td class="ds-text-mono">' + esc(ts) + "</td>" +
+        "<td>" + esc((r.universe || []).join(", ") || "—") + "</td>" +
+        '<td class="num ds-text-mono">' + esc(r.timeframe || "—") + "</td>" +
+        '<td class="num ds-text-mono">' + alphas + "</td>" +
+        '<td class="num ds-text-mono">' + candidates + "</td>" +
+        '<td class="num ds-text-mono">' + dec + "</td>" +
+        "<td>" + factorStatusBadge("Completed") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function renderResearchKPIs() {
+    var f = _rsCurrentFunnel() || {};
+    var totalAlphas    = f.alphas_total || 0;
+    var pairsTested    = f.pairs_backtested || 0;
+    var validationP   = f.validation_passed || 0;
+    var oosP          = f.oos_passed || 0;
+    var robustP       = f.robustness_passed || 0;
+    var decP          = f.decorrelated_alphas || 0;
+    return (
+      UI.metricCard("Total Alphas",     String(totalAlphas), "Alpha candidates", "") +
+      UI.metricCard("Pairs Tested",     String(pairsTested), "Pairwise correlations", "info") +
+      UI.metricCard("Validation Passed", String(validationP), totalAlphas ? rsPct(validationP / totalAlphas, 1) : "—", "warning") +
+      UI.metricCard("OOS Passed",       String(oosP), validationP ? rsPct(oosP / validationP, 1) : "—", "warning") +
+      UI.metricCard("Robustness Passed", String(robustP), oosP ? rsPct(robustP / oosP, 1) : "—", "pos") +
+      UI.metricCard("De-correlated",    String(decP), robustP ? rsPct(decP / robustP, 1) : "—", "pos")
+    );
+  }
+
+  function rsHeaderSelect(id, options, selected) {
+    return '<div style="min-width:160px;">' +
+      UI.select({ id: id, options: options, value: selected }) + "</div>";
+  }
+
+  // ── Bind: delegated handlers on #rs-root (survive innerHTML) ──
+  function _bindExpRows() {
+    document.querySelectorAll("[data-rs-exp]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var newRun = el.getAttribute("data-rs-exp");
+        if (newRun && newRun !== RESEARCH_STATE.selectedRunId) {
+          RESEARCH_STATE.selectedRunId = newRun;
+          // Reset alpha selection — let loadResearchAsync pick a sensible default.
+          RESEARCH_STATE.selectedAlphaId = null;
+          RESEARCH_STATE.alphaDetail = null;
+          loadResearchAsync();
+        }
+      });
+    });
   }
 
   function bindResearchPage() {
-    // Factor row selection (master → detail)
-    var tbody = document.getElementById("rs-factor-tbody");
-    if (tbody) {
-      tbody.addEventListener("click", function (e) {
-        var row = e.target.closest("tr[data-rs-alpha]");
-        if (!row) return;
-        RESEARCH_SELECTED_ALPHA = row.getAttribute("data-rs-alpha");
-        tbody.innerHTML = renderFactorRows();
-        var detail = document.getElementById("rs-factor-detail");
-        if (detail) detail.innerHTML = renderFactorDetail();
-      });
+    var root = document.getElementById("rs-root");
+    if (!root) return;
+
+    // Lazy-load detail for pre-selected alpha (if not already loaded)
+    if (RESEARCH_STATE.selectedAlphaId && !RESEARCH_STATE.alphaDetail) {
+      loadResearchAlphaDetailAsync(RESEARCH_STATE.selectedAlphaId);
     }
-    // Experiment rows → Experiment Detail is a future UI commit (display-only)
-    document.querySelectorAll("[data-rs-exp]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        showToast("Experiment detail — coming in UI V1 / 实验详情待后续 UI 版本", "info");
-      });
+
+    // Single delegated click handler on root
+    root.addEventListener("click", function (e) {
+      // Refresh button
+      var btn = e.target.closest("[data-action]");
+      if (btn) {
+        var action = btn.getAttribute("data-action");
+        if (action === "rs:refresh") { loadResearchAsync(); return; }
+        if (action === "rs:detail-retry" && RESEARCH_STATE.selectedAlphaId) {
+          loadResearchAlphaDetailAsync(RESEARCH_STATE.selectedAlphaId); return;
+        }
+        if (action === "rs:run-refresh") { loadResearchAsync(); return; }
+        if (action === "rs:view-report") { openResearchReport(RESEARCH_STATE.selectedRunId); return; }
+        if (action === "rs:report-close") { UI.closeModal(); return; }
+        if (action === "rs:report-retry") { openResearchReport(RESEARCH_STATE.selectedRunId); return; }
+        return;
+      }
+      // Alpha row selection (delegated on tbody rows)
+      var row = e.target.closest("tr[data-rs-alpha]");
+      if (row) {
+        var newAlpha = row.getAttribute("data-rs-alpha");
+        if (newAlpha && newAlpha !== RESEARCH_STATE.selectedAlphaId) {
+          RESEARCH_STATE.selectedAlphaId = newAlpha;
+          // Update row highlights without re-rendering the table
+          var tbody = document.getElementById("rs-factor-tbody");
+          if (tbody) tbody.querySelectorAll("tr").forEach(function (tr) {
+            tr.classList.remove("rs-cand-row-selected");
+          });
+          row.classList.add("rs-cand-row-selected");
+          loadResearchAlphaDetailAsync(newAlpha);
+        }
+        return;
+      }
+      // Run row selection (Research Runs table)
+      var runRow = e.target.closest("tr[data-rs-run]");
+      if (runRow) {
+        var newRun = runRow.getAttribute("data-rs-run");
+        if (newRun && newRun !== RESEARCH_STATE.selectedRunId) {
+          RESEARCH_STATE.selectedRunId = newRun;
+          RESEARCH_STATE.selectedAlphaId = null;
+          RESEARCH_STATE.alphaDetail = null;
+          loadResearchAsync();
+        }
+        return;
+      }
     });
-    // Refresh button (mock visual feedback)
-    var refreshBtn = document.querySelector('[data-action="rs:refresh"]');
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", function () {
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = "Refreshing…";
-        setTimeout(function () {
-          refreshBtn.disabled = false;
-          refreshBtn.textContent = "Refresh";
-          showToast("Research refreshed (mock) / 研究数据已刷新", "ok");
-        }, 700);
+
+    // Run selector in the page header
+    var runSel = document.getElementById("rs-filter-exp");
+    if (runSel) {
+      runSel.value = RESEARCH_STATE.selectedRunId;
+      runSel.addEventListener("change", function () {
+        var v = runSel.value;
+        if (v && v !== RESEARCH_STATE.selectedRunId) {
+          RESEARCH_STATE.selectedRunId = v;
+          RESEARCH_STATE.selectedAlphaId = null;
+          RESEARCH_STATE.alphaDetail = null;
+          loadResearchAsync();
+        }
       });
     }
+
+    _bindExpRows();
   }
 
-  // ── Research (Commit 010 — full research workspace) ─────────────
-  PAGE_FRAMEWORK["research"] = function () {
-    var kpis =
-      UI.metricCard("Experiments", "12", "", "") +
-      UI.metricCard("Factors Tested", "101", "", "") +
-      UI.metricCard("Candidates", "22", "", "pos") +
-      UI.metricCard("OOS Passed", "26", "", "pos") +
-      UI.metricCard("Paper Candidates", "1", "Alpha021", "pos");
+  // ── Research (Integration 007 — real Research API data) ────────
+  PAGE_FRAMEWORK["research"] = async function () {
+    // Initial load — throws on failure → render() catch → stateError + Retry.
+    var runId = RESEARCH_STATE.selectedRunId;
+    var results = await Promise.all([
+      useResearchOverview(),
+      useResearchAlphas(runId),
+      useResearchDecorrelation(runId),
+    ]);
+    RESEARCH_STATE.runs = results[0].runs || [];
+    RESEARCH_STATE.alphas = results[1].alphas || [];
+    RESEARCH_STATE.decorrelation = results[2] || null;
+    RESEARCH_STATE.overview = results[0];
+    RESEARCH_STATE.lastUpdated = new Date().toLocaleTimeString("en-US", { hour12: false });
+
+    // Pick a sensible default alpha if the cached one isn't in this run.
+    var stillExists = RESEARCH_STATE.alphas.some(function (a) {
+      return a.alpha_id === RESEARCH_STATE.selectedAlphaId;
+    });
+    if (!stillExists) {
+      // Prefer Alpha021 if present (paper-promoted), else first.
+      var a021 = RESEARCH_STATE.alphas.filter(function (a) {
+        return RESEARCH_PAPER_ALPHAS[a.alpha_id];
+      })[0];
+      RESEARCH_STATE.selectedAlphaId = a021 ? a021.alpha_id :
+        (RESEARCH_STATE.alphas[0] ? RESEARCH_STATE.alphas[0].alpha_id : null);
+      RESEARCH_STATE.alphaDetail = null;
+    }
+
+    var runOptions = RESEARCH_STATE.runs.map(function (r) {
+      return { value: r.run_id, label: r.run_id };
+    });
+    if (!runOptions.length) {
+      runOptions = [{ value: RESEARCH_STATE.selectedRunId, label: RESEARCH_STATE.selectedRunId }];
+    }
 
     var headerActions =
-      rsHeaderSelect("rs-filter-exp", [
-        { value: "ALL", label: "All Experiments" },
-        { value: "factor-v1", label: "factor-v1" },
-        { value: "factor-real-d1", label: "factor-real-d1" },
-        { value: "Alpha021 Paper", label: "Alpha021 Paper" },
-      ]) +
-      rsHeaderSelect("rs-filter-asset", [
-        { value: "ALL", label: "All Assets" },
-        { value: "NVDA", label: "NVDA" },
-        { value: "QQQ", label: "QQQ" },
-        { value: "SPY", label: "SPY" },
-        { value: "AG", label: "AG" },
-        { value: "AU", label: "AU" },
-      ]) +
-      rsHeaderSelect("rs-filter-tf", [
-        { value: "D1", label: "D1" },
-        { value: "1H", label: "1H" },
-        { value: "15M", label: "15M" },
-        { value: "5M", label: "5M" },
-      ]) +
+      rsHeaderSelect("rs-filter-exp", runOptions, RESEARCH_STATE.selectedRunId) +
       UI.button("Refresh", "ghost", { sm: true, action: "rs:refresh" });
+
+    var funnel = _rsCurrentFunnel();
+    var lastUpd = RESEARCH_STATE.lastUpdated || "—";
 
     var grid =
       '<div class="rs-grid-2">' +
       '<div class="rs-grid-main">' +
-      UI.panel("Recent Experiments", renderExperimentsList(), {
-        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click to inspect</span>',
-      }) +
+      UI.panel("Recent Experiments",
+        '<div id="rs-exp-list">' + renderExperimentsList() + "</div>",
+        { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click to switch run · updated ' + esc(lastUpd) + "</span>" }
+      ) +
       "</div>" +
       '<div class="rs-grid-side">' +
-      UI.panel("Factor Funnel", renderFactorFunnel()) +
+      UI.panel("Factor Funnel",
+        '<div id="rs-funnel">' + renderFactorFunnel(funnel) + "</div>"
+      ) +
       "</div>" +
       "</div>";
 
     var candLayout =
       '<div class="rs-cand-layout">' +
       '<div class="rs-cand-main">' +
-      UI.panel("Factor Candidates", renderFactorTable(), {
+      UI.panel("Alpha List", renderAlphaTable(), {
         actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Click a row to inspect</span>',
       }) +
       "</div>" +
       '<div class="rs-cand-side">' +
-      UI.panel("Factor Detail", '<div id="rs-factor-detail">' + renderFactorDetail() + "</div>") +
+      UI.panel("Alpha Detail", '<div id="rs-factor-detail">' + renderAlphaDetail() + "</div>") +
       "</div>" +
       "</div>";
 
     return (
-      UI.pageHeader("Research", "Research Workspace", headerActions) +
-      UI.kpiGrid(kpis, 5) +
+      '<div id="rs-root">' +
+      UI.pageHeader("Research", "Factor Discovery v2 — frozen research results (read-only)",
+        headerActions) +
+      '<div id="rs-kpis">' + UI.kpiGrid(renderResearchKPIs(), 6) + '</div>' +
       grid +
-      UI.sectionHeading("Factor Candidates") +
-      candLayout
+      UI.sectionHeading("Alpha List") +
+      candLayout +
+      UI.sectionHeading("De-correlation Families") +
+      UI.panel("De-correlation Gate",
+        '<div id="rs-dec-families">' + renderDecorrelationFamilies() + "</div>",
+        { actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">Frozen research output</span>' }
+      ) +
+      UI.sectionHeading("Research Runs") +
+      UI.panel("Experiment Runs",
+        '<div id="rs-runs-tbody-wrap">' +
+        '<table class="ds-table rs-runs-table">' +
+        "<thead><tr>" +
+        "<th>Run ID</th><th>Experiment</th><th>Date</th><th>Universe</th>" +
+        '<th class="num">TF</th><th class="num">Alphas</th>' +
+        '<th class="num">Candidates</th><th class="num">De-correlated</th><th>Status</th>' +
+        "</tr></thead><tbody>" + renderResearchRunsTableRows() + "</tbody></table></div>",
+        { actions: UI.button("Refresh", "ghost", { sm: true, action: "rs:run-refresh" }) +
+                   UI.button("View Report", "ghost", { sm: true, action: "rs:view-report" }) }
+      ) +
+      "</div>"
     );
   };
 
