@@ -3971,11 +3971,12 @@
   };
 
   /* ==================================================================
-   * Strategy module — Commit 012
+   * Strategy module — Integration 009 (real Strategy API)
    * Strategy lifecycle management center: list → detail (tabs) →
-   * lifecycle → validation → signals. UI-only state machine; does NOT
-   * modify the strategy engine, paper trading, shadow/live execution,
-   * risk engine, or any API/database.
+   * lifecycle → validation → signals. Data comes from
+   * GET /dashboard/strategy/catalog (research funnel mapped onto the
+   * lifecycle) plus /catalog/{id} (research block + paper replay +
+   * backtest history). Rendering only: the quant core stays frozen.
    * ================================================================== */
 
   // ── Strategy data ──────────────────────────────────────────────
@@ -3995,107 +3996,85 @@
   var ST_LC_ICON = { passed: "✓", running: "●", pending: "○", locked: "🔒", paused: "⏸" };
   var ST_LC_STATE = { passed: "PASSED", running: "RUNNING", pending: "NOT STARTED", locked: "LOCKED", paused: "PAUSED" };
 
-  var STRATEGIES = [
-    {
-      id: "alpha021", name: "Alpha021", type: "Factor", version: "v1",
-      universe: ["NVDA", "QQQ", "SPY"], timeframe: "1D", status: "PAPER",
-      ret: 0.0812, sharpe: 1.38, maxDD: -0.055, winRate: 0.68, turnover: 1.24,
-      capital: 1000000, positionSize: 100, maxPosition: 5, riskLimit: 0.06, execution: "Paper",
-      validation: {
-        snapshots: [
-          { label: "Snapshot #1", date: "2026-08-20" },
-          { label: "Snapshot #2", date: "2026-08-24" },
-        ],
-        drift: [
-          { label: "Signal Drift", value: "NORMAL" },
-          { label: "Execution Drift", value: "NORMAL" },
-          { label: "Attribution", value: "PENDING" },
-        ],
-        compare: [
-          { metric: "Fill Rate", from: "85.91%", to: "86.04%" },
-          { metric: "Reject Rate", from: "11.36%", to: "11.26%" },
-          { metric: "Return", from: "+8.12%", to: "+7.32%" },
-          { metric: "Max DD", from: "-5.0%", to: "-5.5%" },
-        ],
-      },
-      signals: [
-        { date: "08-20", symbol: "NVDA", side: "BUY", qty: 100 },
-        { date: "08-24", symbol: "SPY", side: "SELL", qty: 100 },
-        { date: "08-25", symbol: "QQQ", side: "BUY", qty: 200 },
-        { date: "08-27", symbol: "NVDA", side: "SELL", qty: 100 },
-      ],
-      positions: [
-        { symbol: "QQQ", qty: 200, side: "LONG", entry: 380.50, current: 410.20, pnl: 5346.00 },
-      ],
-      risk: { dailyLoss: -0.012, maxDrawdown: -0.055, exposure: 0.40, positionLimit: 5, varLimit: 0.03 },
-      executionCfg: { venue: "Paper", orderType: "Market", tif: "DAY", slippage: "3 bps" },
-      history: [
-        { date: "2026-07-15", event: "Research passed", detail: "Alpha021 validated on NVDA/QQQ/SPY" },
-        { date: "2026-07-28", event: "Backtest completed", detail: "+8.12% return, Sharpe 1.38" },
-        { date: "2026-08-10", event: "De-correlation passed", detail: "Low correlation to existing book" },
-        { date: "2026-08-20", event: "Paper trading started", detail: "Snapshot #1 captured" },
-        { date: "2026-08-24", event: "Snapshot #2", detail: "Drift NORMAL" },
-      ],
-    },
-    { id: "ms001", name: "Momentum S001", type: "System", universe: ["NVDA"], timeframe: "15m", status: "PAPER", ret: 0.054, sharpe: 1.02, maxDD: -0.072, winRate: 0.61, turnover: 2.10 },
-    { id: "mrev2", name: "MeanRev-M2", type: "MeanRev", universe: ["SPY"], timeframe: "1H", status: "PAPER", ret: 0.031, sharpe: 0.88, maxDD: -0.041, winRate: 0.64, turnover: 0.95 },
-    { id: "csq1", name: "Cross-Section Q", type: "Factor", universe: ["QQQ", "SPY"], timeframe: "1D", status: "SHADOW", ret: 0.067, sharpe: 1.21, maxDD: -0.061, winRate: 0.59, turnover: 1.40 },
-    { id: "a101", name: "Alpha101", type: "Factor", universe: ["QQQ"], timeframe: "1D", status: "VALIDATED", ret: 0.045, sharpe: 1.15, maxDD: -0.048, winRate: 0.62, turnover: 1.10 },
-    { id: "dcv2", name: "De-correlation v2", type: "Factor", universe: ["NVDA", "SPY"], timeframe: "1D", status: "VALIDATED", ret: 0.038, sharpe: 1.08, maxDD: -0.044, winRate: 0.60, turnover: 1.05 },
-    { id: "a008", name: "Alpha008", type: "Factor", universe: ["NVDA"], timeframe: "1D", status: "CANDIDATE", ret: 0.022, sharpe: 0.74, maxDD: -0.039, winRate: 0.55, turnover: 0.88 },
-    { id: "a060", name: "Alpha060", type: "Factor", universe: ["SPY"], timeframe: "1D", status: "CANDIDATE", ret: 0.018, sharpe: 0.69, maxDD: -0.035, winRate: 0.53, turnover: 0.82 },
-    { id: "mq1", name: "Momentum-Q", type: "System", universe: ["QQQ"], timeframe: "30m", status: "PAUSED", ret: 0.041, sharpe: 0.92, maxDD: -0.092, winRate: 0.58, turnover: 1.80 },
-    { id: "mrev1", name: "MeanRevert", type: "MeanRev", universe: ["AAPL"], timeframe: "1H", status: "PAUSED", ret: 0.015, sharpe: 0.71, maxDD: -0.041, winRate: 0.60, turnover: 0.90 },
-    { id: "a047", name: "Alpha047", type: "Factor", universe: ["MSFT"], timeframe: "1D", status: "RETIRED", ret: -0.012, sharpe: 0.42, maxDD: -0.118, winRate: 0.47, turnover: 1.30 },
-    { id: "va1", name: "Vol Arb v1", type: "System", universe: ["TSLA"], timeframe: "5m", status: "RETIRED", ret: -0.008, sharpe: 0.38, maxDD: -0.134, winRate: 0.45, turnover: 2.40 },
-  ];
+  // ── Strategy data (Integration 009: real Strategy API) ─────────
+  // ST_STATE.catalog mirrors GET /dashboard/strategy/catalog and
+  // ST_STATE.detail the selected strategy's
+  // GET /dashboard/strategy/catalog/{id} payload. The quant core
+  // (research pipeline, paper replay, backtest engine) stays frozen —
+  // this layer only renders what the backend actually computed.
+  var ST_STATE = {
+    selectedId: null,       // strategy id (== alpha_id, lowercase)
+    signalFilter: "ALL",    // ALL | BUY | SELL
+    catalog: null,          // {source, counts, strategies[]} (catalog API)
+    detail: null,           // detail payload for the selected strategy
+    detailStatus: "idle",   // idle | loading | done | error
+    error: null,            // message from the last failed catalog load
+  };
 
-  var ST_STATE = { selectedId: "alpha021", signalFilter: "ALL" };
-
-  function stPct(x) { return (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%"; }
+  function stPct(x) {
+    return x == null ? "—" : (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
+  }
+  function stNum(x, d) { return x == null ? "—" : Number(x).toFixed(d); }
   function stStatusBadge(status) {
     return '<span class="st-status st-status-' + (status || "").toLowerCase() + '">' + esc(status) + "</span>";
   }
+  function stStrategies() {
+    return (ST_STATE.catalog && ST_STATE.catalog.strategies) || [];
+  }
   function stFind(id) {
-    for (var i = 0; i < STRATEGIES.length; i++) {
-      if (STRATEGIES[i].id === id) return STRATEGIES[i];
+    var list = stStrategies();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) return list[i];
     }
-    return STRATEGIES[0];
+    return list[0] || null;
+  }
+  // Selected strategy = catalog row merged with the detail payload once
+  // it arrives (the detail carries the same headline fields plus the
+  // research / paper / history blocks).
+  function stSelected() {
+    var row = stFind(ST_STATE.selectedId);
+    if (!row) return null;
+    if (ST_STATE.detail && ST_STATE.detail.id === row.id) return ST_STATE.detail;
+    return row;
+  }
+  // True once the detail payload for the current selection has loaded —
+  // tabs that depend on it render a loading state until then.
+  function stDetailReady() {
+    var row = stFind(ST_STATE.selectedId);
+    return !!(row && ST_STATE.detail && ST_STATE.detail.id === row.id);
+  }
+  function stBtRunCount(s) {
+    if (Array.isArray(s.backtest_runs)) return s.backtest_runs.length;
+    return s.backtest_run_count || 0;
   }
 
-  // ── KPI grid ───────────────────────────────────────────────────
+  // ── KPI grid (real catalog counts) ─────────────────────────────
   function renderStKpis() {
-    var total = STRATEGIES.length, active = 0, paper = 0, shadow = 0, live = 0;
-    STRATEGIES.forEach(function (s) {
-      if (s.status === "PAPER" || s.status === "SHADOW" || s.status === "LIVE") active++;
-      if (s.status === "PAPER") paper++;
-      if (s.status === "SHADOW") shadow++;
-      if (s.status === "LIVE") live++;
-    });
+    var c = (ST_STATE.catalog && ST_STATE.catalog.counts) || {};
     var cards =
-      UI.metricCard("Strategies", String(total), "", "") +
-      UI.metricCard("Active", String(active), "", "pos") +
-      UI.metricCard("Paper", String(paper), "", "") +
-      UI.metricCard("Shadow", String(shadow), "", "") +
-      UI.metricCard("Live", String(live), "", live > 0 ? "pos" : "");
+      UI.metricCard("Strategies", String(c.total || 0), "", "") +
+      UI.metricCard("Active", String(c.active || 0), "", "pos") +
+      UI.metricCard("Paper", String(c.paper || 0), "", "") +
+      UI.metricCard("Shadow", String(c.shadow || 0), "", "") +
+      UI.metricCard("Live", String(c.live || 0), "", (c.live || 0) > 0 ? "pos" : "");
     return '<div class="st-kpi-grid">' + cards + "</div>";
   }
 
-  // ── Strategy list (clickable rows) ─────────────────────────────
+  // ── Strategy list (clickable rows, real catalog) ───────────────
   function renderStRows() {
-    return STRATEGIES.map(function (s) {
+    return stStrategies().map(function (s) {
       var sel = s.id === ST_STATE.selectedId ? " st-row-selected" : "";
-      var retCls = s.ret >= 0 ? "pos" : "neg";
+      var retCls = s.ret == null ? "" : s.ret >= 0 ? "pos" : "neg";
       return (
         '<tr class="st-row' + sel + '" data-st-id="' + esc(s.id) + '">' +
         '<td class="st-col-name">' + esc(s.name) + "</td>" +
         "<td>" + esc(s.type) + "</td>" +
-        "<td>" + esc(s.universe.join(" / ")) + "</td>" +
+        "<td>" + esc((s.universe || []).join(" / ")) + "</td>" +
         '<td class="num">' + esc(s.timeframe) + "</td>" +
         "<td>" + stStatusBadge(s.status) + "</td>" +
         '<td class="num ' + retCls + '">' + stPct(s.ret) + "</td>" +
-        '<td class="num">' + s.sharpe.toFixed(2) + "</td>" +
-        '<td class="num neg">' + stPct(s.maxDD) + "</td>" +
+        '<td class="num">' + stNum(s.sharpe, 2) + "</td>" +
+        '<td class="num neg">' + stPct(s.max_dd) + "</td>" +
         "</tr>"
       );
     }).join("");
@@ -4136,11 +4115,13 @@
 
   // ── Detail header + actions ────────────────────────────────────
   function renderStActions(s) {
-    var isPaper = s.status === "PAPER";
-    var lockedPaper = s.status === "SHADOW" || s.status === "LIVE" || s.status === "RETIRED";
-    var runBtn = lockedPaper
-      ? '<span class="st-action-locked"><span class="st-lock-icon">🔒</span>' + UI.button("Paper", "secondary", { sm: true, disabled: true }) + "</span>"
-      : UI.button(isPaper ? "Pause Paper" : "Start Paper", isPaper ? "secondary" : "primary", { sm: true, action: isPaper ? "st:pause" : "st:start-paper" });
+    // Only the frozen alpha carries a paper replay; everything else is a
+    // research-run strategy, so its paper button stays locked.
+    var hasPaper = s.metrics_source === "paper-replay";
+    var runBtn = hasPaper
+      ? UI.button("Pause Paper", "secondary", { sm: true, action: "st:pause" })
+      : '<span class="st-action-locked"><span class="st-lock-icon">🔒</span>' +
+        UI.button("Paper", "secondary", { sm: true, disabled: true }) + "</span>";
     return (
       UI.button("Backtest", "ghost", { sm: true, action: "st:backtest" }) +
       runBtn +
@@ -4161,28 +4142,32 @@
   }
 
   function renderStOverviewTab(s) {
-    var cfg = s.capital != null;
+    var paper = s.paper || null;
+    var meta = (paper && paper.meta) || {};
+    var research = s.research || null;
+    var btCount = stBtRunCount(s);
     return '<div class="st-summary-grid">' +
       stSummaryCell("Status", s.status) +
       stSummaryCell("Type", s.type) +
-      stSummaryCell("Universe", s.universe.join(" / ")) +
+      stSummaryCell("Universe", (s.universe || []).join(" / ")) +
       stSummaryCell("Timeframe", s.timeframe) +
-      stSummaryCell("Version", s.version || "v1") +
-      stSummaryCell("Capital", cfg ? UI.money(s.capital, 0) : "—") +
-      stSummaryCell("Position Size", cfg ? String(s.positionSize) : "—") +
-      stSummaryCell("Max Position", cfg ? String(s.maxPosition) : "—") +
-      stSummaryCell("Risk Limit", cfg ? (s.riskLimit * 100).toFixed(2) + "%" : "—") +
-      stSummaryCell("Execution", cfg ? s.execution : "—") +
+      stSummaryCell("Source Run", s.version) +
+      stSummaryCell("Capital", paper ? UI.money(meta.initial_capital || 0, 0) : "—") +
+      stSummaryCell("Family", research && research.family ? research.family : "—") +
+      stSummaryCell("Rank", research && research.rank != null ? "#" + research.rank : "—") +
+      stSummaryCell("Metrics Source", paper ? "Paper replay" : "Research run (OOS)") +
+      stSummaryCell("Execution", paper ? paper.execution.venue : "—") +
+      stSummaryCell("Backtest Runs", String(btCount)) +
       "</div>";
   }
 
   function renderStPerformanceTab(s) {
     return '<div class="st-kpi-grid">' +
-      UI.metricCard("Return", stPct(s.ret), "", s.ret >= 0 ? "pos" : "neg") +
-      UI.metricCard("Sharpe", s.sharpe.toFixed(2), "", "") +
-      UI.metricCard("Max Drawdown", stPct(s.maxDD), "", "neg") +
-      UI.metricCard("Win Rate", stPct(s.winRate), "", "pos") +
-      UI.metricCard("Turnover", s.turnover.toFixed(2) + "x", "", "") +
+      UI.metricCard("Return", stPct(s.ret), "", s.ret == null ? "" : s.ret >= 0 ? "pos" : "neg") +
+      UI.metricCard("Sharpe", stNum(s.sharpe, 2), "", "") +
+      UI.metricCard("Max Drawdown", stPct(s.max_dd), "", "neg") +
+      UI.metricCard("Win Rate", stPct(s.win_rate), "", "") +
+      UI.metricCard("Turnover", s.turnover == null ? "—" : stNum(s.turnover, 2) + "x", "", "") +
       "</div>";
   }
 
@@ -4193,26 +4178,31 @@
   }
 
   function renderStSignalsRows(s) {
-    var sigs = s.signals || [];
+    var sigs = (s.paper && s.paper.trades) || [];
     var filtered = sigs.filter(function (sig) {
       return ST_STATE.signalFilter === "ALL" || sig.side === ST_STATE.signalFilter;
     });
     if (!filtered.length) {
-      return '<tr><td colspan="4">' + UI.empty("No signals", "No signals match the current filter.") + "</td></tr>";
+      return '<tr><td colspan="5">' + UI.empty("No signals", "No signals match the current filter.") + "</td></tr>";
     }
     return filtered.map(function (sig) {
+      var outcome = sig.outcome || "—";
+      var outcomeCls = outcome === "FILLED" ? "pos" : outcome === "REJECTED" ? "neg" : "";
       return "<tr>" +
         '<td class="num">' + esc(sig.date) + "</td>" +
         "<td>" + esc(sig.symbol) + "</td>" +
         "<td>" + stSignalSide(sig.side) + "</td>" +
-        '<td class="num">' + sig.qty + "</td>" +
+        '<td class="num">' + esc(sig.qty) + "</td>" +
+        '<td class="num ' + outcomeCls + '">' + esc(outcome) + "</td>" +
         "</tr>";
     }).join("");
   }
 
   function renderStSignalsTab(s) {
-    if (!s.signals) {
-      return UI.empty("Coming in UI V1", "Signal log for this strategy will be available in a future UI commit.");
+    if (!stDetailReady()) return UI.loading("Loading signal log…");
+    if (!s.paper) {
+      return UI.empty("Not in paper trading",
+        "Signal logs exist only for strategies with a paper replay — currently the frozen Alpha021.");
     }
     var filters = ["ALL", "BUY", "SELL"];
     var filterHtml = filters.map(function (f) {
@@ -4222,16 +4212,16 @@
     return '<div class="st-signal-filters">' + filterHtml + "</div>" +
       '<table class="ds-table st-signals-table">' +
       "<thead><tr>" +
-      '<th class="num">Time</th><th>Symbol</th><th>Signal</th><th class="num">Qty</th>' +
+      '<th class="num">Time</th><th>Symbol</th><th>Signal</th><th class="num">Qty</th><th class="num">Outcome</th>' +
       "</tr></thead>" +
       '<tbody id="st-signals-tbody">' + renderStSignalsRows(s) + "</tbody>" +
       "</table>";
   }
 
   function updateStSignals() {
-    var s = stFind(ST_STATE.selectedId);
+    var s = stSelected();
     var tbody = document.getElementById("st-signals-tbody");
-    if (tbody) tbody.innerHTML = renderStSignalsRows(s);
+    if (tbody && s) tbody.innerHTML = renderStSignalsRows(s);
     document.querySelectorAll("[data-st-filter]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-st-filter") === ST_STATE.signalFilter);
     });
@@ -4239,8 +4229,10 @@
 
   // ── Positions / Risk / Execution / Validation / History tabs ──
   function renderStPositionsTab(s) {
-    if (!s.positions) {
-      return UI.empty("Coming in UI V1", "Position history for this strategy will be available in a future UI commit.");
+    if (!stDetailReady()) return UI.loading("Loading positions…");
+    if (!s.paper) {
+      return UI.empty("Not in paper trading",
+        "Positions exist only for strategies with a paper replay — currently the frozen Alpha021.");
     }
     return UI.table({
       columns: [
@@ -4251,72 +4243,90 @@
         { key: "current", label: "Current", numeric: true, format: function (v) { return UI.money(v); } },
         { key: "pnl", label: "PnL", numeric: true, color: function (v) { return v >= 0 ? "pos" : "neg"; }, format: function (v) { return UI.signedMoney(v); } },
       ],
-      rows: s.positions,
+      rows: s.paper.positions || [],
     });
   }
 
   function renderStRiskTab(s) {
-    if (!s.risk) {
-      return UI.empty("Coming in UI V1", "Risk metrics for this strategy will be available in a future UI commit.");
+    if (!stDetailReady()) return UI.loading("Loading risk metrics…");
+    if (!s.paper) {
+      return UI.empty("Not in paper trading",
+        "Risk metrics exist only for strategies with a paper replay — currently the frozen Alpha021.");
     }
-    var r = s.risk;
     return '<div class="st-kpi-grid">' +
-      UI.metricCard("Daily Loss", stPct(r.dailyLoss), "", "neg") +
-      UI.metricCard("Max Drawdown", stPct(r.maxDrawdown), "", "neg") +
-      UI.metricCard("Exposure", stPct(r.exposure), "", "") +
-      UI.metricCard("Position Limit", String(r.positionLimit), "", "") +
-      UI.metricCard("VaR Limit", stPct(r.varLimit), "", "") +
+      UI.metricCard("Max Drawdown", stPct(s.max_dd), "", "neg") +
+      UI.metricCard("Exposure", stPct(s.paper.exposure), "", "") +
+      UI.metricCard("Position Limit", String((s.paper.positions || []).length), "", "") +
+      UI.metricCard("Daily Loss", "—", "", "") +
+      UI.metricCard("VaR Limit", "—", "", "") +
       "</div>";
   }
 
   function renderStExecutionTab(s) {
-    if (!s.executionCfg) {
-      return UI.empty("Coming in UI V1", "Execution configuration for this strategy will be available in a future UI commit.");
+    if (!stDetailReady()) return UI.loading("Loading execution config…");
+    if (!s.paper) {
+      return UI.empty("Not in paper trading",
+        "Execution settings exist only for strategies with a paper replay — currently the frozen Alpha021.");
     }
-    var e = s.executionCfg;
+    var e = s.paper.execution || {};
     return '<div class="st-summary-grid">' +
       stSummaryCell("Venue", e.venue) +
-      stSummaryCell("Order Type", e.orderType) +
+      stSummaryCell("Order Type", e.order_type) +
       stSummaryCell("TIF", e.tif) +
       stSummaryCell("Slippage", e.slippage) +
       "</div>";
   }
 
+  // Validation tab = the *real* research funnel for this alpha:
+  // stage flags, per-asset reject reasons and the OOS aggregates from
+  // the source research run.
   function renderStValidationTab(s) {
-    if (!s.validation) {
-      return UI.empty("Coming in UI V1", "Validation snapshots for this strategy will be available after paper trading begins.");
-    }
-    var v = s.validation;
-    var snapHtml = v.snapshots.map(function (snap) {
-      return '<div class="st-snap-card">' +
-        '<div class="st-snap-label">' + esc(snap.label) + "</div>" +
-        '<div class="st-snap-date">' + esc(snap.date) + "</div>" +
-        "</div>";
-    }).join("");
-    var driftHtml = v.drift.map(function (d) {
-      var cls = d.value === "NORMAL" ? "st-drift-normal" : "st-drift-pending";
+    if (!stDetailReady()) return UI.loading("Loading validation data…");
+    var r = s.research || {};
+    var checks = [
+      { label: "Validation", value: r.validation_passed },
+      { label: "OOS", value: r.oos_passed },
+      { label: "Robustness", value: r.robustness_passed },
+      { label: "De-correlation", value: r.family ? true : null },
+    ];
+    var driftHtml = checks.map(function (c) {
+      var cls = c.value === true ? "st-drift-normal"
+        : c.value === false ? "st-drift-failed" : "st-drift-pending";
+      var txt = c.value === true ? "PASSED"
+        : c.value === false ? "FAILED" : "N/A";
       return '<div class="st-drift-cell">' +
-        '<div class="st-drift-label">' + esc(d.label) + "</div>" +
-        '<div class="st-drift-value ' + cls + '">' + esc(d.value) + "</div>" +
+        '<div class="st-drift-label">' + esc(c.label) + "</div>" +
+        '<div class="st-drift-value ' + cls + '">' + txt + "</div>" +
         "</div>";
     }).join("");
-    var compareRows = v.compare.map(function (c) {
-      return "<tr><td>" + esc(c.metric) + "</td>" +
-        '<td class="num">' + esc(c.from) + "</td>" +
-        '<td class="num">' + esc(c.to) + "</td></tr>";
+    var oosCards =
+      UI.metricCard("Mean OOS IC", stNum(r.mean_oos_ic, 4), "", "") +
+      UI.metricCard("Mean OOS Rank IC", stNum(r.mean_oos_rank_ic, 4), "", "") +
+      UI.metricCard("Mean OOS ICIR", stNum(r.mean_oos_icir, 2), "", "") +
+      UI.metricCard("Mean OOS Sharpe", stNum(r.mean_oos_sharpe, 2), "", "") +
+      UI.metricCard("Breadth", r.breadth == null ? "—" : String(r.breadth), "", "");
+    var rejects = r.reject_reasons || {};
+    var rejectRows = Object.keys(rejects).map(function (k) {
+      return "<tr><td>" + esc(k) + '</td><td class="num">' +
+        esc(String(rejects[k])) + "</td></tr>";
     }).join("");
-    return '<div class="st-snapshots">' + snapHtml + "</div>" +
-      '<div class="st-drift">' + driftHtml + "</div>" +
-      UI.panel("Snapshot Comparison",
-        '<table class="ds-table st-compare-table">' +
-        "<thead><tr><th>Metric</th><th>Snapshot #1</th><th>Snapshot #2</th></tr></thead>" +
-        "<tbody>" + compareRows + "</tbody></table>"
-      );
+    return '<div class="st-drift">' + driftHtml + "</div>" +
+      UI.panel("Research OOS Metrics — run " + esc(r.run_id || s.version),
+        '<div class="st-kpi-grid">' + oosCards + "</div>") +
+      (rejectRows
+        ? UI.panel("Per-Asset Reject Reasons",
+            '<table class="ds-table st-compare-table">' +
+            "<thead><tr><th>Check</th><th class=\"num\">Assets Failed</th></tr></thead>" +
+            "<tbody>" + rejectRows + "</tbody></table>")
+        : UI.empty("No reject reasons recorded",
+            "This alpha passed every per-asset check in the source run."));
   }
 
   function renderStHistoryTab(s) {
-    if (!s.history) {
-      return UI.empty("Coming in UI V1", "Lifecycle history for this strategy will be available in a future UI commit.");
+    if (!stDetailReady()) return UI.loading("Loading lifecycle history…");
+    var rows = s.history || [];
+    if (!rows.length) {
+      return UI.empty("No history yet", "Lifecycle events appear as the strategy progresses through the pipeline.");
     }
     return UI.table({
       columns: [
@@ -4324,21 +4334,25 @@
         { key: "event", label: "Event" },
         { key: "detail", label: "Detail" },
       ],
-      rows: s.history,
+      rows: rows,
     });
   }
 
   function renderStDetail() {
-    var s = stFind(ST_STATE.selectedId);
+    var s = stSelected();
+    if (!s) {
+      return UI.empty("No strategy selected",
+        "Select a strategy from the catalog above.");
+    }
     return (
       '<div class="st-detail-head">' +
       '<div class="st-detail-title">' +
       '<span class="st-detail-name">' + esc(s.name) + "</span>" +
       stStatusBadge(s.status) +
       '<span class="st-detail-meta">' +
-      esc(s.universe.join(" / ")) +
+      esc((s.universe || []).join(" / ")) +
       '<span class="st-sep">·</span>' + esc(s.timeframe) +
-      '<span class="st-sep">·</span>' + esc(s.version || "v1") +
+      '<span class="st-sep">·</span>' + esc("run " + (s.version || "—")) +
       "</span>" +
       "</div>" +
       '<div class="st-actions">' + renderStActions(s) + "</div>" +
@@ -4387,9 +4401,41 @@
       "</div>";
   }
 
+  // ── Data loading (Strategy API, Integration 009) ────────────────
+  async function stLoadCatalog(force) {
+    if (ST_STATE.catalog && !force) return;
+    var data = await api.strategyCatalog();
+    ST_STATE.catalog = data;
+    ST_STATE.error = null;
+    if (!stFind(ST_STATE.selectedId)) {
+      ST_STATE.selectedId = data.strategies.length ? data.strategies[0].id : null;
+      ST_STATE.detail = null;
+      ST_STATE.detailStatus = "idle";
+    }
+  }
+
+  async function stLoadDetail() {
+    var id = ST_STATE.selectedId;
+    if (!id) return;
+    ST_STATE.detailStatus = "loading";
+    try {
+      var detail = await api.strategyDetail(id);
+      if (ST_STATE.selectedId !== id) return; // selection moved on
+      ST_STATE.detail = detail;
+      ST_STATE.detailStatus = "done";
+    } catch (err) {
+      if (ST_STATE.selectedId !== id) return;
+      ST_STATE.detail = null;
+      ST_STATE.detailStatus = "error";
+      showToast("Failed to load strategy detail / 策略详情加载失败: " +
+        ((err && err.message) || err), "error");
+    }
+    updateStDetail();
+  }
+
   // ── Bindings (row select, tabs, signal filter, actions, config) ──
   function bindStrategiesPage() {
-    // Row selection — delegated on persistent tbody
+    // Row selection — delegated on persistent tbody; loads the detail
     var tbody = document.getElementById("st-list-tbody");
     if (tbody) {
       tbody.addEventListener("click", function (e) {
@@ -4397,8 +4443,11 @@
         if (!row) return;
         ST_STATE.selectedId = row.getAttribute("data-st-id");
         ST_STATE.signalFilter = "ALL";
+        ST_STATE.detail = null;
+        ST_STATE.detailStatus = "idle";
         tbody.innerHTML = renderStRows();
         updateStDetail();
+        stLoadDetail();
       });
     }
 
@@ -4416,7 +4465,8 @@
         var btn = e.target.closest("[data-action]");
         if (!btn) return;
         var action = btn.getAttribute("data-action");
-        var s = stFind(ST_STATE.selectedId);
+        var s = stSelected();
+        if (!s) return;
         if (action === "st:backtest") {
           location.hash = "#/research/backtest";
         } else if (action === "st:view-signals") {
@@ -4430,39 +4480,17 @@
               UI.button("Cancel", "ghost", { sm: true, action: "close-drawer" }) +
               UI.button("Save", "primary", { sm: true, action: "close-drawer" }),
           });
-        } else if (action === "st:start-paper") {
-          UI.openModal({
-            title: "Start Paper Trading",
-            body:
-              '<div class="ds-flex ds-flex-col ds-gap-3">' +
-              "<div>Start paper trading for <strong>" + esc(s.name) + "</strong>?</div>" +
-              UI.metricCard("Capital", UI.money(s.capital || 1000000, 0), "", "") +
-              "</div>",
-            footer:
-              UI.button("Cancel", "ghost", { sm: true, action: "close-modal" }) +
-              UI.button("Confirm", "primary", { sm: true, action: "st:confirm-start-paper" }),
-            onMount: function (backdrop) {
-              var confirmBtn = backdrop.querySelector('[data-action="st:confirm-start-paper"]');
-              if (confirmBtn) {
-                confirmBtn.addEventListener("click", function () {
-                  UI.closeModal();
-                  showToast("Starting Paper Trading for " + s.name + "…", "info");
-                  var runBtn = detailHost.querySelector('[data-action="st:start-paper"]');
-                  if (runBtn) { runBtn.disabled = true; runBtn.textContent = "Starting…"; runBtn.classList.add("disabled"); }
-                  setTimeout(function () {
-                    showToast("Paper Trading started / 模拟已启动 (UI state only)", "ok");
-                    if (runBtn) { runBtn.disabled = false; runBtn.textContent = "Running"; }
-                  }, 900);
-                });
-              }
-            },
-          });
         } else if (action === "st:pause") {
           if (!confirm("Pause paper trading for " + s.name + "? / 确认暂停模拟交易？")) return;
           showToast("Paper trading paused / 模拟已暂停 (UI state only)", "info");
           btn.textContent = "Paused";
         }
       });
+    }
+
+    // Load the detail for the initial selection in the background
+    if (ST_STATE.selectedId && ST_STATE.detailStatus === "idle") {
+      stLoadDetail();
     }
 
     // "New Strategy" button (page header) — placeholder
@@ -4472,12 +4500,42 @@
         showToast("New strategy — coming in UI V1 / 新建策略待后续 UI 版本", "info");
       });
     }
+
+    // Catalog refresh — refetches and re-renders the page (Integration 009)
+    var refreshBtn = document.querySelector('[data-action="st:refresh"]');
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        stLoadCatalog(true).then(function () {
+          ST_STATE.detail = null;
+          ST_STATE.detailStatus = "idle";
+          return render();
+        }).catch(function (err) {
+          showToast("Failed to refresh catalog / 刷新失败: " +
+            ((err && err.message) || err), "error");
+        }).then(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = "Refresh";
+        });
+      });
+    }
   }
 
-  // ── Strategy page (Commit 012) ─────────────────────────────────
-  PAGE_FRAMEWORK["research/strategies"] = function () {
+  // ── Strategy page (Integration 009: real Strategy API) ─────────
+  PAGE_FRAMEWORK["research/strategies"] = async function () {
+    if (!ST_STATE.catalog) {
+      await stLoadCatalog();
+    }
+    var src = (ST_STATE.catalog && ST_STATE.catalog.source) || {};
+    var desc = "Lifecycle catalog from the research pipeline · source run " +
+      (src.research_run || "—") +
+      (src.paper_replay_available
+        ? " · paper replay available (Alpha021)"
+        : " · paper replay unavailable (missing data files)");
     return (
-      UI.pageHeader("Strategy", "Strategy lifecycle management · Research → Validation → Paper → Shadow → Live",
+      UI.pageHeader("Strategy", desc,
+        UI.button("Refresh", "ghost", { sm: true, action: "st:refresh" }) +
         UI.button("New Strategy", "primary", { sm: true, action: "st:new" })) +
       renderStKpis() +
       UI.panel("Strategies", renderStList()) +
