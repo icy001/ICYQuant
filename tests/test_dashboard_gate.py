@@ -1104,3 +1104,134 @@ def test_d26_strategy_api_integration():
     assert client.get(
         "/api/dashboard/strategy/catalog/alpha021").status_code == 401
     assert client.get("/api/dashboard/backtest/runs").status_code == 401
+
+
+# --- D-27 Risk API (Integration 010) ----------------------------------------
+
+def test_d27_risk_api_integration(attached_pipeline):
+    """Integration 010: Risk Control Center reads the live pipeline.
+
+    GET /dashboard/risk/center aggregates positions / orders / risk
+    decisions / alerts + engine limits + UI-configured loss limits for
+    the Risk and Exposure pages.  Frozen-core boundary: read-only —
+    every number is measured or configured upstream, nothing invented.
+    """
+    from pathlib import Path
+
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: the risk routes are registered in the nav
+    index = (static / "index.html").read_text(encoding="utf-8")
+    assert 'href="#/risk"' in index
+    assert 'href="#/risk/exposure"' in index
+
+    # the mock RK_* arrays are gone; the page is API-driven
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("RK_KPI =", "RK_OVERVIEW =", "RK_ASSET_EXPOSURE =",
+                 "RK_LIMITS =", "RK_EVENTS =", "RK_SECTOR_EXPOSURE ="):
+        assert gone not in app_js, f"mock risk data still present: {gone}"
+    assert "riskCenter" in app_js and "RK_STATE" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "riskCenter" in api_js, "api.js missing client method riskCenter"
+
+    token = _login("admin", "admin123")
+
+    # --- live snapshot: exposure derived from real positions -------------
+    res = client.get("/api/dashboard/risk/center", headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # engine: pipeline attached + risk-engine service UP
+    assert d["engine"]["status"] == "ONLINE"
+    assert d["engine"]["attached"] is True
+    assert d["engine"]["last_update"]
+
+    # cross-check exposure against the positions endpoint itself
+    pos = client.get("/api/dashboard/positions",
+                     headers=_headers(token)).json()["positions"]
+    long_exp = sum(p["exposure"] for p in pos if p["side"] == "BUY")
+    short_exp = sum(p["exposure"] for p in pos if p["side"] == "SELL")
+    e = d["exposure"]
+    assert e["long"] == pytest.approx(long_exp)
+    assert e["short"] == pytest.approx(short_exp)
+    assert e["gross"] == pytest.approx(long_exp + short_exp)
+    assert e["net"] == pytest.approx(long_exp - short_exp)
+    assert e["position_count"] == len(pos) == 2   # TSLA was rejected
+    assert {a["symbol"] for a in e["by_asset"]} == {"AAPL", "NVDA"}
+    by_asset = {a["symbol"]: a for a in e["by_asset"]}
+    assert by_asset["AAPL"]["side"] == "Long"
+    assert by_asset["NVDA"]["side"] == "Short"
+    # gross weights sum to 1 (two decimal tolerance for rounding)
+    assert sum(a["weight"] for a in e["by_asset"]) == pytest.approx(1.0, abs=1e-3)
+    # every strategy exposure row comes from position.account_id
+    strat = {s["label"]: s for s in e["by_strategy"]}
+    assert strat["SCENARIO"]["weight"] == pytest.approx(1.0)
+    # by-side breakdown mirrors the headline numbers
+    by_side = {s["label"]: s for s in e["by_side"]}
+    assert by_side["Long"]["exposure"] == pytest.approx(long_exp)
+    assert by_side["Short"]["exposure"] == pytest.approx(short_exp)
+
+    # concentration: HHI of the same gross weights
+    assert d["concentration"]["hhi"] > 0
+    assert d["concentration"]["holdings"][0]["symbol"] in {"AAPL", "NVDA"}
+
+    # --- KPI table: measured values, not mock constants -------------------
+    kpi = {k["metric"]: k for k in d["kpi"]}
+    assert kpi["Position Quantity"]["value"] == pytest.approx(250.0)  # 100+150
+    assert kpi["Open Positions"]["value"] == 2
+    assert kpi["Net Exposure"]["value"] == pytest.approx(
+        (long_exp - short_exp) / e["equity"], abs=1e-5)
+    assert "Risk Decisions" in kpi
+    for row in d["kpi"]:
+        assert row["status"] in {"NORMAL", "WATCH", "BREACH"}
+
+    # --- limits: engine constants + UI-configured loss limits -------------
+    from apps.dashboard import runtime as rt
+
+    cfg = client.get("/api/dashboard/config",
+                     headers=_headers(token)).json()
+    limits = {l["name"]: l for l in d["limits"]}
+    assert limits["Position Limit"]["limit"] == rt.RISK_POSITION_LIMIT
+    assert limits["Position Limit"]["current"] == pytest.approx(250.0)
+    assert limits["Order Rate Limit"]["current"] == 3   # AAPL/MSFT/NVDA
+    assert limits["Order Rate Limit"]["limit"] == rt.RISK_ORDER_LIMIT
+    assert limits["Daily Loss Limit"]["limit"] == pytest.approx(
+        e["equity"] * cfg["risk"]["max_daily_loss_pct"] / 100.0)
+    assert limits["Drawdown Limit"]["limit"] == pytest.approx(
+        cfg["risk"]["max_drawdown_pct"])
+    for row in d["limits"]:
+        assert row["status"] in {"NORMAL", "WATCH", "BREACH"}
+
+    # --- decisions + event log: the TSLA reject is visible ----------------
+    assert d["decisions"] == {"total": 4, "approved": 3, "rejected": 1}
+    titles = " | ".join(ev["title"] for ev in d["events"])
+    assert "Order rejected: BUY TSLA 99999" in titles
+    assert any(ev["severity"] in {"INFO", "WARNING", "BREACH"}
+               for ev in d["events"])
+
+
+def test_d27_risk_api_offline_and_access():
+    """Integration 010: offline snapshot, RBAC and the auth gate."""
+    # defensive: no pipeline may stay attached from earlier tests
+    runtime.detach()
+
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/risk/center", headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # offline: engine OFFLINE, zeroed exposure, honest empty states
+    assert d["engine"]["status"] == "OFFLINE"
+    assert d["engine"]["attached"] is False
+    assert d["exposure"]["gross"] == 0
+    assert d["exposure"]["position_count"] == 0
+    assert d["exposure"]["by_asset"] == []
+    assert d["concentration"]["hhi"] == 0
+    assert any("No trading pipeline attached" in ev["title"]
+               for ev in d["events"])
+
+    # unauthenticated -> 401
+    assert client.get("/api/dashboard/risk/center").status_code == 401
