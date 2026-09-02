@@ -1797,3 +1797,144 @@ def test_d32_alerts_api_access():
     assert res.status_code == 200
     body = res.json()
     assert "overview" in body and "alerts" in body and "sources" in body
+
+
+# ============================================================================
+# Integration 016 — Integration Polish (unified states / client / context /
+# formatting / auto-refresh / cross-links / no mock leakage)
+# ============================================================================
+
+def test_d33_unified_api_client():
+    """② Every page goes through the one API client — no raw fetch /
+    XMLHttpRequest in the SPA."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    ui_js = (static / "js" / "ui.js").read_text(encoding="utf-8")
+
+    # no direct fetch/XHR outside the api client itself
+    for src, name in ((app_js, "app.js"), (ui_js, "ui.js")):
+        assert "fetch(" not in src, f"{name} bypasses the unified API client"
+        assert "XMLHttpRequest" not in src, f"{name} bypasses the API client"
+
+
+def test_d33_unified_page_states():
+    """① Loading / Error / Empty / Offline are uniform: one state-block
+    helper drives every async page; page-local error markup is gone."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+
+    # the one loader
+    assert "function apiStateBlock" in app_js
+    assert 'kind === "network"' in app_js          # offline detection
+    # every async page consumes it (not bespoke error divs)
+    for page in ("renderMonPage", "renderAlPage", "renderDtPage"):
+        assert f"apiStateBlock(" in app_js
+    assert 'class="ds-error"' not in app_js        # page-local error removed
+    # global retry wiring (re-render the failed route)
+    assert 'data-action="state-retry"' in app_js
+    assert "UI.stateError" in app_js and "UI.stateLoading" in app_js
+
+
+def test_d33_terminal_context():
+    """④⑤ Account / Strategy context is terminal-wide: persisted,
+    consumed by Orders / Positions filters, fed by the Accounts and
+    Strategy pages, and surfaced in the topbar selector."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+
+    assert "var APP_CTX" in app_js
+    assert "function ctxSetAccount" in app_js
+    assert "function ctxSetStrategy" in app_js
+    assert "icy_dash_ctx" in app_js                # localStorage persistence
+    # topbar selector built from the real Accounts API
+    assert "buildTopbarAccountSelector" in app_js
+    assert "accountsCenter" in app_js
+    assert 'ctx-account-select' in app_js
+    # Orders / Positions filters initialize from the terminal context
+    assert 'account: APP_CTX.accountId' in app_js
+    # Accounts page row click and Strategy row click switch the context
+    assert "ctxSetAccount(AC_STATE.selectedId)" in app_js
+    assert "ctxSetStrategy(ST_STATE.selectedId)" in app_js
+
+
+def test_d33_formatting_conventions():
+    """⑥ One formatting vocabulary: money / signed pct / bps / qty /
+    clock helpers exist and are used by the live pages."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+
+    for helper in ("function fmtSignedPct", "function fmtBps",
+                   "function fmtQty", "function fmtClock"):
+        assert helper in app_js, f"missing unified formatter: {helper}"
+    # Settings renders Risk-API values through the shared formatters
+    assert "function stgFmtLimitValue" in app_js
+    assert "UI.money" in app_js and "UI.signedMoney" in app_js
+
+
+def test_d33_refresh_and_cross_links():
+    """③ Live pages get one opt-in, visibility-aware auto-refresh;
+    ⑦ trading pages cross-link symbols into the Data Center."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+
+    # one auto-refresh mechanism, pauses on hidden tabs
+    assert "function bindAutoRefresh" in app_js
+    assert 'document.visibilityState !== "visible"' in app_js
+    # both live pages expose the toggle
+    assert 'id="mo-auto"' in app_js and 'id="al-auto"' in app_js
+    # symbol cross-links into the Data Center from Orders / Positions
+    assert app_js.count('sym-link" data-href="#/system/data"') >= 2
+
+
+def test_d33_no_mock_leakage(attached_pipeline):
+    """⑧ No business mock data remains: the Settings risk section reads
+    the live Risk API and the Trading section lists real accounts —
+    no fabricated limits, no hard-coded account ids."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+
+    # the Commit 016 mock risk limits are gone
+    assert "var STG_RISK_LIMITS" not in app_js
+    # Settings reads the live APIs instead
+    assert "api.riskCenter()" in app_js
+    assert "api.accountsCenter()" in app_js
+    assert "function stgAccountSelect" in app_js
+    # no hard-coded fake account options
+    assert '"US-001"' not in app_js and '"FUT-001"' not in app_js
+    # settings shell uses one host id consistently
+    assert 'id="stg-page"' in app_js
+    assert 'getElementById("stg-shell")' not in app_js
+
+    # live APIs back the Settings sections (RBAC-verified read)
+    token = _login("operator", "operator123")
+    risk = client.get("/api/dashboard/risk/center", headers=_headers(token))
+    assert risk.status_code == 200
+    limits = risk.json()["limits"]
+    assert limits and all(
+        set(row) >= {"name", "current", "limit", "fmt", "status"}
+        for row in limits
+    )

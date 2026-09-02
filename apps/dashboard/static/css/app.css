@@ -903,6 +903,37 @@ svg { display: block; width: 100%; height: auto; }
 .acct-name { color: var(--text); font-family: var(--mono); font-weight: 600; }
 .acct-caret { color: var(--text-faint); font-size: 10px; }
 
+/* Integration 016 ④ — terminal-wide account context selector */
+.ctx-account-select {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 2px;
+  cursor: pointer;
+  outline: none;
+  max-width: 180px;
+}
+.ctx-account-select:focus-visible { outline: 1px solid var(--text-faint); border-radius: 4px; }
+.ctx-account-select option { background: var(--panel-2); color: var(--text); }
+
+/* Integration 016 ⑦ — symbol cross-link between trading pages */
+.sym-link {
+  cursor: pointer;
+  color: var(--accent, #00e5a0);
+  border-bottom: 1px dotted var(--text-faint);
+}
+.sym-link:hover { filter: brightness(1.2); }
+
+/* Integration 016 ③ — auto-refresh toggle (active state) */
+.btn.btn-secondary.btn-sm.active {
+  background: var(--accent-dim, rgba(0, 229, 160, 0.12));
+  color: var(--accent, #00e5a0);
+  border-color: var(--accent, #00e5a0);
+}
+
 .sys-health {
   display: inline-flex;
   align-items: center;

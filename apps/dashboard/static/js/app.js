@@ -282,6 +282,157 @@
     return sign + sym + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
   }
 
+  /* ==================================================================
+   * Integration 016 — unified terminal conventions
+   *
+   * ⑥ Formatting: one vocabulary for money / percentage / signed P&L
+   *    / price / quantity / bps / clock time across every page.
+   *    $1,073,181 · +7.32% · -5.50% · 3.12 bps · 85.91% · 15:32:18
+   * ① API states: one loader for Loading / Error / Offline / Empty so
+   *    no page invents its own (white screens, divergent copy).
+   * ④⑤ Terminal context: selected Account / Strategy survives page
+   *    navigation (localStorage-backed) and feeds Orders / Positions
+   *    filters instead of each page tracking its own account.
+   * ================================================================== */
+
+  // ── ⑥ Unified formatting helpers ───────────────────────────────
+  /** Signed percentage for P&L-style values already in percent: +7.32% / -5.50% */
+  function fmtSignedPct(x) {
+    const n = Number(x);
+    if (!isFinite(n)) return "—";
+    return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+  }
+  /** Basis points: 3.12 bps */
+  function fmtBps(x) {
+    const n = Number(x);
+    if (!isFinite(n)) return "—";
+    return n.toFixed(2) + " bps";
+  }
+  /** Quantity: 1,200 (integer thousands separators) */
+  function fmtQty(x) {
+    const n = Number(x);
+    if (!isFinite(n)) return "—";
+    return Math.round(n).toLocaleString("en-US");
+  }
+  /** Clock time HH:MM:SS (today) or MM/DD HH:MM — the terminal-wide
+   *  convention for tables and event timelines. */
+  function fmtClock(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const p2 = (v) => (v < 10 ? "0" : "") + v;
+    const hh = p2(d.getHours()), mm = p2(d.getMinutes()), ss = p2(d.getSeconds());
+    if (d.toDateString() === new Date().toDateString()) return hh + ":" + mm + ":" + ss;
+    return p2(d.getMonth() + 1) + "/" + p2(d.getDate()) + " " + hh + ":" + mm;
+  }
+
+  // ── ① Unified API page-state block ─────────────────────────────
+  /** One loader for every async page: Loading / Error / Offline /
+   *  Empty. `st` is the page state ({ data, error }); kind=network
+   *  errors surface explicitly as backend-unavailable. */
+  function apiStateBlock(st, opts) {
+    opts = opts || {};
+    if (st && st.error) {
+      const err = st.error;
+      const offline = err && err.kind === "network";
+      const title = offline
+        ? "Backend unavailable / 后端不可用"
+        : "Failed to load / 加载失败";
+      const desc = offline
+        ? "Cannot reach the ICYQuant API. Check the connection and retry. · 无法连接后端，请检查网络后重试。"
+        : (err && err.message ? err.message : String(err));
+      return UI.stateError(title, desc, "Retry", opts.retryAction || "state-retry");
+    }
+    if (!st || !st.data) {
+      return UI.stateLoading(
+        opts.loadingTitle || "Loading / 加载中",
+        opts.loadingDesc || "Fetching latest data from the API…"
+      );
+    }
+    if (opts.isEmpty && opts.isEmpty()) {
+      return UI.stateEmpty(
+        opts.emptyTitle || "No data available",
+        opts.emptyDesc || "The backend reported no records for this view. / 暂无数据"
+      );
+    }
+    return null;   // caller renders the hydrated page
+  }
+
+  // ── ③ Unified visibility-aware auto-refresh ─────────────────────
+  /** One auto-refresh mechanism for live pages (Monitoring / Alerts):
+   *  a 30s interval that pauses when the tab is hidden and stops when
+   *  the user leaves the page. Historical / research pages (Backtest,
+   *  Research) stay on-demand — no polling. */
+  var AUTO_REFRESH_MS = 30000;
+  var _autoRefreshTimers = {};   // key -> interval id
+
+  function bindAutoRefresh(key, btnId, loadFn) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (_autoRefreshTimers[key]) {
+      clearInterval(_autoRefreshTimers[key]);
+      delete _autoRefreshTimers[key];
+    }
+    btn.addEventListener("click", function () {
+      if (_autoRefreshTimers[key]) {
+        clearInterval(_autoRefreshTimers[key]);
+        delete _autoRefreshTimers[key];
+        btn.textContent = "Auto 30s";
+        btn.classList.remove("active");
+      } else {
+        _autoRefreshTimers[key] = setInterval(function () {
+          if (document.visibilityState !== "visible") return;   // don't poll hidden tabs
+          loadFn();
+        }, AUTO_REFRESH_MS);
+        btn.textContent = "Auto ON";
+        btn.classList.add("active");
+      }
+    });
+  }
+
+  // ── ④⑤ Terminal-wide Account / Strategy context ────────────────
+  var CTX_KEY = "icy_dash_ctx";
+  var APP_CTX = { accountId: "ALL", strategyId: "ALL" };
+  try {
+    var _savedCtx = JSON.parse(localStorage.getItem(CTX_KEY) || "null");
+    if (_savedCtx && _savedCtx.accountId) APP_CTX.accountId = _savedCtx.accountId;
+    if (_savedCtx && _savedCtx.strategyId) APP_CTX.strategyId = _savedCtx.strategyId;
+  } catch (e) { /* corrupted ctx — keep defaults */ }
+
+  function ctxPersist() {
+    try { localStorage.setItem(CTX_KEY, JSON.stringify(APP_CTX)); } catch (e) { /* ignore */ }
+  }
+
+  /** Switch the terminal-wide account: persisted, propagated to the
+   *  Orders / Positions filters, reflected in the topbar selector. */
+  function ctxSetAccount(accountId) {
+    APP_CTX.accountId = accountId || "ALL";
+    ctxPersist();
+    ORDERS_FILTERS.account = APP_CTX.accountId;
+    POSITIONS_FILTERS.account = APP_CTX.accountId;
+    var sel = document.getElementById("ctx-account-select");
+    if (sel) sel.value = APP_CTX.accountId;
+    renderTopbarAccountName();
+  }
+
+  /** Switch the terminal-wide strategy context (research / trading). */
+  function ctxSetStrategy(strategyId) {
+    APP_CTX.strategyId = strategyId || "ALL";
+    ctxPersist();
+  }
+
+  /** Topbar account chip text for the current context. */
+  function renderTopbarAccountName() {
+    var sel = document.getElementById("ctx-account-select");
+    if (sel) sel.value = APP_CTX.accountId;
+    var el = document.getElementById("acct-name");
+    if (el) {
+      el.textContent = APP_CTX.accountId === "ALL"
+        ? "All Accounts"
+        : APP_CTX.accountId;
+    }
+  }
+
   function connBadge(status) {
     if (status === "CONNECTED") return badge("Connected / 已连接", "badge-green");
     if (status === "ERROR") return badge("Error / 异常", "badge-red");
@@ -4442,6 +4593,8 @@
         var row = e.target.closest("tr[data-st-id]");
         if (!row) return;
         ST_STATE.selectedId = row.getAttribute("data-st-id");
+        // ⑤ selecting a strategy switches the terminal-wide strategy context
+        ctxSetStrategy(ST_STATE.selectedId);
         ST_STATE.signalFilter = "ALL";
         ST_STATE.detail = null;
         ST_STATE.detailStatus = "idle";
@@ -5440,7 +5593,7 @@
       return '<tr class="ord-row' + sel + '" data-ord-id="' + _ordEsc(o.order_id) + '">' +
         '<td class="ds-text-mono ord-col-id">' + _ordEsc(o.order_id) + '</td>' +
         '<td class="ds-text-mono ord-col-time">' + _ordFmtTime(o.created_at) + '</td>' +
-        '<td class="ord-col-symbol">' + _ordEsc(o.symbol) + '</td>' +
+        '<td class="ord-col-symbol"><span class="sym-link" data-href="#/system/data" title="Open in Data Center">' + _ordEsc(o.symbol) + '</span></td>' +
         '<td class="' + sideCls + ' ord-col-side">' + _ordEsc(o.side) + '</td>' +
         '<td class="ord-col-type">' + _ordEsc(o.order_type) + '</td>' +
         '<td class="num ds-text-mono ord-col-qty">' + _ordNum(o.quantity) + '</td>' +
@@ -5889,7 +6042,8 @@
     // Initial load — throws on failure → render() catch → stateError + Retry
     ORDERS_DATA = await useOrders();
     ORDERS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
-    ORDERS_FILTERS = { status: "ALL", side: "ALL", symbol: "ALL", account: "ALL", search: "" };
+    // ④ terminal-wide account context feeds the page filter
+    ORDERS_FILTERS = { status: "ALL", side: "ALL", symbol: "ALL", account: APP_CTX.accountId, search: "" };
     ORDERS_PAGE = 0;
     ORDERS_DETAIL = null;
     // Pre-select first order (if any)
@@ -6088,7 +6242,7 @@
       var rPnlText = _posSignedMoney(p.realized_pnl);
       var weightText = _positionWeightPct(p).toFixed(1) + "%";
       return '<tr class="pos-row' + sel + '" data-pos-symbol="' + _posEsc(p.symbol) + '">' +
-        '<td class="pos-col-symbol">' + _posEsc(p.symbol) + '</td>' +
+        '<td class="pos-col-symbol"><span class="sym-link" data-href="#/system/data" title="Open in Data Center">' + _posEsc(p.symbol) + '</span></td>' +
         '<td class="pos-col-account">' + _posEsc(p.account_id || p.account || "—") + '</td>' +
         '<td>' + positionSidePill(p.side) + '</td>' +
         '<td class="num ds-text-mono ' + sideCls + '">' + qtyText + '</td>' +
@@ -6370,7 +6524,8 @@
     // Initial load — throws on failure → render() catch → stateError + Retry
     POSITIONS_PAYLOAD = await usePositions();
     POSITIONS_LAST_UPDATED = new Date().toLocaleTimeString("en-US", { hour12: false });
-    POSITIONS_FILTERS = { account: "ALL", symbol: "ALL", side: "ALL", visibility: "OPEN" };
+    // ④ terminal-wide account context feeds the page filter
+    POSITIONS_FILTERS = { account: APP_CTX.accountId, symbol: "ALL", side: "ALL", visibility: "OPEN" };
     POSITIONS_DETAIL = null;
     // Pre-select first open position (if any), else first position
     var exists = POSITIONS_PAYLOAD.positions.some(function (p) { return p.symbol === POSITIONS_SELECTED_SYMBOL; });
@@ -6788,7 +6943,8 @@
         AC_STATE.selectedId = (firstUp || data.accounts[0]).account_id;
       }
     } catch (err) {
-      AC_STATE.error = (err && err.message) || "Failed to load accounts data";
+      // keep the full ApiError (kind=network drives the Offline state)
+      AC_STATE.error = err || "Failed to load accounts data";
     }
   }
 
@@ -6999,7 +7155,7 @@
         refreshBtn.disabled = false;
         refreshBtn.textContent = "Refresh";
         if (AC_STATE.error) {
-          showToast("Accounts refresh failed: " + AC_STATE.error, "error");
+          showToast("Accounts refresh failed: " + (AC_STATE.error.message || AC_STATE.error), "error");
         } else {
           var tbody = document.getElementById("ac-list-tbody");
           if (tbody) tbody.innerHTML = renderAcRows();
@@ -7016,6 +7172,8 @@
         var row = e.target.closest("tr[data-ac-id]");
         if (!row) return;
         AC_STATE.selectedId = row.getAttribute("data-ac-id");
+        // ④ selecting an account here switches the terminal-wide context
+        ctxSetAccount(AC_STATE.selectedId);
         tbody.innerHTML = renderAcRows();
         updateAcDetail();
       });
@@ -7059,11 +7217,11 @@
   // ── Accounts page (Integration 012) ──────────────────────────
   PAGE_FRAMEWORK["operations/accounts"] = async function () {
     await acLoadCenter();
-    if (AC_STATE.error) {
-      return UI.pageHeader("Accounts", "Account & broker management · 多账户管理",
-        UI.button("Refresh", "ghost", { sm: true, action: "ac:refresh" }) +
-        UI.button("Add Account", "primary", { sm: true, action: "ac:add" })) +
-        UI.panel("Error", '<div class="empty">Failed to load: ' + esc(AC_STATE.error) + "</div>");
+    // ① unified API state (offline-aware)
+    var stateBlock = apiStateBlock(AC_STATE);
+    if (stateBlock) {
+      return UI.pageHeader("Accounts", "Account & broker management · 多账户管理") +
+        stateBlock;
     }
     return (
       UI.pageHeader("Accounts", "Account & broker management · 多账户管理",
@@ -7101,7 +7259,8 @@
       EX_STATE.data = data;
       EX_STATE.error = null;
     } catch (err) {
-      EX_STATE.error = (err && err.message) || "Failed to load execution data";
+      // keep the full ApiError (kind=network drives the Offline state)
+      EX_STATE.error = err || "Failed to load execution data";
     }
   }
 
@@ -7230,7 +7389,7 @@
         refreshBtn.disabled = false;
         refreshBtn.textContent = "Refresh";
         if (EX_STATE.error) {
-          showToast("Execution refresh failed: " + EX_STATE.error, "error");
+          showToast("Execution refresh failed: " + (EX_STATE.error.message || EX_STATE.error), "error");
         } else {
           var d = exData();
           var k = d.kpi;
@@ -7245,10 +7404,11 @@
   // ── Execution Control Center (Integration 011) ───────────────
   PAGE_FRAMEWORK["operations/execution"] = async function () {
     await exLoadCenter();
-    if (EX_STATE.error) {
-      return UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心",
-        UI.button("Refresh", "ghost", { sm: true, action: "ex:refresh" })) +
-        UI.panel("Error", '<div class="empty">Failed to load: ' + esc(EX_STATE.error) + "</div>");
+    // ① unified API state (offline-aware)
+    var stateBlock = apiStateBlock(EX_STATE);
+    if (stateBlock) {
+      return UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心") +
+        stateBlock;
     }
     return (
       UI.pageHeader("Execution Control Center", "Execution quality, order flow, and lifecycle · 执行控制中心",
@@ -7319,7 +7479,8 @@
         MO_STATE.selectedId = data.services[0].id;
       }
     } catch (err) {
-      MO_STATE.error = (err && err.message) || "Failed to load monitoring center";
+      // keep the full ApiError (kind=network drives the Offline state)
+      MO_STATE.error = err || "Failed to load monitoring center";
     }
   }
 
@@ -7617,6 +7778,10 @@
         monLoadCenter(true).then(function () { renderMonPageInto(); });
       });
     }
+    // ③ live page: opt-in visibility-aware auto-refresh (30s)
+    bindAutoRefresh("monitoring", "mo-auto", function () {
+      monLoadCenter(true).then(function () { renderMonPageInto(); });
+    });
   }
 
   function renderMonPageInto() {
@@ -7627,15 +7792,18 @@
   }
 
   function renderMonPage() {
-    if (MO_STATE.error) {
+    // ① unified API state (offline-aware) replaces the page-local error div
+    var stateBlock = apiStateBlock(MO_STATE);
+    if (stateBlock) {
       return UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
-        '<div class="ds-error">' + esc(MO_STATE.error) + "</div>";
+        '<div id="mo-page-state">' + stateBlock + "</div>";
     }
     var o = monData().overview;
     return (
       UI.pageHeader("Monitoring", "System monitoring & observability center · 系统监控中心") +
       '<div class="ds-toolbar">' +
         '<button id="mo-refresh" class="btn btn-secondary btn-sm">Refresh</button>' +
+        '<button id="mo-auto" class="btn btn-secondary btn-sm">Auto 30s</button>' +
         '<span class="ds-toolbar-meta">Last check: ' + esc(moHeartbeatAge(o.checked_at)) + "</span>" +
       "</div>" +
       UI.sectionHeading("System Health") +
@@ -7659,7 +7827,8 @@
 
   // ── Monitoring page (Integration 014) — async hydrate ─────────
   PAGE_FRAMEWORK["system"] = function () {
-    if (!MO_STATE.data && !MO_STATE.error) {
+    // (re)load when missing data or after a retry cleared a previous error
+    if (!MO_STATE.data || MO_STATE.error) {
       monLoadCenter().then(function () { renderMonPageInto(); });
     }
     return (
@@ -7700,7 +7869,8 @@
         AL_STATE.selectedId = data.alerts[0].id;
       }
     } catch (err) {
-      AL_STATE.error = (err && err.message) || "Failed to load alert center";
+      // keep the full ApiError (kind=network drives the Offline state)
+      AL_STATE.error = err || "Failed to load alert center";
     }
   }
 
@@ -8038,18 +8208,25 @@
         alLoadCenter(true).then(function () { renderAlertsPageInto(); });
       });
     }
+    // ③ live page: opt-in visibility-aware auto-refresh (30s)
+    bindAutoRefresh("alerts", "al-auto", function () {
+      alLoadCenter(true).then(function () { renderAlertsPageInto(); });
+    });
   }
 
   function renderAlPage() {
-    if (AL_STATE.error) {
+    // ① unified API state (offline-aware) replaces the page-local error div
+    var stateBlock = apiStateBlock(AL_STATE);
+    if (stateBlock) {
       return UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
-        '<div class="ds-error">' + esc(AL_STATE.error) + "</div>";
+        '<div id="al-page-state">' + stateBlock + "</div>";
     }
     var o = alData().overview || {};
     return (
       UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
       '<div class="ds-toolbar">' +
         '<button id="al-refresh" class="btn btn-secondary btn-sm">Refresh</button>' +
+        '<button id="al-auto" class="btn btn-secondary btn-sm">Auto 30s</button>' +
         '<span class="ds-toolbar-meta">Generated: ' + esc(moFmtClock(o.generated_at)) + "</span>" +
       "</div>" +
       UI.sectionHeading("Alert Overview") +
@@ -8073,7 +8250,8 @@
 
   // ── Alerts page (Integration 015) — async hydrate ────────────────
   PAGE_FRAMEWORK["alerts"] = function () {
-    if (!AL_STATE.data && !AL_STATE.error) {
+    // (re)load when missing data or after a retry cleared a previous error
+    if (!AL_STATE.data || AL_STATE.error) {
       alLoadCenter().then(function () { renderAlertsPageInto(); });
       return (
         '<div id="al-page">' +
@@ -8087,12 +8265,16 @@
 
 
   /* ==================================================================
-   * Settings module — Commit 016
+   * Settings module — Commit 016 / Integration 016 polish
    * System Configuration Center: left nav → right panel
    * (General / Trading / Risk / Execution / Notifications / Appearance).
    * UI-only configuration; does NOT modify risk engine, execution engine,
    * broker config, API key, live permissions, or any API/db.
    * Secrets are never persisted in the browser/localStorage/Git.
+   * Integration 016: the Risk section reads the live limits from the
+   * Risk API (no mock numbers); the Trading section lists the real
+   * accounts from the Accounts API. Notification toggles remain
+   * local-only UI preferences (no backend notification store exists).
    * ================================================================== */
 
   // ── Settings sections + state ──────────────────────────────────
@@ -8104,16 +8286,48 @@
     { id: "notifications",  label: "Notifications" },
     { id: "appearance",     label: "Appearance" },
   ];
-  var STG_STATE = { section: "general", env: "live", pfill: "allow", theme: "dark", density: "compact" };
+  var STG_STATE = {
+    section: "general", env: "live", pfill: "allow", theme: "dark", density: "compact",
+    risk: null, riskError: null,     // live limits from /dashboard/risk/center
+    accounts: [],                    // real accounts from /dashboard/accounts/center
+  };
 
-  // ── Risk limits (configured + current + status) ────────────────
-  var STG_RISK_LIMITS = [
-    { label: "Daily Loss Limit",      configured: "$4,000",   current: "$820",   status: "NORMAL" },
-    { label: "Maximum Drawdown",       configured: "10%",     current: "4.2%",    status: "NORMAL" },
-    { label: "Maximum Position",       configured: "$100,000", current: "$86,500", status: "WATCH" },
-    { label: "Maximum Gross Exposure", configured: "200%",    current: "166%",    status: "NORMAL" },
-    { label: "Maximum Leverage",       configured: "2.0x",    current: "1.4x",     status: "NORMAL" },
-  ];
+  /** Hydrate the live values shown on this page (risk limits, real
+   *  account list). Purely read-only; failures degrade gracefully. */
+  async function stgLoadLive(force) {
+    if (STG_STATE.risk && !force) return;
+    try {
+      var risk = await api.riskCenter();
+      STG_STATE.risk = risk;
+      STG_STATE.riskError = null;
+    } catch (err) {
+      STG_STATE.riskError = err;
+    }
+    try {
+      var accounts = await api.accountsCenter();
+      STG_STATE.accounts = (accounts && accounts.accounts) || [];
+    } catch (err) {
+      STG_STATE.accounts = [];
+    }
+  }
+
+  /** Format a Risk-API limit value per its backend fmt hint. */
+  function stgFmtLimitValue(v, fmt) {
+    var n = Number(v);
+    if (!isFinite(n)) return "—";
+    if (fmt === "money") return UI.money(n, 0);
+    if (fmt === "pct") return n.toFixed(1) + "%";
+    return fmtQty(n);   // count
+  }
+
+  /** Default-account select fed by the real Accounts API; the current
+   *  terminal context (APP_CTX) is the default option. */
+  function stgAccountSelect() {
+    var ids = STG_STATE.accounts.map(function (a) { return a.account_id; });
+    if (!ids.length) ids = ["(no accounts available)"];
+    var value = ids.indexOf(APP_CTX.accountId) >= 0 ? APP_CTX.accountId : ids[0];
+    return UI.select({ value: value, options: ids });
+  }
 
   // ── Notifications (label + severity + enabled) ────────────────
   var STG_NOTIFY = [
@@ -8184,7 +8398,7 @@
       envHtml +
       liveWarn +
       '<div class="stg-row">' +
-      UI.field("Default Account", UI.select({ value: "US-001", options: ["US-001", "FUT-001", "FX-001", "CN-001"] })) +
+      UI.field("Default Account", stgAccountSelect()) +
       UI.field("Default Order Size", UI.input({ type: "number", value: "100" })) +
       "</div>" +
       '<div class="stg-row">' +
@@ -8197,21 +8411,42 @@
     );
   }
 
-  // ── Section: Risk (limit cards with current/status) ──────────
+  // ── Section: Risk (live limits from the Risk API) ─────────────
   function renderStgRisk() {
-    var cards = STG_RISK_LIMITS.map(function (r) {
+    // live values from /dashboard/risk/center — no mock numbers
+    if (!STG_STATE.risk) {
+      return STG_STATE.riskError
+        ? UI.stateError(
+            "Risk limits unavailable / 风控限额不可用",
+            (STG_STATE.riskError.message || String(STG_STATE.riskError)) +
+              " · The Risk API did not respond.",
+            "Retry", "stg:risk-retry")
+        : UI.stateLoading("Loading risk limits / 加载风控限额",
+                          "Reading live limits from the Risk API…");
+    }
+    var limits = STG_STATE.risk.limits || [];
+    if (!limits.length) {
+      return UI.stateEmpty("No data available",
+                           "The Risk API reported no configured limits. / 暂无限额数据");
+    }
+    var cards = limits.map(function (r) {
       return (
         '<div class="stg-risk-card">' +
-        '<div><div class="stg-risk-label">' + esc(r.label) + "</div>" +
-        '<div class="stg-risk-value">' + esc(r.configured) + "</div></div>" +
+        '<div><div class="stg-risk-label">' + esc(r.name) + "</div>" +
+        '<div class="stg-risk-value">' + esc(stgFmtLimitValue(r.limit, r.fmt)) + "</div></div>" +
         '<div><div class="stg-risk-label">Current</div>' +
-        '<div class="stg-risk-current">' + esc(r.current) + "</div></div>" +
+        '<div class="stg-risk-current">' + esc(stgFmtLimitValue(r.current, r.fmt)) + "</div></div>" +
         '<div><div class="stg-risk-label">Status</div>' + stgRiskStatusBadge(r.status) + "</div>" +
-        UI.input({ value: r.configured }) +
+        UI.input({ value: stgFmtLimitValue(r.limit, r.fmt), disabled: true }) +
         "</div>"
       );
     }).join("");
-    return '<div class="stg-risk-list">' + cards + "</div>";
+    return (
+      '<div class="stg-risk-list">' + cards + "</div>" +
+      '<div style="font-size:var(--ds-text-xs);color:var(--ds-text-muted);margin-top:8px;">' +
+      "Read-only view of the live engine limits (Risk API) — editing is not wired to the engine. / 限额为引擎实时值（只读）" +
+      "</div>"
+    );
   }
 
   // ── Section: Execution ────────────────────────────────────────
@@ -8245,7 +8480,12 @@
         "</div>"
       );
     }).join("");
-    return '<div class="ds-panel"><div class="ds-panel-body">' + rows + "</div></div>";
+    return (
+      '<div class="ds-panel"><div class="ds-panel-body">' + rows + "</div></div>" +
+      '<div style="font-size:var(--ds-text-xs);color:var(--ds-text-muted);margin-top:8px;">' +
+      "Local-only UI preference — the runtime has no notification store; alert delivery is out of scope (no channels configured). / 本地界面偏好，不持久化" +
+      "</div>"
+    );
   }
 
   // ── Section: Appearance ──────────────────────────────────────
@@ -8353,7 +8593,7 @@
   }
 
   function renderStgShell() {
-    var host = document.getElementById("stg-shell");
+    var host = document.getElementById("stg-page");
     if (host) {
       host.innerHTML = '<div class="stg-layout">' + renderStgNav() + renderStgContent() + "</div>";
       bindStgShell();
@@ -8375,11 +8615,14 @@
     bindStgShell();
   }
 
-  // ── Settings page (Commit 016) ────────────────────────────────
-  PAGE_FRAMEWORK["settings"] = function () {
+  // ── Settings page (Integration 016) — async hydrate live values ──
+  PAGE_FRAMEWORK["settings"] = async function () {
+    if (!STG_STATE.risk && !STG_STATE.riskError) {
+      stgLoadLive().then(function () { renderStgShell(); });
+    }
     return (
       UI.pageHeader("Settings", "System configuration and preferences · 系统配置") +
-      '<div id="stg-shell"><div class="stg-layout">' + renderStgNav() + renderStgContent() + "</div></div>"
+      '<div id="stg-page"><div class="stg-layout">' + renderStgNav() + renderStgContent() + "</div></div>"
     );
   };
 
@@ -8411,7 +8654,8 @@
         DT_STATE.selectedId = (firstReady || data.datasets[0]).id;
       }
     } catch (err) {
-      DT_STATE.error = (err && err.message) || "Failed to load data center";
+      // keep the full ApiError (kind=network drives the Offline state)
+      DT_STATE.error = err || "Failed to load data center";
     }
   }
 
@@ -8677,9 +8921,11 @@
   }
 
   function renderDtPage() {
-    if (DT_STATE.error) {
+    // ① unified API state (offline-aware) replaces the page-local error div
+    var stateBlock = apiStateBlock(DT_STATE);
+    if (stateBlock) {
       return UI.pageHeader("Data", "Market data & data pipeline center · 市场数据中心") +
-        '<div class="ds-error">' + esc(DT_STATE.error) + "</div>";
+        '<div id="dt-page-state">' + stateBlock + "</div>";
     }
     var o = dtData().overview;
     return (
@@ -8709,7 +8955,8 @@
   PAGE_FRAMEWORK["system/data"] = function () {
     // Returning a shell lets the framework mount immediately; we then
     // hydrate async after the first API call resolves.
-    if (!DT_STATE.data && !DT_STATE.error) {
+    // (re)load when missing data or after a retry cleared a previous error
+    if (!DT_STATE.data || DT_STATE.error) {
       dtLoadCenter().then(function () { renderDtPageInto(); });
     }
     return (
@@ -9022,11 +9269,6 @@
         const envText = accType.toUpperCase();
         envBadge.textContent = envText;
         envBadge.className = "env-badge env-" + accType.toLowerCase();
-
-        // Account selector
-        const acctName = document.getElementById("acct-name");
-        const acctCfg = cfg.value.account || {};
-        acctName.textContent = acctCfg.account_name || "Main-Paper";
       }
 
       // System health
@@ -9045,6 +9287,48 @@
     } finally {
       _topbarLoading = false;
     }
+    // ④ Account context: build the terminal-wide selector from the real
+    // Accounts API (once); the active selection lives in APP_CTX and
+    // drives the Orders / Positions account filters.
+    buildTopbarAccountSelector();
+  }
+
+  var _ctxSelectorBuilt = false;
+  async function buildTopbarAccountSelector() {
+    if (_ctxSelectorBuilt) { renderTopbarAccountName(); return; }
+    var host = document.getElementById("account-selector");
+    if (!host) return;
+    var accounts = [];
+    try {
+      var data = await api.accountsCenter();
+      accounts = (data && data.accounts) || [];
+    } catch (e) {
+      accounts = [];   // offline — selector stays with the ALL default
+    }
+    _ctxSelectorBuilt = true;
+    var opts = ['<option value="ALL">All Accounts</option>'].concat(
+      accounts.map(function (a) {
+        return '<option value="' + esc(a.account_id) + '">' +
+               esc(a.account_id + " · " + a.name) + "</option>";
+      })
+    );
+    // replace the static chip with a live selector
+    host.innerHTML =
+      '<span class="acct-label">Account</span>' +
+      '<select id="ctx-account-select" class="ctx-account-select" title="Terminal-wide account context">' +
+      opts.join("") + "</select>";
+    var sel = document.getElementById("ctx-account-select");
+    if (sel) {
+      // a saved context may reference a removed account — verify it exists
+      var ids = ["ALL"].concat(accounts.map(function (a) { return a.account_id; }));
+      if (ids.indexOf(APP_CTX.accountId) < 0) APP_CTX.accountId = "ALL";
+      sel.value = APP_CTX.accountId;
+      sel.addEventListener("change", function () {
+        ctxSetAccount(sel.value);
+        render();   // re-render the current page under the new context
+      });
+    }
+    renderTopbarAccountName();
   }
 
   function bindActions() {
@@ -9053,6 +9337,22 @@
         location.hash = el.getAttribute("data-href");
       });
     });
+
+    // ① unified state-retry from apiStateBlock error/offline blocks —
+    // re-renders the current route, which reloads the failed resource.
+    var stRetry = document.querySelector('[data-action="state-retry"]:not([data-bound])');
+    if (stRetry) {
+      stRetry.setAttribute("data-bound", "1");
+      stRetry.addEventListener("click", function () { render(); });
+    }
+    // Settings risk section has its own retry (local section refresh)
+    var stgRetry = document.querySelector('[data-action="stg:risk-retry"]:not([data-bound])');
+    if (stgRetry) {
+      stgRetry.setAttribute("data-bound", "1");
+      stgRetry.addEventListener("click", function () {
+        stgLoadLive(true).then(function () { renderStgShell(); });
+      });
+    }
 
     // Design System demo: Modal & Drawer
     var demoModalBtn = document.querySelector('[data-action="ds-demo-modal"]');
@@ -9429,8 +9729,8 @@
       bindAccountsPage();
     }
 
-    // Settings (Commit 016): section nav, env radios, save/reset
-    if (document.getElementById("stg-shell")) {
+    // Settings (Commit 016 / Integration 016): section nav, env radios, save/reset
+    if (document.getElementById("stg-page")) {
       bindSettingsPage();
     }
 
