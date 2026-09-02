@@ -207,8 +207,9 @@
     var val = opts.value ? ' value="' + esc(opts.value) + '"' : "";
     var step = opts.step ? ' step="' + esc(opts.step) + '"' : "";
     var action = opts.action ? ' data-action="' + esc(opts.action) + '"' : "";
+    var dis = opts.disabled ? " disabled" : "";
     var cls = ' class="ds-input"';
-    return "<input" + id + type + ph + val + step + action + cls + ">";
+    return "<input" + id + type + ph + val + step + action + dis + cls + ">";
   };
 
   UI.field = function (label, inputHtml) {
