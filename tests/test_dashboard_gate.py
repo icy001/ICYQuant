@@ -1699,3 +1699,101 @@ def test_d31_monitoring_api_access():
     body = res.json()
     assert body["overview"]["services_total"] == 10
     assert "services" in body and "trading" in body
+
+
+# ============================================================================
+# Integration 015 — Alerts API
+# ============================================================================
+
+def test_d32_alerts_api_integration(attached_pipeline):
+    """Integration 015: Alert Center aggregates the existing
+    runtime.alerts() capability; each alert carries current/threshold
+    context plus the related signal → risk → order event chain."""
+    from pathlib import Path
+    from apps.api import main as apps_api_main
+
+    static = (Path(apps_api_main.__file__).resolve().parent.parent
+               / "dashboard" / "static")
+
+    # SPA: mock AL_OVERVIEW / AL_RULES / AL_ALERTS are gone; the page is
+    # API-driven via AL_STATE + alertsCenter.
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    for gone in ("var AL_OVERVIEW = [", "var AL_RULES = [",
+                 "var AL_ALERTS = ["):
+        assert gone not in app_js, f"mock data still present: {gone}"
+    assert "AL_STATE" in app_js and "alertsCenter" in app_js
+    api_js = (static / "js" / "api.js").read_text(encoding="utf-8")
+    assert "alertsCenter" in api_js, "api.js missing alertsCenter"
+
+    token = _login("operator", "operator123")
+
+    # --- live snapshot ----------------------------------------------------
+    res = client.get("/api/dashboard/alerts/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    d = res.json()
+
+    # overview: counts consistent with the alert rows
+    ov = d["overview"]
+    alerts = d["alerts"]
+    assert ov["active"] == len(alerts)
+    assert ov["critical"] == sum(1 for a in alerts
+                                  if a["severity"] == "CRITICAL")
+    assert ov["warning"] == sum(1 for a in alerts
+                                if a["severity"] == "WARNING")
+    assert ov["info"] == sum(1 for a in alerts if a["severity"] == "INFO")
+    assert ov["pipeline_attached"] is True
+    assert ov["generated_at"]
+
+    # alert rows: unified schema, three-tier severity, stable ids
+    required = ("id", "timestamp", "severity", "source", "message",
+                "status", "symbol", "current", "threshold", "events")
+    for a in alerts:
+        for key in required:
+            assert key in a, f"alert row missing {key}"
+        assert a["severity"] in ("CRITICAL", "WARNING", "INFO")
+        assert a["status"] == "TRIGGERED"
+        assert a["id"].startswith("ALT-") and len(a["id"]) == 10
+
+    # risk rejection alerts carry symbol context + the WHY chain
+    rejections = [a for a in alerts if a["source"] == "risk"
+                  and "rejected" in a["message"].lower()]
+    assert rejections, "TSLA risk rejection alert missing"
+    rej = rejections[0]
+    assert rej["symbol"] == "TSLA"
+    assert rej["reason"]                      # parsed rejection reason
+    assert rej["events"], "risk rejection alert has no related events"
+    chain_types = {e["type"] for e in rej["events"]}
+    assert "ORDER_CREATED" in chain_types     # signal → risk → order
+    assert "ORDER_REJECTED" in chain_types
+    for e in rej["events"]:
+        assert e["timestamp"] and e["type"] and e["text"]
+
+    # sources: the real alert capabilities (not static rule cards)
+    sources = d["sources"]
+    assert sources, "alert sources missing"
+    src_ids = {s["id"] for s in sources}
+    assert {"reconciliation", "position-limit", "service-health",
+            "risk-rejections", "pipeline"} <= src_ids
+    for s in sources:
+        assert s["name"] and s["sub"] and isinstance(s["triggered"], int)
+
+    # filters: distinct severities/sources for the filter bar
+    filters = d["filters"]
+    assert set(filters["severities"]) <= {"CRITICAL", "WARNING", "INFO"}
+    assert "risk" in filters["sources"]
+
+
+def test_d32_alerts_api_access():
+    """Integration 015: RBAC and the auth gate."""
+    # unauthenticated -> 401
+    assert client.get(
+        "/api/dashboard/alerts/center").status_code == 401
+
+    # readonly can view the alert center (view-only role)
+    token = _login("readonly", "readonly123")
+    res = client.get("/api/dashboard/alerts/center",
+                     headers=_headers(token))
+    assert res.status_code == 200
+    body = res.json()
+    assert "overview" in body and "alerts" in body and "sources" in body
