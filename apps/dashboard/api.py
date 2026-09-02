@@ -10,8 +10,10 @@ Redis, the event bus or any internal engine directly.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
+import re
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -1082,6 +1084,137 @@ def monitoring_center(principal: Principal = Depends(require_roles())) -> dict:
         "alpha": alpha,
         "events": events_out[:50],
         "infra": infra,
+    }
+
+
+# ── Alerts API (Integration 015) ───────────────────────────────────
+def _alert_context(message: str) -> dict:
+    """Structured current/threshold/symbol context parsed from the
+    alert's own message (formats are owned by runtime.alerts())."""
+    ctx: dict = {"symbol": "", "account": "", "strategy": "",
+                 "current": "", "threshold": "", "reason": ""}
+    # "Position limit reached: 1200 / 1500" / "approaching limit: X / Y"
+    m = re.search(r"limit(?:ed)?: ([\d.]+) / ([\d.]+)", message)
+    if m:
+        ctx["current"], ctx["threshold"] = m.group(1), m.group(2)
+    # "Position / Ledger mismatch: position=1200 ledger=1100"
+    m = re.search(r"position=(\d+) ledger=(\d+)", message)
+    if m:
+        ctx["current"] = f"position={m.group(1)}"
+        ctx["threshold"] = f"ledger={m.group(2)}"
+    # "BUY TSLA rejected: exceeds position limit"
+    m = re.match(r"^(BUY|SELL) ([A-Z.]+) rejected: (.+)$", message)
+    if m:
+        ctx["symbol"] = m.group(2)
+        ctx["reason"] = m.group(3)
+    return ctx
+
+
+def _alert_events(symbol: str) -> list[dict]:
+    """Related bus events explaining WHY the alert fired — the
+    signal → risk → order chain for the alerting symbol."""
+    if not symbol:
+        return []
+    out: list[dict] = []
+    for event in runtime._events():
+        payload = getattr(event, "payload", None) or {}
+        if payload.get("symbol") != symbol:
+            continue
+        etype = getattr(event, "event_type", None)
+        etype = str(getattr(etype, "value", etype) or "")
+        out.append({
+            "timestamp": _iso_or_str(getattr(event, "timestamp", None)),
+            "type": etype,
+            "text": etype.replace("_", " ").lower(),
+        })
+    out.sort(key=lambda e: e["timestamp"] or "")
+    return out
+
+
+@router.get("/dashboard/alerts/center")
+def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
+    """Alert Center aggregation — read-only view over the existing
+    runtime.alerts() capability (reconciliation, position limit,
+    service health, risk rejections). No new alert rules, no engine
+    edits: Monitoring discovers, the Alert Center presents.
+
+    HIGH runtime levels are surfaced as CRITICAL so the UI keeps its
+    three-tier severity vocabulary (CRITICAL / WARNING / INFO).
+    Ack/Resolve are UI-session state — the runtime has no alert
+    store, and 015 does not add one.
+    """
+    raw = runtime.alerts()
+    sev_map = {"CRITICAL": "CRITICAL", "HIGH": "CRITICAL",
+               "WARNING": "WARNING", "INFO": "INFO"}
+
+    alert_rows: list[dict] = []
+    counts = {"CRITICAL": 0, "WARNING": 0, "INFO": 0}
+    for alert in raw:
+        sev = sev_map.get(alert.get("level", "INFO"), "INFO")
+        counts[sev] = counts.get(sev, 0) + 1
+        source = alert.get("source", "system")
+        message = alert.get("message", "")
+        ctx = _alert_context(message)
+        # stable id per (source, message) so selection keeps pointing
+        # at the same row across refreshes
+        digest = hashlib.sha1(f"{source}|{message}".encode()).hexdigest()[:6]
+        alert_rows.append({
+            "id": f"ALT-{digest}",
+            "timestamp": _iso_or_str(alert.get("timestamp")),
+            "severity": sev,
+            "source": source,
+            "message": message,
+            "status": "TRIGGERED",
+            "symbol": ctx["symbol"],
+            "account": ctx["account"],
+            "strategy": ctx["strategy"],
+            "current": ctx["current"],
+            "threshold": ctx["threshold"],
+            "reason": ctx["reason"],
+            # why it fired: signal → risk → order chain for the symbol
+            "events": _alert_events(ctx["symbol"]),
+        })
+
+    # Existing alert capabilities (where each alert comes from) —
+    # replaces the Commit 019 static rule cards with the real ones.
+    sources = [
+        {"id": "reconciliation", "name": "Reconciliation",
+         "sub": "Position vs Ledger mismatch", "severity": "CRITICAL",
+         "triggered": sum(1 for a in alert_rows if a["source"] == "reconciliation")},
+        {"id": "position-limit", "name": "Position Limit",
+         "sub": "Total quantity vs configured limit", "severity": "CRITICAL",
+         "triggered": sum(1 for a in alert_rows
+                           if a["source"] == "risk" and "limit" in a["message"].lower())},
+        {"id": "service-health", "name": "Service Health",
+         "sub": "Health registry service DOWN", "severity": "CRITICAL",
+         "triggered": sum(1 for a in alert_rows
+                           if a["source"] not in ("risk", "reconciliation", "system"))},
+        {"id": "risk-rejections", "name": "Risk Rejections",
+         "sub": "Recent rejected risk decisions", "severity": "INFO",
+         "triggered": sum(1 for a in alert_rows
+                           if a["source"] == "risk" and "rejected" in a["message"].lower())},
+        {"id": "pipeline", "name": "Runtime Pipeline",
+         "sub": "Trading pipeline attachment", "severity": "WARNING",
+         "triggered": sum(1 for a in alert_rows
+                           if a["source"] == "system" and "pipeline" in a["message"].lower())},
+    ]
+
+    return {
+        "overview": {
+            "active": len(alert_rows),
+            "critical": counts["CRITICAL"],
+            "warning": counts["WARNING"],
+            "info": counts["INFO"],
+            "pipeline_attached": runtime.attached(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "sources": sources,
+        # distinct severities / sources present, for the filter bar
+        "filters": {
+            "severities": sorted({a["severity"] for a in alert_rows}),
+            "sources": sorted({a["source"] for a in alert_rows}),
+        },
+        "alerts": alert_rows,
     }
 
 

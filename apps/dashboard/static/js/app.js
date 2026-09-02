@@ -7672,129 +7672,91 @@
 
 
   /* ==================================================================
-   * Alerts module — Commit 019
-   * Unified Alert Center: overview → rules → table → detail.
-   * Severity / source / symbol · account / current vs threshold / status.
-   * Row selection shows cause, data before/after, related accounts,
-   * strategies, positions, and Acknowledge / Resolve actions plus deep
-   * links to Orders / Positions / Risk pages.
-   * UI-only; does NOT implement alert engine, push service, webhooks
-   * or any backend engine behaviour.
+   * Alerts module — Integration 015 (Alerts API)
+   * Unified Alert Center: overview → sources → table → detail.
+   * Connected to GET /api/dashboard/alerts/center — a read-only view
+   * over the existing runtime.alerts() capability (reconciliation,
+   * position limit, service health, risk rejections). Each alert row
+   * carries current/threshold context plus the related signal → risk
+   * → order event chain explaining WHY it fired.
+   * Acknowledge / Resolve are UI-session state only — the runtime has
+   * no alert store and 015 does not add one (no new alert rules).
    * ================================================================== */
 
-  var AL_OVERVIEW = [
-    { id: "active",   cls: "active",   label: "Active Alerts",      value: 17, delta: "+3 vs yesterday" },
-    { id: "today",    cls: "today",    label: "Triggered Today",    value: 42, delta: "avg 38 last 7d" },
-    { id: "critical", cls: "critical", label: "Critical",           value: 3,  delta: "2 not resolved" },
-    { id: "warning",  cls: "warning",  label: "Warning",            value: 11, delta: "7 open · 4 acked" },
-    { id: "ack",      cls: "ack",      label: "Acknowledged",       value: 28, delta: "8 resolved today" },
-  ];
+  // ── Alerts state (Integration 015) ────────────────────────────
+  var AL_STATE = {
+    data: null, error: null, selectedId: null,
+    sevFilter: "ALL", statusFilter: "ALL", sourceFilter: "ALL",
+    acked: {}, resolved: {},           // session-local Ack/Resolve state
+  };
 
-  var AL_RULES = [
-    { id: "price",    name: "Price Alert",           sub: "Crossing of price / % band",          state: "on",  triggered: 12 },
-    { id: "pnl",      name: "P&L Alert",             sub: "Realized / unrealized P&L shocks",     state: "on",  triggered: 5  },
-    { id: "dd",       name: "Drawdown Alert",        sub: "Peak-to-trough drawdown thresholds",   state: "on",  triggered: 2  },
-    { id: "pos",      name: "Position Alert",        sub: "Size / concentration / delta limits",  state: "on",  triggered: 7  },
-    { id: "risk",     name: "Risk Limit Alert",      sub: "VaR / stress / leverage breaches",     state: "on",  triggered: 4  },
-    { id: "exec",     name: "Execution Alert",       sub: "Slippage / latency / partial fills",   state: "on",  triggered: 6  },
-    { id: "health",   name: "System Health Alert",   sub: "Service / infra health rules",         state: "on",  triggered: 3  },
-    { id: "signal",   name: "Strategy Signal Alert", sub: "Strategy emits / anomaly scores",      state: "off", triggered: 0  },
-  ];
-
-  var AL_ALERTS = [
-    {
-      id: "ALT-2026-0421", time: "10:31:08", sev: "CRITICAL", source: "Risk Engine",
-      symbol: "TSLA",      account: "Main-Paper",   event: "Daily VaR breached",
-      value: "1.92%",      threshold: "1.50%",     status: "TRIGGERED",
-      cause: "99% 1-day VaR crossed 1.50% at 10:30 following a $18.40 gap-down open on TSLA.",
-      before: { pnl: "+$1,280", var: "1.12%", pos: "TSLA 800 @ $241.30" },
-      after:  { pnl: "+$614",   var: "1.92%", pos: "TSLA 800 @ $222.90" },
-      related: { account: "Main-Paper", strategy: "Macro017 — Mean Reversion", position: "TSLA / 800 / unreal –$14,720" },
-      links: ["View Order History", "View Position TSLA", "Open Risk Monitor"],
-    },
-    {
-      id: "ALT-2026-0420", time: "10:24:51", sev: "WARNING", source: "Execution Engine",
-      symbol: "SPY",       account: "Algo-02",      event: "Execution latency spike",
-      value: "68 ms P95",  threshold: "25 ms",     status: "TRIGGERED",
-      cause: "Order router experienced backpressure from IB market-data feed; P95 latency climbed 3× above SLA.",
-      before: { fills: 3, latency_p95: "11 ms", reject_rate: "0.0%" },
-      after:  { fills: 1, latency_p95: "68 ms", reject_rate: "12.5%" },
-      related: { account: "Algo-02", strategy: "Execution — Smart Router", position: "SPY / +1,200" },
-      links: ["View Executions", "View Algo-02 Orders"],
-    },
-    {
-      id: "ALT-2026-0419", time: "10:18:09", sev: "CRITICAL", source: "Risk Engine",
-      symbol: "—",         account: "Main-Paper",   event: "Daily loss limit reached",
-      value: "-$3,284",    threshold: "-$3,000",   status: "ACKNOWLEDGED",
-      cause: "Rejection gate triggered at −$3,200; new orders blocked. Trader acknowledged at 10:18:42.",
-      before: { intraday: "+$1,140", orders_today: 92,  rate_limit: "OK" },
-      after:  { intraday: "−$3,284", orders_today: 128, rate_limit: "BLOCKED" },
-      related: { account: "Main-Paper", strategy: "Multi-strategy composite", position: "Net delta: 1,840 β$" },
-      links: ["View Risk Breach Log", "View Orders 103–128", "View Positions Snapshot"],
-    },
-    {
-      id: "ALT-2026-0418", time: "10:12:08", sev: "WARNING", source: "Data Feed",
-      symbol: "NVDA",      account: "—",            event: "Daily bar gap",
-      value: "3 bars",     threshold: "0 bars",    status: "ACKNOWLEDGED",
-      cause: "Historical D1 feed missing 2026-07-21 → 07-23 for NVDA; downstream factors re-computed on partial set.",
-      before: { completeness: "100.0%", factors: "All OK" },
-      after:  { completeness: "98.7%",  factors: "2 factors flagged" },
-      related: { account: "—", strategy: "Alpha021 / Medium-term", position: "NVDA / 150" },
-      links: ["Open Data Center → NVDA", "Inspect Quality Report"],
-    },
-    {
-      id: "ALT-2026-0417", time: "09:48:33", sev: "WARNING", source: "Position Ledger",
-      symbol: "AAPL",      account: "Main-Paper",   event: "Position concentration",
-      value: "18.4%",      threshold: "15.0%",     status: "TRIGGERED",
-      cause: "AAPL climbed to 18.4% of net liquidation value after strong open; above 15% rule threshold.",
-      before: { weight: "13.8%", qty: "600", nlv: "$1,048,300" },
-      after:  { weight: "18.4%", qty: "900", nlv: "$1,048,300" },
-      related: { account: "Main-Paper", strategy: "Momentum03 / Intraday", position: "AAPL 900 @ $214.10" },
-      links: ["View Portfolio Weights", "View Positions", "Trim Order Suggestion"],
-    },
-    {
-      id: "ALT-2026-0416", time: "09:31:14", sev: "INFO", source: "Strategy Runtime",
-      symbol: "QQQ",       account: "Algo-04",      event: "Strategy signal fire",
-      value: "0.84 score", threshold: "0.75 score", status: "RESOLVED",
-      cause: "Anomaly029 fired cross > 0.75 at open; one trade entered and closed +$240 within 14 minutes.",
-      before: { signal: "0.62", open_pos: "flat",   signal_count: 3 },
-      after:  { signal: "0.84", open_pos: "QQQ -50", signal_count: 4 },
-      related: { account: "Algo-04", strategy: "Anomaly029 / Mean Rev", position: "QQQ flat @ resolved" },
-      links: ["View Strategy Signal", "View Trade → Trades"],
-    },
-    {
-      id: "ALT-2026-0415", time: "09:14:02", sev: "CRITICAL", source: "Monitoring",
-      symbol: "—",         account: "—",            event: "Service DEGRADED",
-      value: "execution-engine", threshold: "RUNNING", status: "RESOLVED",
-      cause: "Execution engine health-check P95 latency elevated to 38ms > 25ms; auto-recovered at 09:22 after thread-pool resize.",
-      before: { svc: "RUNNING", latency_p95: "14 ms", restarts: 0 },
-      after:  { svc: "DEGRADED",latency_p95: "38 ms", restarts: 1 },
-      related: { account: "—", strategy: "—", position: "—" },
-      links: ["Open Monitoring → Service Details", "View Restart Logs"],
-    },
-    {
-      id: "ALT-2026-0414", time: "08:58:47", sev: "INFO", source: "Risk Engine",
-      symbol: "EEM",       account: "Main-Paper",   event: "Drawdown warning cleared",
-      value: "-2.1% → -1.2%", threshold: "-2.0%", status: "RESOLVED",
-      cause: "Macro017 30-day peak drawdown recovered from -2.1% to -1.2%; drawdown warning auto-resolved.",
-      before: { dd_30d: "-2.1%", peak_eq: "$1,073,400", mark: "WARNING" },
-      after:  { dd_30d: "-1.2%", peak_eq: "$1,073,400", mark: "CLEARED" },
-      related: { account: "Main-Paper", strategy: "Macro017", position: "Book net long 0.32 β" },
-      links: ["View Equity Curve", "View Risk Dashboard"],
-    },
-  ];
-  var AL_STATE = { selectedId: AL_ALERTS[0].id };
-
-  function alFind(id) {
-    for (var i = 0; i < AL_ALERTS.length; i++) if (AL_ALERTS[i].id === id) return AL_ALERTS[i];
-    return AL_ALERTS[0];
+  async function alLoadCenter(force) {
+    if (AL_STATE.data && !force) return;
+    try {
+      var data = await api.alertsCenter();
+      AL_STATE.data = data;
+      AL_STATE.error = null;
+      if (!AL_STATE.selectedId && data.alerts && data.alerts.length) {
+        AL_STATE.selectedId = data.alerts[0].id;
+      }
+    } catch (err) {
+      AL_STATE.error = (err && err.message) || "Failed to load alert center";
+    }
   }
 
-  // ── Overview KPI row ────────────────────────────────────────────
+  function alData() {
+    return AL_STATE.data || {
+      overview: { active: 0, critical: 0, warning: 0, info: 0,
+                  pipeline_attached: false, generated_at: null },
+      sources: [],
+      filters: { severities: [], sources: [] },
+      alerts: [],
+    };
+  }
+
+  function alFind(id) {
+    var rows = alData().alerts || [];
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i];
+    return rows[0] || null;
+  }
+
+  // UI-session status: TRIGGERED → ACKNOWLEDGED → RESOLVED
+  function alStatus(a) {
+    if (a && AL_STATE.resolved[a.id]) return "RESOLVED";
+    if (a && AL_STATE.acked[a.id]) return "ACKNOWLEDGED";
+    return a ? (a.status || "TRIGGERED") : "TRIGGERED";
+  }
+
+  function alCounts() {
+    var c = { active: 0, critical: 0, warning: 0, info: 0, acked: 0 };
+    (alData().alerts || []).forEach(function (a) {
+      var st = alStatus(a);
+      if (st === "RESOLVED") return;
+      c.active++;
+      if (a.severity === "CRITICAL") c.critical++;
+      else if (a.severity === "WARNING") c.warning++;
+      else c.info++;
+      if (st === "ACKNOWLEDGED") c.acked++;
+    });
+    return c;
+  }
+
+
+  // ── Overview KPI row (live counts; Ack/Resolve update in-session) ──
   function renderAlOverview() {
+    var c = alCounts();
+    var o = alData().overview || {};
+    var cards = [
+      { cls: "active",   label: "Active Alerts", value: c.active,
+        delta: o.pipeline_attached ? "pipeline attached" : "no pipeline" },
+      { cls: "critical", label: "Critical",      value: c.critical, delta: "open / not resolved" },
+      { cls: "warning",  label: "Warning",       value: c.warning,  delta: "open / not resolved" },
+      { cls: "info",     label: "Info",          value: c.info,     delta: "open / not resolved" },
+      { cls: "ack",      label: "Acknowledged",  value: c.acked,    delta: "this session" },
+    ];
     return (
-      '<div class="al-overview">' +
-      AL_OVERVIEW.map(function (k) {
+      '<div class="al-overview" id="al-overview">' +
+      cards.map(function (k) {
         return (
           '<div class="al-kpi ' + esc(k.cls) + '">' +
           '<div class="al-kpi-label">' + esc(k.label) + "</div>" +
@@ -7807,19 +7769,22 @@
     );
   }
 
-  // ── Rules grid ──────────────────────────────────────────────────
-  function renderAlRules() {
+  // ── Alert capability sources (existing runtime.alerts() origins) ──
+  function renderAlSources() {
+    var srcs = alData().sources || [];
+    if (!srcs.length) {
+      return '<div class="empty" style="padding:var(--ds-space-4);">No alert sources / 无告警来源</div>';
+    }
     return (
       '<div class="al-rules">' +
-      AL_RULES.map(function (r) {
-        var cls = r.state === "on" ? "on" : "off";
+      srcs.map(function (r) {
         return (
           '<div class="al-rule">' +
           '<div class="al-rule-body">' +
           '<span class="al-rule-name">' + esc(r.name) + "</span>" +
           '<span class="al-rule-sub">' + esc(r.sub) + " · " + r.triggered + " triggered</span>" +
           "</div>" +
-          '<span class="al-rule-state ' + cls + '">' + (r.state === "on" ? "● ACTIVE" : "○ PAUSED") + "</span>" +
+          '<span class="al-rule-state on">● LIVE</span>' +
           "</div>"
         );
       }).join("") +
@@ -7827,22 +7792,70 @@
     );
   }
 
-  // ── Alert table ─────────────────────────────────────────────────
+  // ── Alert table (filters: severity / status / source) ───────────
+  function alFilteredRows() {
+    var rows = alData().alerts || [];
+    var sev = AL_STATE.sevFilter, st = AL_STATE.statusFilter, src = AL_STATE.sourceFilter;
+    return rows.filter(function (a) {
+      if (sev !== "ALL" && a.severity !== sev) return false;
+      if (st !== "ALL" && alStatus(a) !== st) return false;
+      if (src !== "ALL" && a.source !== src) return false;
+      return true;
+    });
+  }
+
+  function alFilterBtn(group, value, label) {
+    var cur = AL_STATE[group];
+    var cls = cur === value ? "mo-event-filter-btn active" : "mo-event-filter-btn";
+    return '<button class="' + cls + '" data-al-filter-group="' + esc(group) +
+           '" data-al-filter="' + esc(value) + '">' + esc(label) + "</button>";
+  }
+
+  function renderAlFilters() {
+    var srcs = (alData().filters || {}).sources || [];
+    function group(label, key, values) {
+      return (
+        '<span style="font-size:var(--ds-text-xs);color:var(--ds-text-muted);align-self:center;margin-right:2px;">' +
+        esc(label) + "</span>" +
+        values.map(function (v) {
+          return alFilterBtn(key, v, v === "ALL" ? "All" : v);
+        }).join("")
+      );
+    }
+    return (
+      '<div class="mo-event-filter" style="flex-wrap:wrap;">' +
+      group("Severity", "sevFilter", ["ALL", "CRITICAL", "WARNING", "INFO"]) +
+      '<span style="width:12px;"></span>' +
+      group("Status", "statusFilter", ["ALL", "TRIGGERED", "ACKNOWLEDGED", "RESOLVED"]) +
+      '<span style="width:12px;"></span>' +
+      group("Source", "sourceFilter", ["ALL"].concat(srcs)) +
+      "</div>"
+    );
+  }
+
   function renderAlRows() {
-    return AL_ALERTS.map(function (a) {
+    var rows = alFilteredRows();
+    if (!rows.length) {
+      return (
+        '<tr><td colspan="9"><div class="empty" style="padding:var(--ds-space-4);">' +
+        "No alerts in this filter / 当前过滤条件下无告警</div></td></tr>"
+      );
+    }
+    return rows.map(function (a) {
       var sel = a.id === AL_STATE.selectedId ? " al-row-selected" : "";
-      var showAck = a.status !== "RESOLVED" && a.status !== "ACKNOWLEDGED";
-      var showRes = a.status !== "RESOLVED";
+      var st = alStatus(a);
+      var showAck = st === "TRIGGERED";
+      var showRes = st !== "RESOLVED";
       return (
         '<tr data-al-id="' + esc(a.id) + '" class="' + sel + '">' +
-        '<td style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(a.time) + "</td>" +
-        '<td><span class="al-sev ' + esc(a.sev) + '">' + esc(a.sev) + "</span></td>" +
+        '<td style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(moFmtClock(a.timestamp)) + "</td>" +
+        '<td><span class="al-sev ' + esc(a.severity) + '">' + esc(a.severity) + "</span></td>" +
         '<td style="font-weight:var(--ds-font-semibold);">' + esc(a.source) + "</td>" +
-        '<td style="font-family:var(--ds-num-font);">' + esc(a.symbol) + " · " + esc(a.account) + "</td>" +
-        "<td>" + esc(a.event) + "</td>" +
-        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-primary);">' + esc(a.value) + "</td>" +
-        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(a.threshold) + "</td>" +
-        '<td><span class="al-status ' + esc(a.status) + '">' + esc(a.status) + "</span></td>" +
+        '<td style="font-family:var(--ds-num-font);">' + esc(a.symbol || "—") + "</td>" +
+        "<td>" + esc(a.message) + "</td>" +
+        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-primary);">' + esc(a.current || "—") + "</td>" +
+        '<td class="num" style="font-family:var(--ds-num-font);color:var(--ds-text-muted);">' + esc(a.threshold || "—") + "</td>" +
+        '<td><span class="al-status ' + esc(st) + '">' + esc(st) + "</span></td>" +
         '<td><div class="al-actions">' +
         (showAck ? '<button class="al-btn primary" data-al-action="ack" data-al-id="' + esc(a.id) + '">Ack</button>' : "") +
         (showRes ? '<button class="al-btn danger"  data-al-action="resolve" data-al-id="' + esc(a.id) + '">Resolve</button>' : "") +
@@ -7855,8 +7868,8 @@
     return (
       '<table class="al-table ds-table">' +
       "<thead><tr>" +
-      "<th>Time</th><th>Severity</th><th>Source</th><th>Symbol / Account</th>" +
-      "<th>Event</th><th class='num'>Current</th><th class='num'>Threshold</th>" +
+      "<th>Time</th><th>Severity</th><th>Source</th><th>Symbol</th>" +
+      "<th>Message</th><th class='num'>Current</th><th class='num'>Threshold</th>" +
       "<th>Status</th><th>Action</th>" +
       "</tr></thead>" +
       '<tbody id="al-tbody">' + renderAlRows() + "</tbody>" +
@@ -7864,33 +7877,58 @@
     );
   }
   function refreshAlTable() {
+    var fh = document.getElementById("al-filters");
+    if (fh) fh.innerHTML = renderAlFilters();
+    bindAlFilters();
     var tb = document.getElementById("al-tbody");
     if (tb) tb.innerHTML = renderAlRows();
   }
 
-  // ── Alert detail panel ──────────────────────────────────────────
+  // ── Alert detail panel (with related event chain) ───────────────
   function renderAlDetail() {
     var a = alFind(AL_STATE.selectedId);
-    function kv(d, k, v) {
+    if (!a) {
       return (
-        "<dt>" + esc(k) + "</dt>" +
-        "<dd>" + esc(d ? String(d[k]) : v) + "</dd>"
+        '<div class="al-detail">' +
+        '<div class="empty" style="padding:var(--ds-space-4);">No alert selected / 未选择告警</div>' +
+        "</div>"
       );
     }
-    var showAck = a.status !== "RESOLVED" && a.status !== "ACKNOWLEDGED";
-    var showRes = a.status !== "RESOLVED";
+    function kv(k, v, cls) {
+      return (
+        "<dt>" + esc(k) + "</dt>" +
+        "<dd" + (cls ? " style='" + cls + "'" : "") + ">" + esc(v) + "</dd>"
+      );
+    }
+    var st = alStatus(a);
+    var showAck = st === "TRIGGERED";
+    var showRes = st !== "RESOLVED";
+    // why it fired: signal → risk → order chain from the event bus
+    var evts = (a.events || []).map(function (e) {
+      return (
+        '<div class="mo-event-item">' +
+        '<span class="mo-event-time">' + esc(moFmtClock(e.timestamp)) + "</span>" +
+        '<span class="mo-event-text">' + esc(e.text) + "</span>" +
+        "</div>"
+      );
+    }).join("");
+    if (!evts) {
+      evts = '<div class="empty" style="padding:var(--ds-space-2);font-size:var(--ds-text-sm);">' +
+             "No related events on the bus for this alert / 无关联事件</div>";
+    }
     return (
       '<div class="al-detail">' +
       // Header
       '<div class="al-detail-head">' +
       "<div>" +
       '<div class="al-detail-title">' +
-      '<span class="al-sev ' + esc(a.sev) + '" style="margin-right:8px;vertical-align:middle;">' + esc(a.sev) + "</span>" +
-      esc(a.event) +
-      '<span class="al-status ' + esc(a.status) + '" style="margin-left:10px;vertical-align:middle;">' + esc(a.status) + "</span>" +
+      '<span class="al-sev ' + esc(a.severity) + '" style="margin-right:8px;vertical-align:middle;">' + esc(a.severity) + "</span>" +
+      esc(a.message) +
+      '<span class="al-status ' + esc(st) + '" style="margin-left:10px;vertical-align:middle;">' + esc(st) + "</span>" +
       "</div>" +
       '<div class="al-detail-meta">' +
-      esc(a.id) + " · " + esc(a.time) + " · Source " + esc(a.source) + " · Symbol " + esc(a.symbol) + " / Account " + esc(a.account) +
+      esc(a.id) + " · " + esc(moFmtClock(a.timestamp)) + " · Source " + esc(a.source) +
+      (a.symbol ? " · Symbol " + esc(a.symbol) : "") +
       "</div>" +
       "</div>" +
       '<div class="al-detail-actions">' +
@@ -7899,66 +7937,30 @@
       "</div>" +
       "</div>" +
 
-      // Body grid: left = Cause + Before/After; right = Related + Links
+      // Body grid: left = message + context; right = related events
       '<div class="al-detail-grid">' +
-      // Trigger reason
       "<div>" +
-      '<div class="al-detail-section-title">Trigger Reason · 触发原因</div>' +
-      '<div style="font-size:var(--ds-text-sm);color:var(--ds-text-primary);line-height:1.6;">' + esc(a.cause) + "</div>" +
+      '<div class="al-detail-section-title">Alert Message · 告警内容</div>' +
+      '<div style="font-size:var(--ds-text-sm);color:var(--ds-text-primary);line-height:1.6;">' +
+      esc(a.message) +
+      (a.reason ? '<div style="margin-top:4px;color:var(--ds-text-muted);">Reason: ' + esc(a.reason) + "</div>" : "") +
+      "</div>" +
 
-      '<div class="al-detail-section-title">Triggered Data · 触发前后数据</div>' +
-      '<dl class="al-detail-kv" style="grid-template-columns: 120px 1fr 1fr;">' +
-      "<dt>Metrics</dt><dd><b>Before</b></dd><dd><b>After</b></dd>" +
-      "<dt>P&L</dt>"       + kv(a.before, "pnl", "—") + kv(a.after, "pnl", "—") +
-      (a.before.var
-        ? "<dt>VaR</dt>"     + kv(a.before, "var", "—") + kv(a.after, "var", "—")
-        : "") +
-      (a.before.weight
-        ? "<dt>Weight</dt>"  + kv(a.before, "weight", "—") + kv(a.after, "weight", "—")
-        : "") +
-      (a.before.latency_p95
-        ? "<dt>Latency P95</dt>" + kv(a.before, "latency_p95", "—") + kv(a.after, "latency_p95", "—")
-        : "") +
-      (a.before.dd_30d
-        ? "<dt>DD 30d</dt>"  + kv(a.before, "dd_30d", "—") + kv(a.after, "dd_30d", "—")
-        : "") +
-      (a.before.svc
-        ? "<dt>Service</dt>" + kv(a.before, "svc", "—") + kv(a.after, "svc", "—")
-        : "") +
-      (a.before.qty
-        ? "<dt>Qty</dt>"     + kv(a.before, "qty", "—") + kv(a.after, "qty", "—")
-        : "") +
-      (a.before.pos
-        ? "<dt>Position</dt>" + kv(a.before, "pos", "—") + kv(a.after, "pos", "—")
-        : "") +
-      (a.before.fills
-        ? "<dt>Fills</dt>"   + kv(a.before, "fills", "—") + kv(a.after, "fills", "—")
-        : "") +
-      (a.before.signal
-        ? "<dt>Signal</dt>"  + kv(a.before, "signal", "—") + kv(a.after, "signal", "—")
-        : "") +
-      (a.before.intraday
-        ? "<dt>Intraday</dt>" + kv(a.before, "intraday", "—") + kv(a.after, "intraday", "—")
-        : "") +
+      '<div class="al-detail-section-title">Context · 当前值 / 阈值</div>' +
+      '<dl class="al-detail-kv">' +
+      kv("Current", a.current || "—",
+         "color:var(--ds-loss);font-weight:var(--ds-font-semibold);") +
+      kv("Threshold", a.threshold || "—") +
+      kv("Created", moFmtClock(a.timestamp)) +
+      kv("Source", a.source) +
       "</dl>" +
       "</div>" +
 
-      // Related scope
       "<div>" +
-      '<div class="al-detail-section-title">Related · 相关账户 / 策略 / 持仓</div>' +
-      '<dl class="al-detail-kv">' +
-      kv(a.related, "account",  "—") +
-      kv(a.related, "strategy", "—") +
-      kv(a.related, "position", "—") +
-      "<dt>Current</dt><dd style='color:var(--ds-loss);font-weight:var(--ds-font-semibold);'>" + esc(a.value) + "</dd>" +
-      "<dt>Threshold</dt><dd>" + esc(a.threshold) + "</dd>" +
-      "</dl>" +
-
-      '<div class="al-detail-section-title">Deep Links · 跳转关联页面</div>' +
-      '<div class="al-detail-links">' +
-      a.links.map(function (l) {
-        return '<button type="button" class="al-link">' + esc(l) + "</button>";
-      }).join("") +
+      '<div class="al-detail-section-title">Related Events · 关联事件链路</div>' +
+      '<div class="mo-event-list">' + evts + "</div>" +
+      '<div style="font-size:var(--ds-text-xs);color:var(--ds-text-muted);margin-top:6px;">' +
+      "Acknowledge / Resolve are session-local — the runtime has no alert store." +
       "</div>" +
       "</div>" +
       "</div>" +
@@ -7969,8 +7971,37 @@
     var h = document.getElementById("al-detail");
     if (h) h.innerHTML = renderAlDetail();
   }
+  function refreshAlOverview() {
+    var h = document.getElementById("al-overview");
+    if (h) h.outerHTML = renderAlOverview();
+  }
 
   // ── Bindings ────────────────────────────────────────────────────
+  function alApplyAction(id, action) {
+    var target = alFind(id);
+    if (!target) return;
+    if (action === "ack") AL_STATE.acked[target.id] = true;
+    if (action === "resolve") {
+      AL_STATE.resolved[target.id] = true;
+      delete AL_STATE.acked[target.id];
+    }
+    AL_STATE.selectedId = target.id;
+    refreshAlOverview();
+    refreshAlTable();
+    refreshAlDetail();
+  }
+
+  function bindAlFilters() {
+    var btns = document.querySelectorAll("[data-al-filter]");
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        AL_STATE[b.getAttribute("data-al-filter-group")] =
+          b.getAttribute("data-al-filter");
+        refreshAlTable();
+      });
+    });
+  }
+
   function bindAlertsPage() {
     var tbody = document.getElementById("al-tbody");
     if (tbody) {
@@ -7979,14 +8010,8 @@
         var row = e.target.closest("tr[data-al-id]");
         if (actBtn) {
           e.stopPropagation();
-          var id = actBtn.getAttribute("data-al-id");
-          var action = actBtn.getAttribute("data-al-action");
-          var target = alFind(id);
-          if (target && action === "ack")     target.status = "ACKNOWLEDGED";
-          if (target && action === "resolve") target.status = "RESOLVED";
-          AL_STATE.selectedId = id;
-          refreshAlTable();
-          refreshAlDetail();
+          alApplyAction(actBtn.getAttribute("data-al-id"),
+                        actBtn.getAttribute("data-al-action"));
           return;
         }
         if (!row) return;
@@ -8001,30 +8026,63 @@
       detail.addEventListener("click", function (e) {
         var b = e.target.closest("[data-al-action]");
         if (!b) return;
-        var id = b.getAttribute("data-al-id");
-        var action = b.getAttribute("data-al-action");
-        var target = alFind(id);
-        if (target && action === "ack")     target.status = "ACKNOWLEDGED";
-        if (target && action === "resolve") target.status = "RESOLVED";
-        refreshAlTable();
-        refreshAlDetail();
+        alApplyAction(b.getAttribute("data-al-id"),
+                      b.getAttribute("data-al-action"));
+      });
+    }
+    bindAlFilters();
+    // Toolbar refresh (keeps session Ack/Resolve state: ids are stable)
+    var refresh = document.getElementById("al-refresh");
+    if (refresh) {
+      refresh.addEventListener("click", function () {
+        alLoadCenter(true).then(function () { renderAlertsPageInto(); });
       });
     }
   }
 
-  // ── Alerts page (Commit 019) — new system page ──────────────────
-  PAGE_FRAMEWORK["alerts"] = function () {
+  function renderAlPage() {
+    if (AL_STATE.error) {
+      return UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
+        '<div class="ds-error">' + esc(AL_STATE.error) + "</div>";
+    }
+    var o = alData().overview || {};
     return (
       UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
+      '<div class="ds-toolbar">' +
+        '<button id="al-refresh" class="btn btn-secondary btn-sm">Refresh</button>' +
+        '<span class="ds-toolbar-meta">Generated: ' + esc(moFmtClock(o.generated_at)) + "</span>" +
+      "</div>" +
       UI.sectionHeading("Alert Overview") +
       renderAlOverview() +
-      UI.sectionHeading("Alert Rules") +
-      UI.panel("8 Rule Types · Pricing, P&L, Risk, Execution, System, Signal…", renderAlRules()) +
+      UI.sectionHeading("Alert Sources") +
+      UI.panel("Alert Capabilities · Reconciliation, Position Limit, Service Health, Risk Rejections", renderAlSources()) +
       UI.sectionHeading("Alert Table") +
-      UI.panel("Events · Severity · Status · Actions", renderAlTable()) +
+      UI.panel("Events · Severity · Status · Actions",
+               '<div id="al-filters">' + renderAlFilters() + "</div>" + renderAlTable()) +
       UI.sectionHeading("Alert Detail") +
       '<div id="al-detail">' + renderAlDetail() + "</div>"
     );
+  }
+
+  function renderAlertsPageInto() {
+    var host = document.getElementById("al-page");
+    if (!host) return;
+    host.innerHTML = renderAlPage();
+    bindAlertsPage();
+  }
+
+  // ── Alerts page (Integration 015) — async hydrate ────────────────
+  PAGE_FRAMEWORK["alerts"] = function () {
+    if (!AL_STATE.data && !AL_STATE.error) {
+      alLoadCenter().then(function () { renderAlertsPageInto(); });
+      return (
+        '<div id="al-page">' +
+        (UI.pageHeader("Alerts", "Unified alert center · 统一告警中心") +
+         '<div class="ds-loading">Loading alert center…</div>') +
+        "</div>"
+      );
+    }
+    return '<div id="al-page">' + renderAlPage() + "</div>";
   };
 
 

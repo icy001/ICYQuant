@@ -486,6 +486,15 @@
       return this.get("/dashboard/monitoring/center");
     },
 
+    // ── Alerts API (Integration 015) ──────────────────────────
+    /** Alert Center: overview counts → alert capability sources →
+     *  alert rows with current/threshold context and the related
+     *  signal → risk → order event chain. Read-only view over the
+     *  existing runtime.alerts() capability — no new alert rules. */
+    alertsCenter: async function () {
+      return this.get("/dashboard/alerts/center");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.
