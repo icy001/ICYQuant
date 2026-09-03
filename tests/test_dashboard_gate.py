@@ -2113,5 +2113,61 @@ def test_d34_alert_disposition_api(attached_pipeline):
         assert any(e["actor"] == "admin" for e in acked)
         assert any(e["actor"] == "admin" for e in solved)
     finally:
-        # keep the process-level singleton clean for the other tests
+        # keep the singleton clean for the other tests
         alert_state.reset()
+
+
+def test_d34_alert_persistence_across_restart(tmp_path):
+    """Phase 1 criterion #6: dispositions survive a process restart.
+
+    A fresh ``AlertStateStore`` pointed at the same SQLite file (the
+    restart-equivalent) must hydrate the previously-written ACK and
+    RESOLVE records — proving this is real persistence, not in-memory
+    state. Idempotency (first actor + timestamp) is preserved across
+    the restart boundary.
+    """
+    from apps.dashboard.alert_state import (
+        AlertStateStore,
+        STATUS_ACKNOWLEDGED,
+        STATUS_RESOLVED,
+        STATUS_TRIGGERED,
+    )
+
+    db = tmp_path / "dispositions.db"
+
+    # --- "process 1": ack then resolve, then "die" ---------------------
+    s1 = AlertStateStore(db_path=db)
+    assert s1.status_of("ALT-restart") == STATUS_TRIGGERED
+    ack_rec = s1.ack("ALT-restart", "operator")
+    assert s1.status_of("ALT-restart") == STATUS_ACKNOWLEDGED
+    assert ack_rec.actor == "operator"
+    res_rec = s1.resolve("ALT-restart", "admin")
+    assert s1.status_of("ALT-restart") == STATUS_RESOLVED
+    assert res_rec.actor == "admin"
+    first_resolve_at = res_rec.timestamp
+    s1.close()
+
+    # --- "process 2": fresh store, same DB file (simulates restart) ----
+    s2 = AlertStateStore(db_path=db)
+    # the resolve survived the restart
+    assert s2.status_of("ALT-restart") == STATUS_RESOLVED
+    rec = s2.record_of("ALT-restart")
+    assert rec.action == "RESOLVE"
+    assert rec.actor == "admin"            # first actor preserved
+    assert rec.timestamp == first_resolve_at  # first timestamp preserved
+    # re-ack after restart is still a no-op (resolve is terminal)
+    assert s2.ack("ALT-restart", "operator") is s2.record_of("ALT-restart")
+    assert s2.status_of("ALT-restart") == STATUS_RESOLVED
+    # a second alert only acked in process 1 also survives
+    s2.close()
+
+    # --- reset clears the durable store too ----------------------------
+    s3 = AlertStateStore(db_path=db)
+    s3.ack("ALT-x", "operator")
+    assert s3.status_of("ALT-x") == STATUS_ACKNOWLEDGED
+    s3.reset()
+    s3.close()
+    s4 = AlertStateStore(db_path=db)
+    assert s4.status_of("ALT-x") == STATUS_TRIGGERED  # reset was durable
+    assert s4.status_of("ALT-restart") == STATUS_TRIGGERED
+    s4.close()

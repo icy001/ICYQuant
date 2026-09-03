@@ -1159,9 +1159,10 @@ def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
     three-tier severity vocabulary (CRITICAL / WARNING / INFO).
 
     Alert dispositions (Phase 1 persistence): rows are derived per
-    request, then merged with the process-level AlertStateStore —
-    TRIGGERED → ACKNOWLEDGED → RESOLVED survives refreshes and is
-    shared across sessions (see apps/dashboard/alert_state.py).
+    request, then merged with the SQLite-backed AlertStateStore —
+    TRIGGERED → ACKNOWLEDGED → RESOLVED survives refreshes and
+    restarts and is shared across sessions (see
+    apps/dashboard/alert_state.py).
     """
     raw = runtime.alerts()
     sev_map = {"CRITICAL": "CRITICAL", "HIGH": "CRITICAL",
