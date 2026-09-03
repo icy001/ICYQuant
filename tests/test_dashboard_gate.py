@@ -1938,3 +1938,180 @@ def test_d33_no_mock_leakage(attached_pipeline):
         set(row) >= {"name", "current", "limit", "fmt", "status"}
         for row in limits
     )
+
+
+# ============================================================================
+# Alert Persistence Phase 1 — D-34 (AlertStateStore / ack / resolve)
+# ============================================================================
+
+def test_d34_alert_state_store_semantics():
+    """Phase 1 ledger semantics (pure unit, fresh store — no globals).
+
+    TRIGGERED → ACKNOWLEDGED → RESOLVED, resolve is terminal, both
+    actions idempotent keeping the first actor + timestamp."""
+    from apps.dashboard.alert_state import (
+        AlertStateStore,
+        STATUS_ACKNOWLEDGED,
+        STATUS_RESOLVED,
+        STATUS_TRIGGERED,
+    )
+
+    store = AlertStateStore()
+    assert store.status_of("ALT-x") == STATUS_TRIGGERED   # unknown -> triggered
+
+    # ack keeps the FIRST record on re-ack (even by another actor)
+    first = store.ack("ALT-x", "operator")
+    assert first.action == "ACK" and first.actor == "operator"
+    assert store.status_of("ALT-x") == STATUS_ACKNOWLEDGED
+    again = store.ack("ALT-x", "admin")
+    assert again is first                                  # same object, no overwrite
+    assert len(store) == 1
+
+    # resolve overrides ack; re-resolve keeps the first resolve
+    resolved = store.resolve("ALT-x", "admin")
+    assert resolved.action == "RESOLVE" and resolved.actor == "admin"
+    assert store.status_of("ALT-x") == STATUS_RESOLVED
+    assert store.resolve("ALT-x", "operator") is resolved  # idempotent
+
+    # ack after resolve is a no-op (resolve is terminal)
+    assert store.ack("ALT-x", "operator") is resolved
+    assert store.status_of("ALT-x") == STATUS_RESOLVED
+
+
+def test_d34_alert_disposition_api(attached_pipeline):
+    """Phase 1 endpoints: POST ack / resolve against the process-level
+    store, merged into the Alert Center rows; status flow survives a
+    re-read (refresh-equivalent), counts stay consistent, RBAC + audit
+    + 404 enforced."""
+    from apps.dashboard.alert_state import alert_state
+
+    operator = _login("operator", "operator123")
+    admin = _login("admin", "admin123")
+    h_op, h_adm = _headers(operator), _headers(admin)
+
+    try:
+        # --- pick the deterministic TSLA risk-rejection alert ---------
+        center = client.get("/api/dashboard/alerts/center",
+                            headers=h_op).json()
+        alerts = center["alerts"]
+        assert alerts, "fixture produced no alerts"
+        target = next(a for a in alerts if a["symbol"] == "TSLA")
+        other = next(a for a in alerts if a["id"] != target["id"])
+        alert_id = target["id"]
+
+        # baseline: TRIGGERED, no disposition, counts zeroed
+        assert target["status"] == "TRIGGERED"
+        assert target["disposition"] is None
+        ov = center["overview"]
+        assert ov["acknowledged"] == 0 and ov["resolved"] == 0
+
+        # --- TRIGGERED → ACKNOWLEDGED ----------------------------------
+        res = client.post(f"/api/dashboard/alerts/{alert_id}/ack",
+                          headers=h_op)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["ok"] is True
+        assert body["alert_id"] == alert_id
+        assert body["status"] == "ACKNOWLEDGED"
+        assert body["disposition"]["action"] == "ACK"
+        assert body["disposition"]["by"] == "operator"
+        assert body["disposition"]["at"]
+
+        # refresh-equivalent: re-deriving the center keeps the state
+        center = client.get("/api/dashboard/alerts/center",
+                            headers=h_op).json()
+        target = next(a for a in center["alerts"] if a["id"] == alert_id)
+        assert target["status"] == "ACKNOWLEDGED"
+        assert target["disposition"]["by"] == "operator"
+        ov = center["overview"]
+        assert ov["acknowledged"] == 1 and ov["resolved"] == 0
+        assert ov["active"] == len(center["alerts"])
+
+        # re-ack by admin keeps the first ack (idempotent, first actor)
+        res = client.post(f"/api/dashboard/alerts/{alert_id}/ack",
+                          headers=h_adm)
+        assert res.status_code == 200
+        assert res.json()["disposition"]["by"] == "operator"
+
+        # --- ACKNOWLEDGED → RESOLVED (terminal) ------------------------
+        res = client.post(f"/api/dashboard/alerts/{alert_id}/resolve",
+                          headers=h_adm)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["status"] == "RESOLVED"
+        assert body["disposition"]["action"] == "RESOLVE"
+        assert body["disposition"]["by"] == "admin"
+
+        center = client.get("/api/dashboard/alerts/center",
+                            headers=h_op).json()
+        rows = center["alerts"]
+        target = next(a for a in rows if a["id"] == alert_id)
+        assert target["status"] == "RESOLVED"
+
+        # counts consistent with the merged rows
+        ov = center["overview"]
+        assert ov["acknowledged"] == sum(
+            1 for a in rows if a["status"] == "ACKNOWLEDGED")
+        assert ov["resolved"] == sum(
+            1 for a in rows if a["status"] == "RESOLVED")
+        assert ov["active"] == sum(
+            1 for a in rows if a["status"] != "RESOLVED")
+
+        # ack after resolve is a no-op; re-resolve keeps the first record
+        first_resolve_at = target["disposition"]["at"]
+        res = client.post(f"/api/dashboard/alerts/{alert_id}/ack",
+                          headers=h_op)
+        assert res.status_code == 200
+        assert res.json()["status"] == "RESOLVED"
+        assert res.json()["disposition"]["action"] == "RESOLVE"
+        res = client.post(f"/api/dashboard/alerts/{alert_id}/resolve",
+                          headers=h_op)
+        assert res.json()["disposition"]["at"] == first_resolve_at
+
+        # --- 404: disposition for an unknown alert id -------------------
+        assert client.post("/api/dashboard/alerts/ALT-nope0/ack",
+                           headers=h_op).status_code == 404
+        assert client.post("/api/dashboard/alerts/ALT-nope0/resolve",
+                           headers=h_op).status_code == 404
+
+        # --- RBAC: control op is OPERATOR/ADMIN only --------------------
+        # unauthenticated -> 401
+        assert client.post(
+            f"/api/dashboard/alerts/{other['id']}/ack").status_code == 401
+        # trader / readonly (view roles) -> 403
+        for username, password in (("trader", "trader123"),
+                                   ("readonly", "readonly123")):
+            tok = _login(username, password)
+            assert client.post(
+                f"/api/dashboard/alerts/{other['id']}/ack",
+                headers=_headers(tok)).status_code == 403
+            assert client.post(
+                f"/api/dashboard/alerts/{other['id']}/resolve",
+                headers=_headers(tok)).status_code == 403
+
+        # denied attempts never mutated the store
+        center = client.get("/api/dashboard/alerts/center",
+                            headers=h_op).json()
+        other_row = next(a for a in center["alerts"]
+                         if a["id"] == other["id"])
+        assert other_row["status"] == "TRIGGERED"
+        assert other_row["disposition"] is None
+
+        # --- audit trail: dispositions are audited ----------------------
+        log = client.get("/api/dashboard/audit-log?limit=1000",
+                         headers=h_op).json()
+        acked = [e for e in log["entries"]
+                 if e["target"] == alert_id
+                 and e["details"].get("action") == "alert_ack"]
+        solved = [e for e in log["entries"]
+                  if e["target"] == alert_id
+                  and e["details"].get("action") == "alert_resolve"]
+        assert acked, "ack disposition missing from the audit log"
+        assert solved, "resolve disposition missing from the audit log"
+        # every entry carries the acting principal (re-attempts included)
+        assert any(e["actor"] == "operator" for e in acked)
+        assert any(e["actor"] == "admin" for e in acked)
+        assert any(e["actor"] == "admin" for e in solved)
+    finally:
+        # keep the process-level singleton clean for the other tests
+        alert_state.reset()
