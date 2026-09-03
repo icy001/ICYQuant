@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from apps.dashboard import runtime
+from apps.dashboard.alert_state import alert_state
 from apps.dashboard.auth import Principal, auth, require_roles
 from apps.runtime.paper_trading import (
     PaperAccount,
@@ -1131,6 +1132,22 @@ def _alert_events(symbol: str) -> list[dict]:
     return out
 
 
+def _alert_id(source: str, message: str) -> str:
+    """Stable id per (source, message) so selection keeps pointing at
+    the same row across refreshes — and so dispositions recorded in
+    the AlertStateStore key on content, not on row order."""
+    digest = hashlib.sha1(f"{source}|{message}".encode()).hexdigest()[:6]
+    return f"ALT-{digest}"
+
+
+def _current_alert_ids() -> set[str]:
+    """Ids of the alerts runtime.alerts() currently derives."""
+    return {
+        _alert_id(a.get("source", "system"), a.get("message", ""))
+        for a in runtime.alerts()
+    }
+
+
 @router.get("/dashboard/alerts/center")
 def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
     """Alert Center aggregation — read-only view over the existing
@@ -1140,8 +1157,11 @@ def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
 
     HIGH runtime levels are surfaced as CRITICAL so the UI keeps its
     three-tier severity vocabulary (CRITICAL / WARNING / INFO).
-    Ack/Resolve are UI-session state — the runtime has no alert
-    store, and 015 does not add one.
+
+    Alert dispositions (Phase 1 persistence): rows are derived per
+    request, then merged with the process-level AlertStateStore —
+    TRIGGERED → ACKNOWLEDGED → RESOLVED survives refreshes and is
+    shared across sessions (see apps/dashboard/alert_state.py).
     """
     raw = runtime.alerts()
     sev_map = {"CRITICAL": "CRITICAL", "HIGH": "CRITICAL",
@@ -1149,22 +1169,25 @@ def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
 
     alert_rows: list[dict] = []
     counts = {"CRITICAL": 0, "WARNING": 0, "INFO": 0}
+    status_counts = {"TRIGGERED": 0, "ACKNOWLEDGED": 0, "RESOLVED": 0}
     for alert in raw:
         sev = sev_map.get(alert.get("level", "INFO"), "INFO")
         counts[sev] = counts.get(sev, 0) + 1
         source = alert.get("source", "system")
         message = alert.get("message", "")
         ctx = _alert_context(message)
-        # stable id per (source, message) so selection keeps pointing
-        # at the same row across refreshes
-        digest = hashlib.sha1(f"{source}|{message}".encode()).hexdigest()[:6]
+        alert_id = _alert_id(source, message)
+        status = alert_state.status_of(alert_id)
+        status_counts[status] += 1
+        record = alert_state.record_of(alert_id)
         alert_rows.append({
-            "id": f"ALT-{digest}",
+            "id": alert_id,
             "timestamp": _iso_or_str(alert.get("timestamp")),
             "severity": sev,
             "source": source,
             "message": message,
-            "status": "TRIGGERED",
+            "status": status,
+            "disposition": record.as_dict() if record else None,
             "symbol": ctx["symbol"],
             "account": ctx["account"],
             "strategy": ctx["strategy"],
@@ -1201,10 +1224,13 @@ def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
 
     return {
         "overview": {
-            "active": len(alert_rows),
+            # active = open alerts (triggered + acknowledged, no resolve)
+            "active": len(alert_rows) - status_counts["RESOLVED"],
             "critical": counts["CRITICAL"],
             "warning": counts["WARNING"],
             "info": counts["INFO"],
+            "acknowledged": status_counts["ACKNOWLEDGED"],
+            "resolved": status_counts["RESOLVED"],
             "pipeline_attached": runtime.attached(),
             "generated_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -1216,6 +1242,82 @@ def alerts_center(principal: Principal = Depends(require_roles())) -> dict:
         },
         "alerts": alert_rows,
     }
+
+
+# ── Alert dispositions (Alert Persistence Phase 1) ──────────────────
+# Process-level ack/resolve against the stable ALT- digests. RBAC and
+# audit follow the platform's control-operation pattern (session
+# start/stop, accounts sync): OPERATOR/ADMIN only, AuditCenter trail.
+class _AlertActionRequest(BaseModel):
+    """Optional note attached to the disposition (audited, not stored)."""
+    note: str = ""
+
+
+def _disposition_response(alert_id: str, record) -> dict:
+    return {
+        "ok": True,
+        "alert_id": alert_id,
+        "status": alert_state.status_of(alert_id),
+        "disposition": record.as_dict(),
+    }
+
+
+@router.post("/dashboard/alerts/{alert_id}/ack")
+def alert_ack(
+    alert_id: str,
+    request: Request,
+    body: Optional[_AlertActionRequest] = None,
+    principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
+) -> dict:
+    """Acknowledge an alert: TRIGGERED → ACKNOWLEDGED.
+
+    Idempotent (re-ack keeps the first record) and a no-op when the
+    alert is already RESOLVED. 404 when the alert is not currently
+    derived by the runtime — dispositions are never invented for
+    unknown ids.
+    """
+    if alert_id not in _current_alert_ids():
+        raise HTTPException(status_code=404, detail="Alert not found")
+    record = alert_state.ack(alert_id, principal.username)
+    auth.record(
+        AuditAction.ADMIN_ACTION,
+        principal,
+        target=alert_id,
+        severity=AuditSeverity.INFO,
+        details={"action": "alert_ack",
+                 "result": record.action,
+                 "note": (body.note if body else "")},
+        ip_address=_client_ip(request),
+    )
+    return _disposition_response(alert_id, record)
+
+
+@router.post("/dashboard/alerts/{alert_id}/resolve")
+def alert_resolve(
+    alert_id: str,
+    request: Request,
+    body: Optional[_AlertActionRequest] = None,
+    principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
+) -> dict:
+    """Resolve an alert: → RESOLVED (terminal).
+
+    Overrides an earlier ACK, idempotent (re-resolve keeps the first
+    record). 404 when the alert is not currently derived.
+    """
+    if alert_id not in _current_alert_ids():
+        raise HTTPException(status_code=404, detail="Alert not found")
+    record = alert_state.resolve(alert_id, principal.username)
+    auth.record(
+        AuditAction.ADMIN_ACTION,
+        principal,
+        target=alert_id,
+        severity=AuditSeverity.INFO,
+        details={"action": "alert_resolve",
+                 "result": record.action,
+                 "note": (body.note if body else "")},
+        ip_address=_client_ip(request),
+    )
+    return _disposition_response(alert_id, record)
 
 
 def _iso_or_str(value) -> str:
