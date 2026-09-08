@@ -2556,6 +2556,7 @@
     "#/research/strategies": { group: "research", navKey: "research/strategies", label: "Strategies", zh: "策略", desc: "Strategy management" },
     "#/research/backtest": { group: "research", navKey: "research/backtest", label: "Backtest", zh: "回测", desc: "Backtest workspace" },
     "#/research/factors": { group: "research", navKey: "research/factors", label: "Factor Discovery", zh: "因子发现", desc: "Factor discovery engine" },
+    "#/trading/universe": { group: "trading", navKey: "trading/universe", label: "Universe", zh: "标的池", desc: "Trading instrument master" },
     "#/trading/paper": { group: "trading", navKey: "trading/paper", label: "Paper Trading", zh: "模拟", desc: "Paper trading workspace" },
     "#/trading/orders": { group: "trading", navKey: "trading/orders", label: "Orders", zh: "订单", desc: "Order management" },
     "#/trading/positions": { group: "trading", navKey: "trading/positions", label: "Positions", zh: "持仓", desc: "Position management" },
@@ -5245,6 +5246,68 @@
     quote: null,          // last useQuote() result
     sessionRunning: false,
     submitting: false,    // duplicate-submit lock
+  };
+
+  // ── Trading Universe page (Commit 002) ─────────────────────
+  PAGE_FRAMEWORK["trading/universe"] = async function () {
+    var data;
+    try {
+      data = await ICY_API.tradingUniverse();
+    } catch (e) {
+      return UI.pageHeader("Trading Universe", "交易标的池", "trading/universe") +
+        UI.stateError("Universe API unavailable",
+          (e.message || String(e)) + " · The Instrument Master API did not respond.",
+          "Retry", "nav:trading/universe");
+    }
+    var instruments = data.universe || [];
+    if (!instruments.length) {
+      return UI.pageHeader("Trading Universe", "交易标的池", "trading/universe") +
+        UI.stateEmpty("No instruments registered",
+          "The Instrument Master is empty. / 标的池为空");
+    }
+
+    var rows = instruments.map(function (inst) {
+      return (
+        '<tr class="uni-row" data-symbol="' + esc(inst.symbol) + '">' +
+        '<td class="t-num">' + esc(inst.symbol) + '</td>' +
+        '<td>' + esc(inst.name) + '</td>' +
+        '<td>' + esc(inst.exchange) + '</td>' +
+        '<td>' + esc(inst.instrument_type) + '</td>' +
+        '<td class="t-num">' + esc(inst.currency) + '</td>' +
+        '<td class="t-num">' + inst.lot_size + '</td>' +
+        '<td class="t-num">' + esc(inst.tick_size) + '</td>' +
+        '<td>' + (inst.enabled
+          ? '<span class="ds-badge ds-badge-ok">ENABLED</span>'
+          : '<span class="ds-badge ds-badge-warn">DISABLED</span>') +
+        '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    var tableHtml =
+      '<div class="ds-table-wrap">' +
+      '<table class="ds-table">' +
+      '<thead><tr>' +
+      '<th>Symbol</th><th>Name</th><th>Exchange</th><th>Type</th>' +
+      '<th>Currency</th><th>Lot Size</th><th>Tick Size</th><th>Status</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '</table></div>';
+
+    var kpiHtml = UI.kpiGrid([
+      { label: "Instruments", value: data.count, hint: "Total registered" },
+      { label: "Exchanges", value: (data.exchanges || []).join(", "), hint: "SZSE + SSE" },
+      { label: "Types", value: (data.instrument_types || []).join(", "), hint: "ETF / QDII-ETF / LOF / QDII-LOF" },
+      { label: "Currency", value: data.currency || "CNY", hint: "All instruments" },
+    ]);
+
+    return (
+      UI.pageHeader("Trading Universe", "交易标的池 — A-share ETF / LOF Instrument Master", "trading/universe") +
+      kpiHtml +
+      UI.sectionHeading("Instrument Master") +
+      UI.panel("Registered Instruments / 已注册标的", tableHtml,
+        { actions: UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/universe" }) })
+    );
   };
 
   PAGE_FRAMEWORK["trading/paper"] = async function () {

@@ -76,8 +76,8 @@ class TestInferType:
     def test_qdii_etf_513310(self):
         assert Instrument.infer_type("513310") == InstrumentType.QDII_ETF
 
-    def test_qdii_etf_159871(self):
-        assert Instrument.infer_type("159871") == InstrumentType.QDII_ETF
+    def test_etf_159871(self):
+        assert Instrument.infer_type("159871") == InstrumentType.ETF
 
     def test_qdii_lof_165520(self):
         assert Instrument.infer_type("165520") == InstrumentType.QDII_LOF
@@ -85,8 +85,8 @@ class TestInferType:
     def test_qdii_lof_501225(self):
         assert Instrument.infer_type("501225") == InstrumentType.QDII_LOF
 
-    def test_lof_161116(self):
-        assert Instrument.infer_type("161116") == InstrumentType.LOF
+    def test_qdii_lof_161116(self):
+        assert Instrument.infer_type("161116") == InstrumentType.QDII_LOF
 
     def test_etf_default_15(self):
         assert Instrument.infer_type("159852") == InstrumentType.ETF

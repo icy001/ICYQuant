@@ -2115,3 +2115,55 @@ def test_d34_alert_disposition_api(attached_pipeline):
     finally:
         # keep the process-level singleton clean for the other tests
         alert_state.reset()
+
+
+# ===========================================================================
+# D-35 — Trading Universe / Instrument Master (Commit 002)
+# ===========================================================================
+
+def test_d35_universe_api():
+    """Universe endpoint returns 11 instruments with correct metadata."""
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    res = client.get("/api/dashboard/universe", headers=h)
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    # 11 instruments registered
+    assert data["count"] == 11
+    assert len(data["universe"]) == 11
+
+    # all CNY
+    for inst in data["universe"]:
+        assert inst["currency"] == "CNY"
+        assert inst["lot_size"] == 100
+        assert inst["tick_size"] == "0.001"
+        assert inst["enabled"] is True
+        assert inst["exchange"] in ("SZSE", "SSE")
+        assert inst["instrument_type"] in (
+            "ETF", "QDII-ETF", "LOF", "QDII-LOF"
+        )
+
+    # exchanges and types reported
+    assert set(data["exchanges"]) == {"SSE", "SZSE"}
+    assert set(data["instrument_types"]) == {
+        "ETF", "QDII-ETF", "LOF", "QDII-LOF"
+    }
+    assert data["currency"] == "CNY"
+
+    # verify a few specific symbols
+    by_sym = {i["symbol"]: i for i in data["universe"]}
+    assert by_sym["159852"]["name"] == "软件ETF"
+    assert by_sym["159852"]["exchange"] == "SZSE"
+    assert by_sym["159852"]["instrument_type"] == "ETF"
+
+    assert by_sym["513050"]["exchange"] == "SSE"
+    assert by_sym["513050"]["instrument_type"] == "QDII-ETF"
+
+    assert by_sym["501225"]["instrument_type"] == "QDII-LOF"
+    assert by_sym["161116"]["instrument_type"] == "QDII-LOF"
+    assert by_sym["165520"]["instrument_type"] == "LOF"
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/universe").status_code == 401

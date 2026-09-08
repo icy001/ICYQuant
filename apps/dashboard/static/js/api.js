@@ -495,6 +495,14 @@
       return this.get("/dashboard/alerts/center");
     },
 
+    // ── Instrument Master / Universe (Commit 002) ──────────────
+    /** A-share ETF/LOF trading universe — 11 instruments with
+     *  authoritative metadata (name, exchange, type, lot_size,
+     *  tick_size). No real-time prices yet. */
+    tradingUniverse: async function () {
+      return this.get("/dashboard/universe");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

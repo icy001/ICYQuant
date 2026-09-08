@@ -1417,6 +1417,39 @@ def alerts(principal: Principal = Depends(require_roles())) -> dict:
     return {"alerts": runtime.alerts()}
 
 
+# ===========================================================================
+# Commit 002 — ETF Instrument Master / Universe
+#
+# Single source of truth for the 11 A-share trading instruments.
+# Downstream modules (Strategy, Paper, Dashboard, Adapter) reference
+# this instead of maintaining their own symbol lists.
+# ===========================================================================
+
+
+@router.get("/dashboard/universe")
+def trading_universe(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """A-share ETF/LOF trading universe from Instrument Master.
+
+    Returns the 11 seed symbols with authoritative metadata (name,
+    exchange, instrument_type, currency, lot_size, tick_size, enabled).
+
+    No real-time prices — this is the instrument registry only.
+    Real-time quotes come in Commit 003.
+    """
+    from services.market_data.universe import universe
+
+    instruments = universe.as_list()
+    return {
+        "universe": instruments,
+        "count": len(instruments),
+        "exchanges": sorted({i["exchange"] for i in instruments}),
+        "instrument_types": sorted({i["instrument_type"] for i in instruments}),
+        "currency": "CNY",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Factor paper trading (Alpha021) - deterministic research-layer replay
 # ---------------------------------------------------------------------------

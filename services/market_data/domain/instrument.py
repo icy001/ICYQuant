@@ -8,6 +8,7 @@ QDII products have different trading hours and T+2 settlement).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
@@ -41,9 +42,8 @@ class TradingStatus(str, Enum):
 class Instrument:
     """A single tradable A-share fund instrument.
 
-    Phase 1 keeps the model minimal: symbol + exchange + type +
-    currency + lot_size + trading_status.  Phase 2 (Instrument
-    Master) adds ISIN, underlying, fee structure, etc.
+    Commit 002 extends the model with tick_size and enabled fields
+    for the Instrument Master / Universe registry.
     """
 
     symbol: str
@@ -53,6 +53,8 @@ class Instrument:
     lot_size: int = 100
     trading_status: TradingStatus = TradingStatus.NORMAL
     name: str = ""
+    tick_size: Decimal = Decimal("0.001")
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         if not self.symbol:
@@ -85,11 +87,11 @@ class Instrument:
         Phase 2 (Instrument Master) will store authoritative types.
         """
         # Known QDII-ETFs (cross-border, tracks overseas index)
-        qdii_etf_codes = {"513050", "513310", "159871"}
+        qdii_etf_codes = {"513050", "513310"}
         # Known QDII-LOFs
-        qdii_lof_codes = {"165520", "501225"}
+        qdii_lof_codes = {"165520", "501225", "161116"}
         # Known LOFs (not QDII)
-        lof_codes = {"161116"}
+        lof_codes = set()
 
         if symbol in qdii_etf_codes:
             return InstrumentType.QDII_ETF
