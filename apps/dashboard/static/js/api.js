@@ -525,6 +525,12 @@
       return this.get(q);
     },
 
+    // ── Trading Session (Commit 005) ───────────────────────────
+    /** Current A-share market phase + session + next event. */
+    marketStatus: async function () {
+      return this.get("/dashboard/market-status");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

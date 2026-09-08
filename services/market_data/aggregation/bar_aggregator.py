@@ -129,7 +129,7 @@ class BarAggregator:
     explicit :meth:`close_current`).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, gap_filter: object = None) -> None:
         # symbol → current in-progress bar state
         self._states: dict[str, _BarState] = {}
         # symbol → list of closed bars (history)
@@ -137,6 +137,10 @@ class BarAggregator:
         # symbol → set of missing bar_ids (gaps)
         self._gaps: dict[str, list[str]] = {}
         self._max_history = 500  # per symbol
+        # Optional callable (datetime) -> bool: minutes where the
+        # filter returns False (lunch break, overnight, holidays)
+        # are market closures, not data gaps, and are not recorded.
+        self._gap_filter = gap_filter
 
     def on_quote(
         self, quote: MarketQuote
@@ -168,12 +172,14 @@ class BarAggregator:
         closed_bar = self._close_bar(symbol, state, q_minute)
 
         # Gap detection: if q_minute > state.bar_ts + 1 min, the
-        # intervening minutes have no data.
+        # intervening minutes have no data.  Minutes rejected by the
+        # gap filter (market closures) are not data gaps.
         missing_ids: list[str] = []
         expected = state.bar_ts + timedelta(minutes=1)
         while expected < q_minute:
-            gap_id = f"{symbol}_{expected.strftime('%Y%m%d%H%M')}"
-            missing_ids.append(gap_id)
+            if self._gap_filter is None or self._gap_filter(expected):
+                gap_id = f"{symbol}_{expected.strftime('%Y%m%d%H%M')}"
+                missing_ids.append(gap_id)
             expected += timedelta(minutes=1)
         if missing_ids:
             self._gaps.setdefault(symbol, []).extend(missing_ids)

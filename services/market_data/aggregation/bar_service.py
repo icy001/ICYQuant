@@ -24,21 +24,44 @@ logger = logging.getLogger(__name__)
 
 
 class BarService:
-    """Thread-safe bar storage + aggregation hub."""
+    """Thread-safe bar storage + aggregation hub.
+
+    ``enforce_session`` (Commit 005): when True, quotes outside bar
+    phases (pre-open, auction, lunch break, post-close, non-trading
+    days) are NOT aggregated — no lunch bars, no overnight bars, no
+    phantom bars on holidays.  Market closures are also excluded
+    from gap detection (they are not data gaps).
+
+    Default False so the always-on Mock feed (Phase 1) keeps the
+    Dashboard live outside market hours; real adapters enable it.
+    """
 
     def __init__(
         self,
         *,
         aggregator: Optional[BarAggregator] = None,
         max_bars_per_symbol: int = 500,
+        enforce_session: bool = False,
     ) -> None:
         self._lock = threading.Lock()
+        self._enforce_session = enforce_session
+        if enforce_session:
+            from ..calendar.trading_calendar import calendar
+
+            aggregator = aggregator or BarAggregator(
+                gap_filter=calendar.is_bar_phase
+            )
         self._aggregator = aggregator or BarAggregator()
         self._max_bars = max_bars_per_symbol
 
     def on_quote(self, quote: MarketQuote) -> Optional[tuple[Bar, list[str]]]:
         """Push a quote into aggregation.  Returns (closed_bar,
         missing_ids) when a bar is finalized, else None."""
+        if self._enforce_session:
+            from ..calendar.trading_calendar import calendar
+
+            if not calendar.is_bar_phase(quote.timestamp):
+                return None  # market closure — no bar
         with self._lock:
             return self._aggregator.on_quote(quote)
 

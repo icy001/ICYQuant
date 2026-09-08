@@ -3691,11 +3691,77 @@ tr:focus-within {
   font-family: var(--ds-num-font);
 }
 
+/* ── Market Status (Commit 005) ── */
+.md-market-status {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1.2fr 1fr;
+  gap: var(--ds-space-4);
+  align-items: center;
+}
+.md-ms-title {
+  font-size: var(--ds-text-xs);
+  letter-spacing: 0.08em;
+  color: var(--ds-text-muted);
+  font-weight: var(--ds-font-bold);
+}
+.md-ms-state {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-1);
+}
+.md-ms-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ds-text-muted);
+  flex: none;
+}
+.md-ms-dot-profit   { background: var(--ds-profit); box-shadow: 0 0 8px rgba(0, 229, 160, 0.55); }
+.md-ms-dot-warning  { background: var(--ds-warning); box-shadow: 0 0 8px rgba(255, 176, 32, 0.45); }
+.md-ms-dot-neutral  { background: var(--ds-text-muted); }
+.md-ms-word {
+  font-size: var(--ds-text-xl);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  letter-spacing: 0.04em;
+}
+.md-ms-phase {
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-text-sm);
+  margin-top: 2px;
+}
+.md-ms-block {
+  border-left: 1px solid var(--ds-border);
+  padding-left: var(--ds-space-4);
+  min-width: 0;
+}
+.md-ms-label {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  letter-spacing: 0.05em;
+}
+.md-ms-value {
+  color: var(--ds-text-primary);
+  font-weight: var(--ds-font-bold);
+  font-size: var(--ds-text-sm);
+  margin-top: 2px;
+}
+.md-ms-sub {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  margin-top: 2px;
+}
+
 @media (max-width: 1280px) {
   .md-quote-grid { grid-template-columns: repeat(3, 1fr); }
+  .md-market-status { grid-template-columns: 1.4fr 1fr 1.2fr; }
+  .md-market-status .md-ms-block:last-child { display: none; }
 }
 @media (max-width: 960px) {
   .md-quote-grid { grid-template-columns: repeat(2, 1fr); }
+  .md-market-status { grid-template-columns: 1fr 1fr; }
+  .md-market-status .md-ms-block { border-left: none; padding-left: 0; }
 }
 
 /* ==================================================================

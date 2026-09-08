@@ -2344,3 +2344,72 @@ def test_d37_bars_api():
         "/api/dashboard/bars/159852?limit=501", headers=h
     )
     assert res.status_code == 400
+
+
+# --- D-38 Market Status (Commit 005 — A-share Trading Session) ----------------
+
+
+def test_d38_market_status_api():
+    """Market status endpoint exposes the trading session state."""
+    from datetime import datetime, timezone
+
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    res = client.get("/api/dashboard/market-status", headers=h)
+    assert res.status_code == 200
+    body = res.json()
+    for key in (
+        "market",
+        "phase",
+        "phase_label",
+        "is_trading_day",
+        "is_tradable",
+        "trading_date",
+        "session",
+        "next_event",
+        "server_time",
+        "timezone",
+    ):
+        assert key in body, f"missing {key}"
+    assert body["market"] == "A-SHARE"
+    valid_phases = {
+        "PRE_OPEN", "AUCTION", "CONTINUOUS_AM", "LUNCH_BREAK",
+        "CONTINUOUS_PM", "CLOSE", "POST_CLOSE", "NON_TRADING",
+    }
+    assert body["phase"] in valid_phases
+    assert body["next_event"]["phase"] in valid_phases
+
+    # The engine behind the endpoint — deterministic snapshots.
+    from services.market_data.calendar.trading_calendar import TradingCalendar
+
+    cal = TradingCalendar()
+
+    # 10:00 CST on a trading day — continuous AM
+    snap = cal.status(datetime(2026, 9, 8, 2, 0, tzinfo=timezone.utc))
+    assert snap["phase"] == "CONTINUOUS_AM"
+    assert snap["is_trading_day"] is True
+    assert snap["is_tradable"] is True
+    assert snap["trading_date"] == "2026-09-08"
+    assert snap["session"]["start"].startswith("2026-09-08T09:30")
+    assert snap["session"]["end"].startswith("2026-09-08T11:30")
+    assert snap["next_event"]["phase"] == "LUNCH_BREAK"
+
+    # 12:00 CST — lunch break: feed stays connected, trading paused
+    snap = cal.status(datetime(2026, 9, 8, 4, 0, tzinfo=timezone.utc))
+    assert snap["phase"] == "LUNCH_BREAK"
+    assert snap["is_tradable"] is False
+    assert snap["next_event"]["phase"] == "CONTINUOUS_PM"
+
+    # Sunday — non-trading day
+    snap = cal.status(datetime(2026, 9, 6, 4, 0, tzinfo=timezone.utc))
+    assert snap["phase"] == "NON_TRADING"
+    assert snap["is_trading_day"] is False
+    assert snap["is_tradable"] is False
+
+    # Makeup Saturday trades like a weekday
+    assert cal.is_trading_day("2026-02-28") is True
+    assert cal.is_trading_day("2026-10-01") is False
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/market-status").status_code == 401

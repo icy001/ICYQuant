@@ -2844,6 +2844,9 @@
   // ── Dashboard (Integration 002 — real API data) ──────────────
   PAGE_FRAMEWORK["dashboard"] = async function () {
     var d = await useDashboard();
+    // Market phase (Commit 005) — best-effort; the cockpit never
+    // blocks on the calendar.
+    var mkt = await useMarketStatus();
 
     // ── Helpers ────────────────────────────────────────────────
     function fmtMoney(v) { return UI.money(v, 2); }
@@ -2853,6 +2856,19 @@
 
     // ── Empty state (no pipeline attached) ─────────────────────
     var noPipeline = !d.meta.pipeline_attached;
+
+    // Market meta item: connection state + current trading phase
+    // (Commit 005 — "LIVE" alone no longer says enough).
+    var mktMeta = "";
+    if (mkt) {
+      var mktState = marketStateOf(mkt.phase);
+      mktMeta =
+        '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Market</span>' +
+        '<span class="ds-text-mono">' +
+        '<span class="md-ms-dot md-ms-dot-' + mktState.tone + '" style="display:inline-block;vertical-align:middle;margin-right:5px;"></span>' +
+        esc(mkt.market || "A-SHARE") + ' · ' + esc(mkt.phase || "—") +
+        '</span></span>';
+    }
 
     // 1) Account context bar
     var ts = d.meta.timestamp ? new Date(d.meta.timestamp).toLocaleString() : "—";
@@ -2866,6 +2882,7 @@
       '<div class="dash-acct-meta">' +
       '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Last Update</span><span class="ds-text-mono">' + ts + '</span></span>' +
       '<span class="dash-acct-meta-item"><span class="dash-acct-meta-label">Session</span><span class="ds-text-mono">' + esc(d.meta.environment || "PAPER") + (d.meta.pipeline_attached ? " · LIVE" : " · IDLE") + '</span></span>' +
+      mktMeta +
       '</div>' +
       '</div>';
 
@@ -5312,6 +5329,74 @@
   };
 
   /* ==================================================================
+   * Commit 005 — A-share Trading Session / Market Status
+   *
+   * One shared renderer for the market phase strip.  The backend
+   * TradingCalendar is the single source of truth (phase, session
+   * window, next event); the frontend only maps phase → display
+   * state (OPEN / PAUSED / CLOSED) — it never re-implements time
+   * checks, mirroring the backend Strategy Gate rule.
+   * ================================================================== */
+  function marketStateOf(phase) {
+    if (phase === "CONTINUOUS_AM" || phase === "CONTINUOUS_PM")
+      return { word: "OPEN", tone: "profit" };
+    if (phase === "LUNCH_BREAK" || phase === "PRE_OPEN" || phase === "AUCTION")
+      return { word: "PAUSED", tone: "warning" };
+    return { word: "CLOSED", tone: "neutral" };
+  }
+
+  /** HH:MM wall clock from a CST ISO string ("2026-09-08T09:30:00+08:00"). */
+  function cstHM(iso) {
+    return iso ? String(iso).substring(11, 16) : "—";
+  }
+
+  /** Fetch market status (best-effort; null when unavailable). */
+  async function useMarketStatus() {
+    try { return await ICY_API.marketStatus(); }
+    catch (e) { return null; }
+  }
+
+  function renderMarketStatus(status) {
+    if (!status) {
+      return UI.stateEmpty("Market status unavailable",
+        "Trading calendar did not respond. / 交易日历服务未响应");
+    }
+    var state = marketStateOf(status.phase);
+    var sess = status.session || {};
+    var next = status.next_event || {};
+    var nextAt = next.at || "";
+    var nextDay = nextAt ? nextAt.substring(0, 10) : "";
+    var nextWhen = (nextDay && nextDay !== status.trading_date)
+      ? nextDay + " " + cstHM(nextAt)
+      : cstHM(nextAt);
+    return (
+      '<div class="md-market-status">' +
+      '<div>' +
+      '<div class="md-ms-title">' + esc(status.market || "A-SHARE") + ' MARKET</div>' +
+      '<div class="md-ms-state"><span class="md-ms-dot md-ms-dot-' + state.tone + '"></span>' +
+      '<span class="md-ms-word">' + state.word + '</span></div>' +
+      '<div class="md-ms-phase">' + esc(status.phase_label || status.phase) + '</div>' +
+      '</div>' +
+      '<div class="md-ms-block">' +
+      '<div class="md-ms-label">Phase</div>' +
+      '<div class="md-ms-value">' + esc(status.phase || "—") + '</div>' +
+      '<div class="md-ms-sub">is_tradable: ' + (status.is_tradable ? "true" : "false") + '</div>' +
+      '</div>' +
+      '<div class="md-ms-block">' +
+      '<div class="md-ms-label">Session</div>' +
+      '<div class="md-ms-value t-num">' + cstHM(sess.start) + ' — ' + cstHM(sess.end) + '</div>' +
+      '<div class="md-ms-sub">' + esc(status.trading_date || "") + ' · ' + esc(status.timezone || "Asia/Shanghai") + '</div>' +
+      '</div>' +
+      '<div class="md-ms-block">' +
+      '<div class="md-ms-label">Next</div>' +
+      '<div class="md-ms-value">' + esc(next.label || next.phase || "—") + '</div>' +
+      '<div class="md-ms-sub t-num">' + nextWhen + '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ==================================================================
    * Commit 003 — Market Data / Real-time Quote pipeline
    *
    * Reads the latest validated quote snapshot from QuoteService via
@@ -5330,6 +5415,11 @@
           (e.message || String(e)) + " · The quote pipeline did not respond.",
           "Retry", "nav:trading/market");
     }
+
+    // ── Market status (Commit 005) — trading session strip ──
+    var marketStatus = await useMarketStatus();
+    var marketStatusPanel = UI.panel("Market Status / 市场状态",
+      renderMarketStatus(marketStatus), { actions: "" });
 
     var universeInfo;
     try {
@@ -5532,6 +5622,7 @@
 
     return (
       UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
+      marketStatusPanel +
       kpiHtml +
       UI.sectionHeading("Universe Quotes",
         UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +

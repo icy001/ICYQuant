@@ -1624,6 +1624,28 @@ def bars_detail(
     )
 
 
+# ===========================================================================
+# Commit 005 — A-share Trading Session
+#
+# Trading calendar + market phase engine.  Separates Trading Day
+# from Calendar Day (weekends / holidays / makeup days) and defines
+# the phase of the market at any moment (PRE_OPEN / AUCTION /
+# CONTINUOUS_AM / LUNCH_BREAK / CONTINUOUS_PM / CLOSE / POST_CLOSE /
+# NON_TRADING).  is_tradable is the Strategy Gate — downstream
+# code never implements its own time checks.
+# ===========================================================================
+
+
+@router.get("/dashboard/market-status")
+def market_status(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Current A-share market phase + session + next event."""
+    from services.market_data.calendar.trading_calendar import calendar
+
+    return calendar.status()
+
+
 # ---------------------------------------------------------------------------
 # Factor paper trading (Alpha021) - deterministic research-layer replay
 # ---------------------------------------------------------------------------
