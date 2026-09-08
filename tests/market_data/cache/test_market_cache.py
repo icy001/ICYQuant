@@ -590,3 +590,67 @@ class TestQuoteFeedIntegration:
         assert stats["write_failures"] == 0
         # mock feed timestamps are monotonic — nothing rejected
         assert stats["stale_updates_rejected"] == 0
+
+
+class TestUniverseCache:
+    """§17 test gate — the 11-symbol universe end to end:
+
+    11/11 Quote Cache, 11/11 Symbol Keys, 11/11 Latest State.
+    """
+
+    def test_all_11_symbols_cached(self):
+        from services.market_data.universe import universe
+
+        symbols = universe.symbols()
+        assert len(symbols) == 11
+
+        svc = QuoteService(
+            validator=MarketDataValidator(stale_seconds=600)
+        )
+        adapter = MockMarketDataAdapter(seed=11)
+        bars = BarService()
+        cache = MarketCache(
+            config=CacheConfig(enabled=True),
+            quality_config=QualityConfig(),
+        )
+        feed = QuoteFeed(
+            adapter, svc, interval=0.005,
+            bar_service=bars, market_cache=cache,
+        )
+        feed.start(symbols=symbols)
+        deadline = time.time() + 10.0
+        while time.time() < deadline:
+            if len(cache.symbols()) == len(symbols):
+                break
+            time.sleep(0.05)
+        feed.stop()
+
+        # 11/11 symbol keys — the quote-key inventory holds one key
+        # per universe symbol (icyquant:market:quote:{symbol})
+        cached = cache.symbols()
+        assert sorted(cached) == sorted(symbols)
+
+        # 11/11 quote cache + 11/11 latest state (never MISS)
+        for sym in symbols:
+            entry = cache.get_quote(sym)
+            assert entry is not None, f"{sym} never cached"
+            assert entry["symbol"] == sym
+            state = cache.cache_state(sym)
+            assert state is not CacheState.MISS, f"{sym} is MISS"
+            assert state in {
+                CacheState.LIVE,
+                CacheState.STALE,
+                CacheState.MARKET_PAUSED,
+                CacheState.MARKET_CLOSED,
+            }
+
+        # latest 1m bar cached per symbol (live bars at minimum)
+        for sym in symbols:
+            bar = cache.get_latest_bar(sym)
+            assert bar is not None, f"{sym} bar never cached"
+            assert bar["symbol"] == sym
+
+        # overview counts cover the whole universe
+        ov = cache.overview(symbols)
+        assert ov["instruments"] == 11
+        assert sum(ov["counts"].values()) == 11
