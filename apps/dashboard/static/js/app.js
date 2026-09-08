@@ -5421,6 +5421,115 @@
     var feedStats = data.stats || {};
     var kpiHtml = UI.kpiGrid(kpis, 4);
 
+    // ── 1m K-line section (Commit 004) ──
+    var klineSymbol = _tradingState.symbol || "159852";
+    var barsData = null;
+    try {
+      barsData = await ICY_API.bars(klineSymbol, 60);
+    } catch (e) {
+      barsData = null;
+    }
+
+    function renderKline(barsData) {
+      if (!barsData || !barsData.bars || !barsData.bars.length) {
+        return UI.stateEmpty("No bars yet",
+          "Waiting for the first 1-minute bar to close. / 等待第一根 1 分钟 K 线");
+      }
+      var bars = barsData.bars;
+      var n = bars.length;
+      // ── price range ──
+      var pMin = Infinity, pMax = -Infinity;
+      var vMax = 0;
+      for (var i = 0; i < n; i++) {
+        var b = bars[i];
+        var hi = Number(b.high), lo = Number(b.low);
+        if (hi > pMax) pMax = hi;
+        if (lo < pMin) pMin = lo;
+        if (b.volume > vMax) vMax = b.volume;
+      }
+      if (pMin === pMax) { pMin -= 0.01; pMax += 0.01; }
+      var pPad = (pMax - pMin) * 0.1;
+      pMin -= pPad; pMax += pPad;
+
+      // ── layout ──
+      var W = 800, H = 240, VP = 170, VB = 50, GAP = 30;
+      var bw = n > 0 ? (W - GAP * 2) / n : 0;
+      if (bw > 12) bw = 12;
+      var step = (W - GAP * 2) / Math.max(n, 1);
+
+      function yP(p) {
+        return VP - ((Number(p) - pMin) / (pMax - pMin)) * VP;
+      }
+      function yV(v) {
+        if (vMax <= 0) return VB;
+        return VB - (Number(v) / vMax) * VB;
+      }
+
+      var svg = '<svg class="md-kline-svg" viewBox="0 0 ' + W + ' ' + (VP + VB + 20) + '" preserveAspectRatio="none">';
+      // price grid lines
+      for (var g = 0; g <= 4; g++) {
+        var gy = (VP / 4) * g;
+        var gp = pMax - (g / 4) * (pMax - pMin);
+        svg += '<line x1="' + GAP + '" y1="' + gy + '" x2="' + (W - GAP) + '" y2="' + gy + '" stroke="var(--ds-border)" stroke-width="0.5" opacity="0.5"/>';
+        svg += '<text x="' + (W - GAP + 4) + '" y="' + (gy + 4) + '" class="md-kline-axis">' + gp.toFixed(3) + '</text>';
+      }
+      // bars
+      for (var i = 0; i < n; i++) {
+        var b = bars[i];
+        var x = GAP + step * i + step / 2;
+        var yO = yP(b.open), yC = yP(b.close), yH = yP(b.high), yL = yP(b.low);
+        var isUp = Number(b.close) >= Number(b.open);
+        var color = isUp ? "var(--ds-profit)" : "var(--ds-loss)";
+        // wick
+        svg += '<line x1="' + x + '" y1="' + yH + '" x2="' + x + '" y2="' + yL + '" stroke="' + color + '" stroke-width="1"/>';
+        // body
+        var bodyTop = Math.min(yO, yC);
+        var bodyHt = Math.max(Math.abs(yO - yC), 1);
+        var bw2 = Math.min(bw * 0.7, 8);
+        svg += '<rect x="' + (x - bw2 / 2) + '" y="' + bodyTop + '" width="' + bw2 + '" height="' + bodyHt + '" fill="' + color + '" opacity="' + (b.is_closed ? "0.9" : "0.5") + '"/>';
+        // volume bar
+        var vy = yV(b.volume) + VP + 10;
+        var vh = VB - yV(b.volume);
+        svg += '<rect x="' + (x - bw2 / 2) + '" y="' + vy + '" width="' + bw2 + '" height="' + Math.max(vh, 0.5) + '" fill="' + color + '" opacity="0.4"/>';
+      }
+      // volume axis label
+      svg += '<text x="' + GAP + '" y="' + (VP + 18) + '" class="md-kline-axis">Volume</text>';
+      svg += '</svg>';
+
+      var liveBar = bars[bars.length - 1];
+      var liveBadge = liveBar && !liveBar.is_closed
+        ? ' <span class="ds-badge ds-badge-ok">LIVE</span>'
+        : '';
+      var lastClose = liveBar ? Number(liveBar.close) : 0;
+      var lastChg = liveBar ? Number(liveBar.change_pct) : 0;
+      var chgDir = lastChg > 0 ? "pos" : lastChg < 0 ? "neg" : "neutral";
+      var chgSign = lastChg > 0 ? "+" : "";
+
+      return (
+        '<div class="md-kline-wrap">' +
+        '<div class="md-kline-head">' +
+        '<span class="md-kline-sym t-num">' + esc(barsData.symbol || klineSymbol) + '</span>' +
+        '<span class="md-kline-name">' + esc(barsData.name || "") + '</span>' +
+        '<span class="md-kline-close t-num">' + (lastClose ? lastClose.toFixed(3) : '—') + '</span>' +
+        '<span class="md-kline-chg t-num ' + chgDir + '">' + chgSign + lastChg.toFixed(2) + '%</span>' +
+        liveBadge +
+        '<span class="md-kline-tf">1m</span>' +
+        '<span class="md-kline-cnt t-num">' + (barsData.closed_count || 0) + ' closed</span>' +
+        '</div>' +
+        svg +
+        '</div>'
+      );
+    }
+
+    // symbol selector buttons
+    var symButtons = quotes.map(function (v) {
+      var active = v.symbol === klineSymbol ? "primary" : "ghost";
+      return UI.button(v.symbol, active, {
+        sm: true,
+        action: "setsym:" + v.symbol,
+      });
+    }).join(" ");
+
     return (
       UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
       kpiHtml +
@@ -5428,6 +5537,11 @@
         UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +
       UI.panel("Latest Quote Snapshot / 最新行情",
         '<div class="md-quote-grid">' + cardsHtml + '</div>',
+        { actions: "" }) +
+      UI.sectionHeading("1-Minute K-Line / 1 分钟 K 线", symButtons) +
+      UI.panel((barsData ? (barsData.name || klineSymbol) : klineSymbol) + " · 1m",
+        barsData ? renderKline(barsData) : UI.stateEmpty("No bars",
+          "Waiting for bar data. / 等待 K 线数据"),
         { actions: "" }) +
       UI.panel("Feed Statistics / 喂价统计",
         '<div class="md-feed-stats">' +

@@ -516,6 +516,15 @@
       return this.get("/dashboard/quotes/" + encodeURIComponent(symbol));
     },
 
+    // ── 1-minute Bars (Commit 004) ─────────────────────────────
+    /** Latest N closed 1m bars + the current in-progress (live)
+     *  bar for a universe symbol. */
+    bars: async function (symbol, limit) {
+      var q = "/dashboard/bars/" + encodeURIComponent(symbol);
+      if (limit) q += "?limit=" + limit;
+      return this.get(q);
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

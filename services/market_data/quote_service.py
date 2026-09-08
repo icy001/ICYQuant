@@ -176,10 +176,12 @@ class QuoteFeed:
         service: QuoteService,
         *,
         interval: float = 0.2,
+        bar_service: Optional[object] = None,
     ) -> None:
         self._adapter = adapter
         self._service = service
         self._interval = interval
+        self._bar_service = bar_service  # BarService or None
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
 
@@ -208,6 +210,9 @@ class QuoteFeed:
                         break
                     try:
                         self._service.update(quote)
+                        # Push to bar aggregator (Commit 004)
+                        if self._bar_service is not None:
+                            self._bar_service.on_quote(quote)
                     except MarketDataError as exc:
                         self._service.mark_rejected()
                         logger.warning("quote rejected: %s", exc)

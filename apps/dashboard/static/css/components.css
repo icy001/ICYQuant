@@ -3646,6 +3646,51 @@ tr:focus-within {
 }
 .md-feed-stats b { color: var(--ds-text-primary); font-family: var(--ds-num-font); }
 
+/* ── K-line (Commit 004) ── */
+.md-kline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+.md-kline-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+}
+.md-kline-sym {
+  font-family: var(--ds-num-font);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+}
+.md-kline-name { color: var(--ds-text-muted); font-size: var(--ds-text-sm); }
+.md-kline-close {
+  font-family: var(--ds-num-font);
+  font-size: var(--ds-text-lg);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+}
+.md-kline-chg { font-size: var(--ds-text-sm); font-weight: var(--ds-font-bold); }
+.md-kline-chg.pos { color: var(--ds-profit); }
+.md-kline-chg.neg { color: var(--ds-loss); }
+.md-kline-tf {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  border: 1px solid var(--ds-border);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.md-kline-cnt { font-size: var(--ds-text-xs); color: var(--ds-text-muted); }
+.md-kline-svg {
+  width: 100%;
+  height: 260px;
+}
+.md-kline-axis {
+  font-size: 10px;
+  fill: var(--ds-text-muted);
+  font-family: var(--ds-num-font);
+}
+
 @media (max-width: 1280px) {
   .md-quote-grid { grid-template-columns: repeat(3, 1fr); }
 }

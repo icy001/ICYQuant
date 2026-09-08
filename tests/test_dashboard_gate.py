@@ -2278,3 +2278,69 @@ def test_d36_quote_feed_rbac():
     assert (
         client.post("/api/dashboard/quotes/feed/start").status_code == 401
     )
+
+
+# ===========================================================================
+# D-37 — 1-minute Bar API (Commit 004)
+# ===========================================================================
+
+def test_d37_bars_api():
+    """Bars endpoint returns 1m OHLCV bars for a universe symbol."""
+    import time as _time
+
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    # Ensure feed is running (starts lazily on first quotes call)
+    client.get("/api/dashboard/quotes", headers=h)
+    # Wait for bars to accumulate
+    deadline = _time.time() + 15.0
+    bars_data = None
+    while _time.time() < deadline:
+        res = client.get(
+            "/api/dashboard/bars/159852?limit=60", headers=h
+        )
+        if res.status_code == 200:
+            bars_data = res.json()
+            if bars_data.get("count", 0) > 0:
+                break
+        _time.sleep(1.0)
+
+    assert bars_data is not None, "bars endpoint never returned data"
+    assert bars_data["symbol"] == "159852"
+    assert bars_data["timeframe"] == "1m"
+    assert bars_data["count"] > 0
+    assert bars_data["name"] == "软件ETF"
+
+    # Verify bar fields
+    for bar in bars_data["bars"]:
+        for field in (
+            "timestamp", "open", "high", "low", "close",
+            "volume", "turnover", "is_closed", "bar_id",
+        ):
+            assert field in bar, f"missing {field}"
+        assert bar["symbol"] == "159852"
+        assert bar["exchange"] == "SZSE"
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/bars/159852").status_code == 401
+
+    # Unknown symbol → 404
+    res = client.get("/api/dashboard/bars/999999", headers=h)
+    assert res.status_code == 404
+
+    # Bad timeframe → 400
+    res = client.get(
+        "/api/dashboard/bars/159852?timeframe=5m", headers=h
+    )
+    assert res.status_code == 400
+
+    # Bad limit → 400
+    res = client.get(
+        "/api/dashboard/bars/159852?limit=0", headers=h
+    )
+    assert res.status_code == 400
+    res = client.get(
+        "/api/dashboard/bars/159852?limit=501", headers=h
+    )
+    assert res.status_code == 400

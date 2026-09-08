@@ -1469,6 +1469,7 @@ def _ensure_quote_feed() -> dict:
     """
     global _quote_feed
     from services.market_data.adapters.mock import MockMarketDataAdapter
+    from services.market_data.aggregation.bar_service import bar_service
     from services.market_data.quote_service import QuoteFeed, quote_service
     from services.market_data.universe import universe
 
@@ -1476,7 +1477,9 @@ def _ensure_quote_feed() -> dict:
         return quote_service.stats()
 
     adapter = MockMarketDataAdapter(seed=None)
-    feed = QuoteFeed(adapter, quote_service, interval=0.2)
+    feed = QuoteFeed(
+        adapter, quote_service, interval=0.2, bar_service=bar_service
+    )
     feed.start(symbols=universe.symbols())
     _quote_feed = feed
     return quote_service.stats()
@@ -1553,6 +1556,72 @@ def quotes_feed_stop(
         _quote_feed.stop()
         _quote_feed = None
     return {"status": "ok"}
+
+
+# ===========================================================================
+# Commit 004 — 1-minute Bar API
+#
+# Returns the latest N closed 1m bars + the in-progress (live) bar
+# for a universe symbol.  Bars are aggregated in real time from the
+# same QuoteFeed that powers Commit 003's quote snapshot.
+# ===========================================================================
+
+
+@router.get("/dashboard/bars")
+def bars(
+    symbol: str = "",
+    timeframe: str = "1m",
+    limit: int = 200,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """1-minute OHLCV bars for a universe symbol.
+
+    Query params:
+        symbol     — 6-digit code (must be in universe)
+        timeframe  — "1m" (only 1m supported in Commit 004)
+        limit      — max bars to return (1–500, default 200)
+
+    Returns closed bars + the current in-progress bar (is_closed=
+    False) if one exists.
+    """
+    from services.market_data.aggregation.bar_service import bar_service
+    from services.market_data.universe import universe
+
+    sym = symbol.strip()
+    inst = universe.get(sym)
+    if inst is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Symbol {sym} is not in the trading universe",
+        )
+    if timeframe != "1m":
+        raise HTTPException(
+            status_code=400,
+            detail="Only timeframe=1m is supported in Commit 004",
+        )
+    if limit < 1 or limit > 500:
+        raise HTTPException(
+            status_code=400,
+            detail="limit must be between 1 and 500",
+        )
+    _ensure_quote_feed()
+    snapshot = bar_service.as_snapshot(sym, limit)
+    snapshot["name"] = inst.name
+    snapshot["instrument_type"] = inst.instrument_type.value
+    return snapshot
+
+
+@router.get("/dashboard/bars/{symbol}")
+def bars_detail(
+    symbol: str,
+    timeframe: str = "1m",
+    limit: int = 200,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Path-param variant of GET /dashboard/bars?symbol=..."""
+    return bars(
+        symbol=symbol, timeframe=timeframe, limit=limit, principal=principal
+    )
 
 
 # ---------------------------------------------------------------------------
