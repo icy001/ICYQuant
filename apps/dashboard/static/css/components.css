@@ -3728,6 +3728,189 @@ tr:focus-within {
   letter-spacing: 0.03em;
 }
 
+/* Quality Overview strip (§15) */
+.md-qo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2) var(--ds-space-3);
+  padding-bottom: var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-border);
+  margin-bottom: var(--ds-space-3);
+}
+.md-qo-total {
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-primary);
+  font-weight: var(--ds-font-bold);
+  margin-right: var(--ds-space-2);
+}
+.md-qo-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--ds-space-1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+}
+.md-qo-count {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-bold);
+}
+.md-qo-label {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ds-text-muted);
+}
+.md-qo-ok .md-qo-count   { color: var(--ds-profit); }
+.md-qo-warn .md-qo-count { color: var(--ds-warning); }
+.md-qo-bad .md-qo-count  { color: var(--ds-loss); }
+
+/* per-symbol drill-down table (§15) */
+.md-qsym-table { margin-top: var(--ds-space-3); }
+.md-qsym-head,
+.md-qsym-row {
+  display: grid;
+  grid-template-columns: 70px 110px 1fr 70px 70px 50px 50px;
+  gap: var(--ds-space-3);
+  align-items: center;
+  padding: 3px var(--ds-space-2);
+  font-size: var(--ds-text-xs);
+}
+.md-qsym-head {
+  color: var(--ds-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ds-border);
+}
+.md-qsym-row {
+  color: var(--ds-text-secondary);
+  border-bottom: 1px solid var(--ds-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.md-qsym-row:hover { background: var(--ds-surface-hover, rgba(255,255,255,0.03)); }
+.md-qsym-row.active {
+  background: var(--ds-surface-active, rgba(0, 229, 160, 0.06));
+  border-left: 2px solid var(--ds-profit);
+  padding-left: calc(var(--ds-space-2) - 2px);
+}
+.md-qsym-sym { color: var(--ds-text-primary); font-weight: var(--ds-font-bold); }
+.md-qsym-alert { color: var(--ds-warning); font-weight: var(--ds-font-bold); }
+
+@media (max-width: 1280px) {
+  .md-qsym-head, .md-qsym-row {
+    grid-template-columns: 64px 100px 1fr 64px 64px 44px 44px;
+  }
+}
+
+/* ── Market Cache (Commit 007) ── */
+
+/* infrastructure rows: name | meta | state */
+.md-ci-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: 4px var(--ds-space-2);
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-secondary);
+  border-bottom: 1px solid var(--ds-border);
+}
+.md-ci-row:last-child { border-bottom: none; }
+.md-ci-name {
+  color: var(--ds-text-primary);
+  font-weight: var(--ds-font-bold);
+  letter-spacing: 0.03em;
+}
+.md-ci-meta {
+  color: var(--ds-text-muted);
+  font-family: var(--ds-num-font);
+}
+.md-ci-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+}
+.md-ci-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.md-ci-dot-ok      { background: var(--ds-profit); }
+.md-ci-dot-bad     { background: var(--ds-loss); }
+.md-ci-dot-neutral { background: var(--ds-text-muted); }
+.md-ci-status {
+  font-size: 10px;
+  font-weight: var(--ds-font-bold);
+  letter-spacing: 0.05em;
+  color: var(--ds-text-muted);
+}
+.md-ci-row-path { padding-top: var(--ds-space-2); }
+.md-ci-row-path.blocked {
+  background: rgba(255, 82, 82, 0.06);
+  border-left: 2px solid var(--ds-loss);
+  padding-left: calc(var(--ds-space-2) - 2px);
+}
+
+/* cache panel blocks */
+.md-cache-infra {
+  margin-top: var(--ds-space-3);
+  padding: var(--ds-space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: 6px;
+  background: var(--ds-surface);
+}
+.md-cache-error {
+  margin-top: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  border: 1px solid rgba(255, 82, 82, 0.35);
+  border-radius: 6px;
+  font-size: var(--ds-text-xs);
+  color: var(--ds-loss);
+  font-family: var(--ds-num-font);
+}
+
+/* per-symbol cache table: Symbol | Cache | Last | Age | Latency | Quality */
+.md-cache-head,
+.md-cache-row {
+  display: grid;
+  grid-template-columns: 70px 96px 1fr 80px 80px 96px;
+  gap: var(--ds-space-3);
+  align-items: center;
+  padding: 3px var(--ds-space-2);
+  font-size: var(--ds-text-xs);
+}
+.md-cache-head {
+  color: var(--ds-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ds-border);
+}
+.md-cache-row {
+  color: var(--ds-text-secondary);
+  border-bottom: 1px solid var(--ds-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.md-cache-row:hover { background: var(--ds-surface-hover, rgba(255,255,255,0.03)); }
+.md-cache-row.active {
+  background: var(--ds-surface-active, rgba(0, 229, 160, 0.06));
+  border-left: 2px solid var(--ds-profit);
+  padding-left: calc(var(--ds-space-2) - 2px);
+}
+.md-cache-q {
+  color: var(--ds-text-muted);
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 1280px) {
+  .md-cache-head, .md-cache-row {
+    grid-template-columns: 64px 88px 1fr 72px 72px 88px;
+  }
+}
+
 /* Quality panel */
 .md-quality-wrap {
   display: grid;

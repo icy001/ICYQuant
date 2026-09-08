@@ -98,6 +98,8 @@ class QualityGate:
         self._last_price: dict[str, Decimal] = {}
         # per-symbol last full verdict (for API display)
         self._last_result: dict[str, MarketDataQualityResult] = {}
+        # per-symbol duplicate counter (Commit 006 §15 drill-down)
+        self._dup_count: dict[str, int] = {}
         # stats
         self._evaluated = 0
         self._rejected = 0
@@ -308,6 +310,10 @@ class QualityGate:
             if not result.passed:
                 self._rejected += 1
                 self._quarantine.record(quote, result)
+            if duplicate:
+                self._dup_count[quote.symbol] = (
+                    self._dup_count.get(quote.symbol, 0) + 1
+                )
             self._by_status[status.value] = (
                 self._by_status.get(status.value, 0) + 1
             )
@@ -336,6 +342,11 @@ class QualityGate:
         with self._lock:
             return self._last_result.get(symbol)
 
+    def duplicate_count(self, symbol: str) -> int:
+        """Duplicates seen for a symbol (§15 drill-down metric)."""
+        with self._lock:
+            return self._dup_count.get(symbol, 0)
+
     def stats(self) -> dict:
         with self._lock:
             return {
@@ -352,6 +363,7 @@ class QualityGate:
             self._last_volume_day.clear()
             self._last_price.clear()
             self._last_result.clear()
+            self._dup_count.clear()
             self._evaluated = 0
             self._rejected = 0
             self._by_status.clear()

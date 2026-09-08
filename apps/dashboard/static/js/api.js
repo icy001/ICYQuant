@@ -538,6 +538,14 @@
       return this.get("/dashboard/quality" + qs);
     },
 
+    // ── Market Cache (Commit 007) ─────────────────────────────
+    /** Shared latest market state: cache health (backend, quote /
+     *  bar / session / quality caches, trading path), per-state
+     *  instrument counts and per-symbol cache rows. */
+    marketCache: async function () {
+      return this.get("/dashboard/market-cache");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

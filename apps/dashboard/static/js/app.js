@@ -5396,13 +5396,22 @@
     );
   }
 
+  /* A-share 6-digit symbol for the Market Data page K-line /
+   * quality drill-down; falls back to the default ETF when the
+   * global trading state holds a non-A-share symbol (e.g. NVDA). */
+  function marketKlineSymbol() {
+    var s = _tradingState.symbol;
+    return s && /^\d{6}$/.test(s) ? s : "159852";
+  }
+
   /* ==================================================================
    * Commit 006 — Market Data Quality panel
    *
-   * Gate config (env-driven thresholds), evaluation stats and the
-   * quarantine list.  Rejected data is never deleted — it is
-   * quarantined so "why did ICYQuant produce no order?" is always
-   * traceable.
+   * Quality Overview (per-status instrument counts), per-symbol
+   * drill-down (last quote / latency / age / duplicates / gaps /
+   * status), gate config (env-driven thresholds) and the quarantine
+   * list.  Rejected data is never deleted — it is quarantined so
+   * "why did ICYQuant produce no order?" is always traceable.
    * ================================================================== */
   function renderQualityPanel(data) {
     if (!data) {
@@ -5413,11 +5422,65 @@
     var stats = data.stats || {};
     var qs = data.quarantine || {};
     var items = data.quarantine_items || [];
+    var overview = data.overview || { instruments: 0, counts: {}, offline: 0 };
+    var symbols = data.symbols || [];
     var gateBadge = data.gate_enabled
       ? UI.badge("GATE ON", "ok")
       : UI.badge("DERIVE MODE", "neutral");
 
-    var html =
+    // ── Quality Overview strip (§15) ──
+    var ovCounts = overview.counts || {};
+    var ovChips = [
+      ["FRESH", ovCounts.FRESH || 0, "ok"],
+      ["WARNING", ovCounts.WARNING || 0, "warn"],
+      ["STALE", ovCounts.STALE || 0, "warn"],
+      ["INVALID", ovCounts.INVALID || 0, "bad"],
+      ["QUARANTINED", ovCounts.QUARANTINED || 0, "bad"],
+    ].map(function (c) {
+      return '<span class="md-qo-chip md-qo-' + c[2] + '">' +
+        '<span class="md-qo-count t-num">' + c[1] + '</span>' +
+        '<span class="md-qo-label">' + c[0] + '</span></span>';
+    }).join("");
+    var overviewHtml =
+      '<div class="md-qo-strip">' +
+      '<span class="md-qo-total"><b class="t-num">' + esc(overview.instruments) + '</b> Instruments</span>' +
+      ovChips +
+      (overview.offline
+        ? '<span class="md-qo-chip md-qo-bad"><span class="md-qo-count t-num">' + overview.offline + '</span><span class="md-qo-label">OFFLINE</span></span>'
+        : "") +
+      '</div>';
+
+    // ── per-symbol drill-down table (§15) ──
+    function fmtAge(ms) {
+      if (ms == null) return "—";
+      return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
+    }
+    var tableRows = symbols.map(function (s) {
+      var tone = s.status === "FRESH" ? "ok"
+        : s.status === "INVALID" || s.status === "QUARANTINED" ? "bad"
+        : "warn";
+      var active = s.symbol === marketKlineSymbol();
+      return (
+        '<div class="md-qsym-row' + (active ? " active" : "") + '" data-action="setsym:' + esc(s.symbol) + '">' +
+        '<span class="md-qsym-sym t-num">' + esc(s.symbol) + '</span>' +
+        '<span class="md-qs md-qs-' + tone + '">' + esc(s.status) + '</span>' +
+        '<span class="t-num">' + (s.last != null ? esc(s.last) : "—") + '</span>' +
+        '<span class="t-num">' + (s.latency_ms != null ? s.latency_ms + "ms" : "—") + '</span>' +
+        '<span class="t-num">' + fmtAge(s.quote_age_ms) + '</span>' +
+        '<span class="t-num">' + (s.duplicates > 0 ? s.duplicates : "0") + '</span>' +
+        '<span class="t-num' + (s.gaps > 0 ? " md-qsym-alert" : "") + '">' + (s.gaps > 0 ? s.gaps : "0") + '</span>' +
+        '</div>'
+      );
+    }).join("");
+    var tableHtml =
+      '<div class="md-qsym-head">' +
+      '<span>Symbol</span><span>Quality</span><span>Last</span>' +
+      '<span>Latency</span><span>Age</span><span>Dup</span><span>Gaps</span>' +
+      '</div>' +
+      '<div class="md-qsym-body">' + (tableRows ||
+        UI.stateEmpty("No instruments", "Waiting for the universe. / 等待品种数据")) + '</div>';
+
+    var html = overviewHtml +
       '<div class="md-quality-wrap">' +
       '<div class="md-quality-config">' +
       '<div class="md-ms-label">Thresholds <span class="md-ms-sub">(env)</span></div>' +
@@ -5442,7 +5505,8 @@
       (items.length ? items.length + " recent item(s) below" : "No rejected data — clean feed") +
       '</div>' +
       '</div>' +
-      '</div>';
+      '</div>' +
+      '<div class="md-qsym-table">' + tableHtml + '</div>';
 
     if (items.length) {
       var rows = items.map(function (it) {
@@ -5460,6 +5524,131 @@
       html += '<div class="md-quar-list">' + rows + '</div>';
     }
     return html;
+  }
+
+  /* ==================================================================
+   * Commit 007 — Market Cache panel
+   *
+   * The shared latest market state (Redis in production, honest
+   * in-memory fallback for local dev).  The frontend never touches
+   * Redis directly — it reads through the Market Data API.  The
+   * panel shows infrastructure health (backend + quote / bar /
+   * session / quality caches + trading path), per-state counts
+   * and one cache row per symbol (state / last / age / latency /
+   * quality).  A degraded cache reports BLOCKED, never fake calm.
+   * ================================================================== */
+  function renderCachePanel(data) {
+    if (!data) {
+      return UI.stateEmpty("Market cache unavailable",
+        "The market cache service did not respond. / 行情缓存服务未响应");
+    }
+    var health = data.health || {};
+    var components = data.components || {};
+    var overview = data.overview || { instruments: 0, cached_symbols: 0, counts: {} };
+    var symbols = data.symbols || [];
+    var stats = data.stats || {};
+    var cfg = data.config || {};
+
+    function statusDot(status) {
+      var tone = status === "HEALTHY" ? "ok"
+        : status === "DEGRADED" ? "bad" : "neutral";
+      var word = status === "HEALTHY" ? "HEALTHY"
+        : status === "DEGRADED" ? "DEGRADED" : status;
+      return '<span class="md-ci-dot md-ci-dot-' + tone + '"></span>' +
+        '<span class="md-ci-status">' + esc(word) + '</span>';
+    }
+
+    // ── infrastructure rows (§13) ──
+    var backendLabel = (cfg.backend === "redis")
+      ? "Redis" : "Memory (local dev)";
+    var infraRows = [
+      ["Cache Backend", backendLabel, statusDot(health.status)]
+    ].concat([
+      ["Quote Cache", "quotes: " + (stats.writes && stats.writes.quote || 0),
+        statusDot((components.quote || {}).status || "EMPTY")],
+      ["Bar Cache", "bars: " + (stats.writes && stats.writes.bar || 0),
+        statusDot((components.bar || {}).status || "EMPTY")],
+      ["Session Cache", "sessions: " + (stats.writes && stats.writes.session || 0),
+        statusDot((components.session || {}).status || "EMPTY")],
+    ]);
+    var infraHtml = infraRows.map(function (r) {
+      return '<div class="md-ci-row">' +
+        '<span class="md-ci-name">' + esc(r[0]) + '</span>' +
+        '<span class="md-ci-meta">' + esc(r[1]) + '</span>' +
+        '<span class="md-ci-state">' + r[2] + '</span>' +
+        '</div>';
+    }).join("");
+
+    // trading path (§15): degraded cache blocks the trading path
+    var tradingOk = health.trading_allowed !== false;
+    var tradingHtml = '<div class="md-ci-row md-ci-row-path' + (tradingOk ? "" : " blocked") + '">' +
+      '<span class="md-ci-name">Trading Path</span>' +
+      '<span class="md-ci-meta">TTL ' + esc(cfg.ttl_trading_s || "—") +
+      's / ' + esc(cfg.ttl_closed_s || "—") + 's</span>' +
+      '<span class="md-ci-state">' +
+      (tradingOk
+        ? '<span class="md-qs md-qs-ok">● NORMAL</span>'
+        : '<span class="md-qs md-qs-bad">● BLOCKED</span>') +
+      '</span></div>';
+
+    // ── per-state counts strip (§13) ──
+    var counts = overview.counts || {};
+    var cached = overview.cached_symbols || 0;
+    var total = overview.instruments || 0;
+    var chips = [
+      ["LIVE", counts.LIVE || 0, "ok"],
+      ["STALE", counts.STALE || 0, "warn"],
+      ["PAUSED", counts.MARKET_PAUSED || 0, "warn"],
+      ["CLOSED", counts.MARKET_CLOSED || 0, "neutral"],
+      ["MISS", counts.MISS || 0, "bad"],
+    ].map(function (c) {
+      return '<span class="md-qo-chip md-qo-' + c[2] + '">' +
+        '<span class="md-qo-count t-num">' + c[1] + '</span>' +
+        '<span class="md-qo-label">' + c[0] + '</span></span>';
+    }).join("");
+    var stripHtml =
+      '<div class="md-qo-strip">' +
+      '<span class="md-qo-total"><b class="t-num">' + cached + '</b> / ' +
+      '<span class="t-num">' + total + '</span> Cached Symbols</span>' +
+      chips +
+      '</div>';
+
+    // ── per-symbol cache rows (§12: Fresh / Age / Latency) ──
+    function fmtAgeS(s) {
+      if (s == null) return "—";
+      return s >= 1000 ? (s / 1000).toFixed(1) + "k s" : s.toFixed(1) + "s";
+    }
+    var rows = symbols.map(function (s) {
+      var tone = s.state === "LIVE" ? "ok"
+        : s.state === "MISS" ? "bad" : "warn";
+      var active = s.symbol === marketKlineSymbol();
+      return (
+        '<div class="md-cache-row' + (active ? " active" : "") + '" data-action="setsym:' + esc(s.symbol) + '">' +
+        '<span class="md-qsym-sym t-num">' + esc(s.symbol) + '</span>' +
+        '<span class="md-qs md-qs-' + tone + '">' + esc(s.state) + '</span>' +
+        '<span class="t-num">' + (s.last != null ? esc(s.last) : "—") + '</span>' +
+        '<span class="t-num">' + fmtAgeS(s.age_seconds) + '</span>' +
+        '<span class="t-num">' + (s.latency_ms != null ? s.latency_ms + "ms" : "—") + '</span>' +
+        '<span class="md-cache-q">' + esc(s.quality_status || "—") + '</span>' +
+        '</div>'
+      );
+    }).join("");
+    var tableHtml =
+      '<div class="md-cache-head">' +
+      '<span>Symbol</span><span>Cache</span><span>Last</span>' +
+      '<span>Age</span><span>Latency</span><span>Quality</span>' +
+      '</div>' +
+      '<div class="md-qsym-body">' + (rows ||
+        UI.stateEmpty("No cached symbols", "Waiting for the first tick. / 等待首笔行情")) + '</div>';
+
+    return (
+      stripHtml +
+      '<div class="md-cache-infra">' + infraHtml + tradingHtml + '</div>' +
+      (health.last_error
+        ? '<div class="md-cache-error">Last error: ' + esc(health.last_error) + '</div>'
+        : "") +
+      '<div class="md-qsym-table md-cache-table">' + tableHtml + '</div>'
+    );
   }
 
   /* ==================================================================
@@ -5496,6 +5685,16 @@
     }
     var qualityPanel = UI.panel("Data Quality / 数据质量",
       renderQualityPanel(qualityData), { actions: "" });
+
+    // ── Market Cache (Commit 007) — shared latest market state ──
+    var cacheData = null;
+    try {
+      cacheData = await ICY_API.marketCache();
+    } catch (e) {
+      cacheData = null;
+    }
+    var cachePanel = UI.panel("Market Cache / 行情缓存",
+      renderCachePanel(cacheData), { actions: "" });
 
     var universeInfo;
     try {
@@ -5615,7 +5814,7 @@
     var kpiHtml = UI.kpiGrid(kpis, 4);
 
     // ── 1m K-line section (Commit 004) ──
-    var klineSymbol = _tradingState.symbol || "159852";
+    var klineSymbol = marketKlineSymbol();
     var barsData = null;
     try {
       barsData = await ICY_API.bars(klineSymbol, 60);
@@ -5727,6 +5926,7 @@
       UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
       marketStatusPanel +
       qualityPanel +
+      cachePanel +
       kpiHtml +
       UI.sectionHeading("Universe Quotes",
         UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +
@@ -9895,6 +10095,18 @@
       el.addEventListener("click", function () {
         var navKey = el.getAttribute("data-action").slice(4);
         location.hash = "#/" + navKey;
+      });
+    });
+
+    // Market Data: setsym:* — switch the K-line / quality-table symbol
+    // (Commit 004 symbol selector + Commit 006 quality drill-down rows)
+    document.querySelectorAll('[data-action^="setsym:"]').forEach(function (el) {
+      el.addEventListener("click", function () {
+        var sym = el.getAttribute("data-action").slice(7);
+        if (sym && sym !== _tradingState.symbol) {
+          _tradingState.symbol = sym;
+          render();
+        }
       });
     });
 

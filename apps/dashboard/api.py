@@ -1466,10 +1466,13 @@ def _ensure_quote_feed() -> dict:
     """Start the Mock quote feed on first use (idempotent).
 
     Subscribes all universe symbols and streams at 0.2s intervals.
+    Every quality-passed quote / bar / session is written through
+    to the Market Cache (Commit 007).
     """
     global _quote_feed
     from services.market_data.adapters.mock import MockMarketDataAdapter
     from services.market_data.aggregation.bar_service import bar_service
+    from services.market_data.cache import market_cache
     from services.market_data.quote_service import QuoteFeed, quote_service
     from services.market_data.universe import universe
 
@@ -1478,7 +1481,11 @@ def _ensure_quote_feed() -> dict:
 
     adapter = MockMarketDataAdapter(seed=None)
     feed = QuoteFeed(
-        adapter, quote_service, interval=0.2, bar_service=bar_service
+        adapter,
+        quote_service,
+        interval=0.2,
+        bar_service=bar_service,
+        market_cache=market_cache,
     )
     feed.start(symbols=universe.symbols())
     _quote_feed = feed
@@ -1666,15 +1673,23 @@ def market_data_quality(
 
     Query params:
         limit — max quarantined items to return (1–200, default 50)
+
+    Returns the Quality Overview (per-status instrument counts) and
+    one drill-down row per symbol: last quote, latency, quote age,
+    duplicate count, gap count, quality status.
     """
     if limit < 1 or limit > 200:
         raise HTTPException(
             status_code=400, detail="limit must be between 1 and 200"
         )
+    from services.market_data.aggregation.bar_service import bar_service
     from services.market_data.quality import QualityConfig
+    from services.market_data.quality.quality_status import QualityStatus
     from services.market_data.quality.quarantine import QuarantineStore
     from services.market_data.quote_service import quote_service
+    from services.market_data.universe import universe
 
+    _ensure_quote_feed()
     gate = quote_service.quality_gate
     cfg = QualityConfig.from_env()
     if gate is not None:
@@ -1690,6 +1705,38 @@ def market_data_quality(
         q_stats = QuarantineStore().stats()
         gate_enabled = False
 
+    # ── Quality Overview: per-status counts across the universe ──
+    views = quote_service.snapshot(universe.symbols())
+    counts = {s.value: 0 for s in QualityStatus}
+    offline = 0
+    symbol_rows = []
+    for v in views:
+        quality = v.get("quality")
+        q = v.get("quote") or {}
+        if quality is None:
+            status = "OFFLINE"
+            offline += 1
+        else:
+            status = quality["status"]
+            if status in counts:
+                counts[status] += 1
+        symbol_rows.append(
+            {
+                "symbol": v["symbol"],
+                "status": status,
+                "tradable": bool(quality.get("tradable"))
+                if quality
+                else False,
+                "last": q.get("last"),
+                "latency_ms": (quality or {}).get("latency_ms"),
+                "quote_age_ms": (quality or {}).get("quote_age_ms"),
+                "duplicates": gate.duplicate_count(v["symbol"])
+                if gate is not None
+                else 0,
+                "gaps": len(bar_service.gaps(v["symbol"])),
+            }
+        )
+
     return {
         "gate_enabled": gate_enabled,
         "config": cfg.as_dict(),
@@ -1701,10 +1748,121 @@ def market_data_quality(
             "outlier_pct": "MARKET_DATA_OUTLIER_PCT",
             "allow_warning_trading": "MARKET_DATA_ALLOW_WARNING_TRADING",
         },
+        "overview": {
+            "instruments": len(views),
+            "counts": counts,
+            "offline": offline,
+        },
+        "symbols": symbol_rows,
         "stats": stats,
         "quote_service": quote_service.stats(),
         "quarantine": q_stats,
         "quarantine_items": quarantine,
+    }
+
+
+# ===========================================================================
+# Commit 007 — Redis Market Cache API
+#
+# The shared latest market state: health of the cache infrastructure
+# (backend, quote/bar/session/quality caches, trading path), the
+# per-state instrument counts, and one cache row per universe symbol
+# (state, age, latency, quality).  A degraded cache never pretends
+# to be fine — the trading path reports BLOCKED (§15) while quote
+# ingestion keeps retrying.
+# ===========================================================================
+
+
+@router.get("/dashboard/market-cache")
+def market_cache_status(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Market cache health + per-symbol cache states (Commit 007)."""
+    from datetime import datetime, timezone
+
+    from services.market_data.cache import market_cache
+    from services.market_data.universe import universe
+
+    _ensure_quote_feed()
+    health = market_cache.health()
+    stats = market_cache.stats()
+    symbols = universe.symbols()
+    overview = market_cache.overview(symbols)
+
+    # §13 per-component health: DEGRADED wins, else HEALTHY once
+    # the component has been written at least once, else EMPTY.
+    degraded = health["status"] == "DEGRADED"
+    components = {}
+    for name, writes in stats["writes"].items():
+        if degraded:
+            state = "DEGRADED"
+        elif writes > 0:
+            state = "HEALTHY"
+        else:
+            state = "EMPTY"
+        components[name] = {"status": state, "writes": writes}
+
+    now = datetime.now(timezone.utc)
+    symbol_rows = []
+    for sym in symbols:
+        entry = market_cache.get_quote(sym)
+        state = market_cache.cache_state(sym, now=now)
+        if entry is None:
+            symbol_rows.append(
+                {
+                    "symbol": sym,
+                    "state": state.value,
+                    "last": None,
+                    "age_seconds": None,
+                    "latency_ms": None,
+                    "quality_status": None,
+                    "cached_at": None,
+                }
+            )
+            continue
+        ts = entry.get("timestamp")
+        age = (
+            round((now - datetime.fromisoformat(ts)).total_seconds(), 1)
+            if ts
+            else None
+        )
+        symbol_rows.append(
+            {
+                "symbol": sym,
+                "state": state.value,
+                "last": entry.get("last"),
+                "age_seconds": age,
+                "latency_ms": entry.get("latency_ms"),
+                "quality_status": entry.get("quality_status"),
+                "cached_at": entry.get("cached_at"),
+            }
+        )
+
+    return {
+        "health": health,
+        "config": market_cache.config.as_dict(),
+        "config_source": {
+            "enabled": "MARKET_CACHE_ENABLED",
+            "backend": "REDIS_URL",
+            "ttl_trading_s": "MARKET_CACHE_TTL_TRADING_S",
+            "ttl_closed_s": "MARKET_CACHE_TTL_CLOSED_S",
+        },
+        "components": components,
+        "overview": {
+            "instruments": overview["instruments"],
+            "cached_symbols": len(
+                [s for s in symbols if market_cache.get_quote(s)]
+            ),
+            "counts": overview["counts"],
+        },
+        "symbols": symbol_rows,
+        "stats": stats,
+        "keys": {
+            "quote": "icyquant:market:quote:{symbol}",
+            "bar": "icyquant:market:bar:1m:{symbol}",
+            "session": "icyquant:market:session:{exchange}",
+            "quality": "icyquant:market:quality:{symbol}",
+        },
     }
 
 

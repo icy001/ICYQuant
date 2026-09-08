@@ -1,11 +1,12 @@
 """Quote Service — the real-time quote pipeline hub.
 
-Pipeline (Commit 003 + 006)::
+Pipeline (Commit 003 + 006 + 007)::
 
     MarketDataAdapter  →  QuoteNormalizer (inside adapter)
                        →  Quality Gate (Commit 006, optional)
                        →  QuoteValidator
                        →  QuoteService (latest quote per symbol)
+                       →  MarketCache (Commit 007, optional)
                        →  Backend API
                        →  Frontend
 
@@ -22,6 +23,11 @@ the quote never reaches Bar aggregation or Strategy, and the full
 payload is preserved in the gate's quarantine.  Without a gate the
 service derives a stateless quality view on read so the Dashboard
 still shows honest quality information (Phase 1 mock feed).
+
+MarketCache (Commit 007): when a cache is attached to the feed,
+every quality-passed quote / closed bar / session is written
+through to the shared latest market state.  Cache failures degrade
+the cache (health view) but never break ingestion.
 
 Phase 1 uses MockMarketDataAdapter; swapping in a real broker
 adapter later requires no changes downstream (the Paper → Shadow →
@@ -92,7 +98,11 @@ class QuoteService:
     # ── write path ──────────────────────────────────────────────
 
     def update(
-        self, quote: MarketQuote, *, sequence_id: Optional[str] = None
+        self,
+        quote: MarketQuote,
+        *,
+        sequence_id: Optional[str] = None,
+        now: Optional[datetime] = None,
     ) -> MarketQuote:
         """Quality-gate + validate + store the latest quote.
 
@@ -104,10 +114,13 @@ class QuoteService:
         staleness window so that old quotes can still be queried
         for display (as STALE) — freshness is computed at read
         time instead.
+
+        ``now`` overrides the gate's evaluation clock (used by
+        tests for deterministic verdicts; defaults to wall time).
         """
         if self._quality_gate is not None:
             result = self._quality_gate.evaluate(
-                quote, sequence_id=sequence_id
+                quote, sequence_id=sequence_id, now=now
             )
             if not result.passed:
                 with self._lock:
@@ -181,6 +194,38 @@ class QuoteService:
             _display_gate = QualityGate()
         return _display_gate.derive(quote).as_dict()
 
+    def quality(self, symbol: str) -> Optional[dict]:
+        """Latest quality verdict view for a symbol (Commit 006).
+
+        Public read used by the QuoteFeed to tag cached quotes with
+        their quality status (Commit 007).  None when no quote.
+        """
+        quote = self.latest(symbol)
+        if quote is None:
+            return None
+        return self._quality_view(quote, symbol)
+
+    # ── Strategy Gate integration (Commit 006 §16) ─────────────
+
+    def tradable(self, symbol: str) -> bool:
+        """May Strategy / Paper Trading act on this symbol's data?
+
+        The single decision point so downstream code never
+        re-implements ad-hoc freshness checks::
+
+            Signal BUY → Quality Gate → FRESH   → allow into Paper
+            Signal BUY → Quality Gate → STALE   → BLOCK
+
+        With a gate attached: the authoritative write-path verdict.
+        Without one: a read-path derivation (freshness evaluated
+        against *now*, so old stored quotes honestly report False).
+        No quote at all → not tradable.
+        """
+        quote = self.latest(symbol)
+        if quote is None:
+            return False
+        return bool(self._quality_view(quote, symbol).get("tradable"))
+
     def snapshot(self, symbols: Optional[list[str]] = None) -> list[dict]:
         """Latest quote views for the given symbols (default: all
         symbols that have quotes)."""
@@ -241,11 +286,14 @@ class QuoteFeed:
         *,
         interval: float = 0.2,
         bar_service: Optional[object] = None,
+        market_cache: Optional[object] = None,
     ) -> None:
         self._adapter = adapter
         self._service = service
         self._interval = interval
         self._bar_service = bar_service  # BarService or None
+        # MarketCache (Commit 007) or None
+        self._market_cache = market_cache
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
 
@@ -275,8 +323,29 @@ class QuoteFeed:
                     try:
                         self._service.update(quote)
                         # Push to bar aggregator (Commit 004)
+                        closed = None
                         if self._bar_service is not None:
-                            self._bar_service.on_quote(quote)
+                            closed = self._bar_service.on_quote(quote)
+                        # Push to the market cache (Commit 007) —
+                        # only quality-passed data reaches here.  A
+                        # degraded cache never breaks ingestion: the
+                        # feed keeps retrying while the health view
+                        # reports DEGRADED (§15).
+                        if self._market_cache is not None:
+                            self._market_cache.set_quote(
+                                quote,
+                                quality=self._service.quality(
+                                    quote.symbol
+                                ),
+                            )
+                            if closed is not None and closed[0] is not None:
+                                self._market_cache.set_bar(closed[0])
+                            if self._bar_service is not None:
+                                live = self._bar_service.current_bar(
+                                    quote.symbol
+                                )
+                                if live is not None:
+                                    self._market_cache.set_bar(live)
                     except MarketDataError as exc:
                         self._service.mark_rejected()
                         logger.warning("quote rejected: %s", exc)

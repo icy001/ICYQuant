@@ -699,6 +699,155 @@ class TestQualityConfig:
         assert cfg.fresh_ms == 3000
 
 
+# --- Per-symbol duplicate counting (§15 drill-down) ---------------------------
+
+
+class TestDuplicateCount:
+    def test_per_symbol_count(self):
+        gate = QualityGate()
+        t1 = cst(2026, 9, 8, 10, 0)
+        gate.evaluate(q(ts=t1), now=t1)
+        assert gate.duplicate_count("159852") == 0
+        gate.evaluate(q(ts=t1), now=t1)          # dup #1
+        gate.evaluate(q(ts=t1), now=t1)          # dup #2
+        assert gate.duplicate_count("159852") == 2
+
+    def test_other_symbol_not_affected(self):
+        gate = QualityGate()
+        t1 = cst(2026, 9, 8, 10, 0)
+        gate.evaluate(q(ts=t1), now=t1)
+        gate.evaluate(q(ts=t1), now=t1)
+        assert gate.duplicate_count("510300") == 0
+
+    def test_reset_clears_counts(self):
+        gate = QualityGate()
+        t1 = cst(2026, 9, 8, 10, 0)
+        gate.evaluate(q(ts=t1), now=t1)
+        gate.evaluate(q(ts=t1), now=t1)
+        gate.reset()
+        assert gate.duplicate_count("159852") == 0
+
+
+# --- Strategy Gate integration (§16) ---------------------------------------------
+
+
+class TestStrategyGateIntegration:
+    def _service(self):
+        from services.market_data.validators.market_data_validator import (
+            MarketDataValidator,
+        )
+
+        return QuoteService(
+            quality_gate=QualityGate(),
+            validator=MarketDataValidator(stale_seconds=10**9),
+        )
+
+    def test_no_quote_not_tradable(self):
+        svc = QuoteService()
+        assert svc.tradable("159852") is False
+
+    def test_fresh_quote_tradable(self):
+        svc = self._service()
+        t = cst(2026, 9, 8, 10, 31)
+        svc.update(q(ts=t), now=t)
+        # verdict evaluated at write time with the session active
+        assert svc.tradable("159852") is True
+
+    def test_rejected_quote_not_tradable(self):
+        """Signal BUY → Gate → INVALID → BLOCK: the rejected quote
+        never even reaches the latest-quote cache."""
+        svc = self._service()
+        with pytest.raises(QualityRejectedError):
+            svc.update(q(last="-1"))
+        assert svc.tradable("159852") is False
+
+    def test_derive_mode_old_quote_not_tradable(self):
+        """Without a gate the read path re-derives freshness against
+        now — an old stored quote honestly reports not tradable."""
+        svc = QuoteService(
+            validator=__import__(
+                "services.market_data.validators.market_data_validator",
+                fromlist=["MarketDataValidator"],
+            ).MarketDataValidator(stale_seconds=10**9),
+        )
+        # quote from long ago within a continuous session
+        old = cst(2026, 9, 8, 10, 0)
+        svc.update(q(ts=old))
+        assert svc.tradable("159852") is False
+
+
+# --- Pipeline E2E (§18: Quote → Session → Gate → PASS/FAIL) ----------------------
+
+
+class TestPipelineEndToEnd:
+    """The full Commit 006 pipeline::
+
+        Quote → Normalizer → Session → Quality Gate
+             → PASS  → Strategy / Paper
+             → FAIL  → Quarantine
+    """
+
+    def _service(self):
+        from services.market_data.validators.market_data_validator import (
+            MarketDataValidator,
+        )
+
+        gate = QualityGate()
+        return (
+            QuoteService(
+                quality_gate=gate,
+                validator=MarketDataValidator(stale_seconds=10**9),
+            ),
+            gate,
+        )
+
+    def test_pass_path(self):
+        svc, gate = self._service()
+        t = cst(2026, 9, 8, 10, 31)
+        stored = svc.update(q(ts=t, volume=1000), now=t)
+        # stored → visible to Strategy
+        assert svc.latest("159852").last == stored.last
+        assert svc.tradable("159852") is True
+        # nothing rejected
+        assert gate.quarantine.count() == 0
+        assert gate.stats()["evaluated"] == 1
+
+    def test_fail_path_goes_to_quarantine(self):
+        svc, gate = self._service()
+        with pytest.raises(QualityRejectedError):
+            svc.update(q(bid="1.235", ask="1.233"))
+        # never stored
+        assert svc.latest("159852") is None
+        # preserved in quarantine with the verdict
+        assert gate.quarantine.count() == 1
+        item = gate.quarantine.recent()[0]
+        assert item["reasons"] == ["CROSSED_BOOK"]
+        assert item["status"] == "INVALID"
+        # Strategy sees: not tradable
+        assert svc.tradable("159852") is False
+
+    def test_duplicate_path_dropped_and_counted(self):
+        svc, gate = self._service()
+        t = cst(2026, 9, 8, 10, 31)
+        svc.update(q(ts=t), now=t)
+        with pytest.raises(QualityRejectedError):
+            svc.update(q(ts=t), now=t)  # resend
+        assert gate.duplicate_count("159852") == 1
+        # the original accepted quote is still the latest one
+        assert svc.latest("159852") is not None
+
+    def test_stale_valid_data_stored_but_blocked(self):
+        """STALE quote: valid data → stored for display, but the
+        Strategy Gate blocks it (BLOCK_TRADING, no quarantine)."""
+        svc, gate = self._service()
+        t = cst(2026, 9, 8, 10, 31)
+        stale = q(ts=t - timedelta(seconds=30))
+        svc.update(stale, now=t)
+        assert svc.latest("159852") is not None
+        assert gate.quarantine.count() == 0
+        assert svc.tradable("159852") is False
+
+
 # --- Derive (stateless read path) -----------------------------------------------------
 
 

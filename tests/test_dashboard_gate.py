@@ -2476,3 +2476,86 @@ def test_d39_market_data_quality():
 
     # RBAC: no token → 401
     assert client.get("/api/dashboard/quality").status_code == 401
+
+
+# --- D-40 Market Cache (Commit 007 — Redis Market Cache) ---------------------
+
+
+def test_d40_market_cache():
+    """Market cache endpoint: infrastructure health + per-symbol
+    cache states + key convention, through the API only."""
+    import time as _time
+
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    # ensure the feed runs so the cache actually fills (lazy start)
+    client.get("/api/dashboard/quotes", headers=h)
+    deadline = _time.time() + 10.0
+    body = None
+    while _time.time() < deadline:
+        res = client.get("/api/dashboard/market-cache", headers=h)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        if body["overview"]["counts"]["MISS"] < body["overview"]["instruments"]:
+            break
+        _time.sleep(0.4)
+    assert body is not None, "market cache endpoint never responded"
+    assert (
+        body["overview"]["counts"]["MISS"]
+        < body["overview"]["instruments"]
+    ), "no quote ever reached the cache"
+
+    # health: backend + trading path honesty (§14/§15)
+    health = body["health"]
+    assert health["status"] in ("HEALTHY", "DEGRADED")
+    assert health["backend"] in ("memory", "redis")
+    assert "trading_allowed" in health
+    assert "consecutive_failures" in health
+
+    # config surfaced (env-driven, never hard-coded)
+    for key in ("enabled", "backend", "ttl_trading_s", "ttl_closed_s"):
+        assert key in body["config"], f"missing config {key}"
+    assert "config_source" in body
+
+    # per-component health (§13)
+    for name in ("quote", "bar", "session", "quality"):
+        assert name in body["components"], f"missing component {name}"
+        assert body["components"][name]["status"] in (
+            "HEALTHY", "EMPTY", "DEGRADED"
+        )
+
+    # per-symbol rows for the whole universe
+    assert len(body["symbols"]) == 11
+    valid_states = {"LIVE", "STALE", "MARKET_PAUSED", "MARKET_CLOSED", "MISS"}
+    for row in body["symbols"]:
+        assert row["state"] in valid_states
+        for field in (
+            "symbol", "state", "last", "age_seconds", "latency_ms",
+            "quality_status",
+        ):
+            assert field in row, f"row missing {field}"
+    cached = [r for r in body["symbols"] if r["state"] != "MISS"]
+    assert cached, "at least one symbol must be cached by now"
+    for row in cached:
+        assert row["last"] is not None
+        assert row["quality_status"]
+
+    # overview counts add up (§13)
+    counts = body["overview"]["counts"]
+    assert sum(counts.values()) == body["overview"]["instruments"]
+    assert body["overview"]["cached_symbols"] == len(cached)
+
+    # stats reflect writes through the feed
+    assert body["stats"]["writes"]["quote"] > 0
+    assert body["stats"]["writes"]["session"] >= 1
+
+    # key convention surfaced once for every consumer (§4)
+    assert body["keys"]["quote"] == "icyquant:market:quote:{symbol}"
+    assert body["keys"]["bar"] == "icyquant:market:bar:1m:{symbol}"
+    assert body["keys"]["session"] == "icyquant:market:session:{exchange}"
+    assert body["keys"]["quality"] == "icyquant:market:quality:{symbol}"
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/market-cache").status_code == 401
+
