@@ -5397,6 +5397,72 @@
   }
 
   /* ==================================================================
+   * Commit 006 — Market Data Quality panel
+   *
+   * Gate config (env-driven thresholds), evaluation stats and the
+   * quarantine list.  Rejected data is never deleted — it is
+   * quarantined so "why did ICYQuant produce no order?" is always
+   * traceable.
+   * ================================================================== */
+  function renderQualityPanel(data) {
+    if (!data) {
+      return UI.stateEmpty("Quality API unavailable",
+        "The market data quality gate did not respond. / 数据质量服务未响应");
+    }
+    var cfg = data.config || {};
+    var stats = data.stats || {};
+    var qs = data.quarantine || {};
+    var items = data.quarantine_items || [];
+    var gateBadge = data.gate_enabled
+      ? UI.badge("GATE ON", "ok")
+      : UI.badge("DERIVE MODE", "neutral");
+
+    var html =
+      '<div class="md-quality-wrap">' +
+      '<div class="md-quality-config">' +
+      '<div class="md-ms-label">Thresholds <span class="md-ms-sub">(env)</span></div>' +
+      '<div class="md-quality-thresholds t-num">' +
+      '<span>fresh &lt; <b>' + esc(cfg.fresh_ms) + 'ms</b></span>' +
+      '<span>stale ≥ <b>' + esc(cfg.stale_ms) + 'ms</b></span>' +
+      '<span>future ± <b>' + esc(cfg.future_tolerance_ms) + 'ms</b></span>' +
+      '<span>outlier &gt; <b>' + esc(cfg.outlier_pct) + '%</b></span>' +
+      '</div>' +
+      '<div class="md-ms-sub">' + gateBadge +
+      ' WARNING trading: ' + (cfg.allow_warning_trading ? "allowed" : "blocked (default)") +
+      '</div>' +
+      '</div>' +
+      '<div class="md-quality-stats">' +
+      '<div class="md-ms-label">Evaluations</div>' +
+      '<div class="md-quality-nums t-num">' +
+      '<span>evaluated <b>' + esc(stats.evaluated || 0) + '</b></span>' +
+      '<span>rejected <b>' + esc(stats.rejected || 0) + '</b></span>' +
+      '<span>quarantined <b>' + esc(qs.total_rejected || 0) + '</b></span>' +
+      '</div>' +
+      '<div class="md-ms-sub">' +
+      (items.length ? items.length + " recent item(s) below" : "No rejected data — clean feed") +
+      '</div>' +
+      '</div>' +
+      '</div>';
+
+    if (items.length) {
+      var rows = items.map(function (it) {
+        var tone = it.status === "INVALID" || it.status === "QUARANTINED" ? "neg" : "warn";
+        return (
+          '<div class="md-quar-row">' +
+          '<span class="md-quar-sym t-num">' + esc(it.symbol) + '</span>' +
+          '<span class="md-quar-status ' + tone + '">' + esc(it.status) + '</span>' +
+          '<span class="md-quar-reasons">' + esc((it.reasons || []).join(", ")) + '</span>' +
+          '<span class="md-quar-time t-num">' +
+          (it.received_at ? it.received_at.substring(11, 19) : "—") + '</span>' +
+          '</div>'
+        );
+      }).join("");
+      html += '<div class="md-quar-list">' + rows + '</div>';
+    }
+    return html;
+  }
+
+  /* ==================================================================
    * Commit 003 — Market Data / Real-time Quote pipeline
    *
    * Reads the latest validated quote snapshot from QuoteService via
@@ -5420,6 +5486,16 @@
     var marketStatus = await useMarketStatus();
     var marketStatusPanel = UI.panel("Market Status / 市场状态",
       renderMarketStatus(marketStatus), { actions: "" });
+
+    // ── Data Quality (Commit 006) — gate config + quarantine ──
+    var qualityData = null;
+    try {
+      qualityData = await ICY_API.marketQuality(20);
+    } catch (e) {
+      qualityData = null;
+    }
+    var qualityPanel = UI.panel("Data Quality / 数据质量",
+      renderQualityPanel(qualityData), { actions: "" });
 
     var universeInfo;
     try {
@@ -5493,6 +5569,32 @@
       var pct = Number(q.change_pct) || 0;
       var dir = pct > 0 ? "pos" : pct < 0 ? "neg" : "neutral";
       var sign = pct > 0 ? "+" : "";
+      // ── Data Quality block (Commit 006) ──
+      var qualityHtml = "";
+      var quality = v.quality;
+      if (quality && quality.checks) {
+        var qsTone = quality.status === "FRESH" ? "ok"
+          : quality.status === "INVALID" || quality.status === "QUARANTINED" ? "bad"
+          : "warn";
+        qualityHtml = '<div class="md-quote-quality">' +
+          '<span class="md-qs md-qs-' + qsTone + '">● ' + esc(quality.status) + '</span>';
+        var checkRows = [
+          ["Price", quality.checks.price],
+          ["Timestamp", quality.checks.timestamp],
+          ["Session", quality.checks.session],
+          ["Volume", quality.checks.volume],
+        ].map(function (c) {
+          return '<span class="md-qc ' + (c[1] ? "ok" : "bad") + '">' +
+            (c[1] ? "✓" : "✗") + " " + c[0] + '</span>';
+        }).join("");
+        qualityHtml += '<span class="md-qc-row">' + checkRows + '</span>';
+        if (quality.tradable === false) {
+          qualityHtml += '<span class="md-quote-blocked">Trading: BLOCKED' +
+            (quality.reasons && quality.reasons.length
+              ? " · " + esc(quality.reasons.join(", ")) : "") + '</span>';
+        }
+        qualityHtml += '</div>';
+      }
       return (
         '<div class="ds-metric-card md-quote-card">' +
         '<div class="md-quote-head"><span class="md-quote-sym t-num">' + esc(symbol) + '</span>' +
@@ -5504,6 +5606,7 @@
         '<div class="md-quote-sub t-num">Vol ' + fmtQty(q.volume) + ' · ' + fmtTurnover(q.turnover) + '</div>' +
         '<div class="md-quote-lat t-num">' + (q.age_seconds != null ? q.age_seconds.toFixed(1) + "s · " : "") +
         (q.latency_ms != null ? q.latency_ms + "ms" : "") + '</div>' +
+        qualityHtml +
         '</div>'
       );
     }).join("");
@@ -5623,6 +5726,7 @@
     return (
       UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
       marketStatusPanel +
+      qualityPanel +
       kpiHtml +
       UI.sectionHeading("Universe Quotes",
         UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +

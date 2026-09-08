@@ -2413,3 +2413,66 @@ def test_d38_market_status_api():
 
     # RBAC: no token → 401
     assert client.get("/api/dashboard/market-status").status_code == 401
+
+
+# --- D-39 Market Data Quality (Commit 006 — Quality Gate) --------------------
+
+
+def test_d39_market_data_quality():
+    """Quality endpoint + quality fields on quotes/bars views."""
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    res = client.get("/api/dashboard/quality", headers=h)
+    assert res.status_code == 200
+    body = res.json()
+    for key in (
+        "gate_enabled", "config", "stats", "quote_service",
+        "quarantine", "quarantine_items", "config_source",
+    ):
+        assert key in body, f"missing {key}"
+    # env-driven thresholds are surfaced (never hard-coded)
+    cfg = body["config"]
+    for key in (
+        "fresh_ms", "warning_ms", "stale_ms",
+        "future_tolerance_ms", "outlier_pct", "allow_warning_trading",
+    ):
+        assert key in cfg, f"missing config {key}"
+    # limit validation
+    assert (
+        client.get(
+            "/api/dashboard/quality?limit=0", headers=h
+        ).status_code
+        == 400
+    )
+
+    # quotes views carry the quality verdict (derive mode on the
+    # Phase 1 mock feed)
+    res = client.get("/api/dashboard/quotes", headers=h)
+    assert res.status_code == 200
+    quotes = res.json()["quotes"]
+    assert quotes
+    for v in quotes:
+        assert "quality" in v, "quote view missing quality"
+        if v["quality"] is not None:
+            quality = v["quality"]
+            for key in (
+                "status", "passed", "tradable", "action",
+                "checks", "reasons", "quote_age_ms", "latency_ms",
+            ):
+                assert key in quality, f"quality missing {key}"
+            valid_status = {
+                "FRESH", "WARNING", "STALE", "INVALID", "QUARANTINED",
+            }
+            assert quality["status"] in valid_status
+
+    # bars expose structural quality stats
+    res = client.get("/api/dashboard/bars/159852", headers=h)
+    assert res.status_code == 200
+    quality = res.json()["quality"]
+    assert "checked" in quality
+    assert "invalid_count" in quality
+    assert "invalid_bars" in quality
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/quality").status_code == 401

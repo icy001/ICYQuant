@@ -1,8 +1,9 @@
 """Quote Service — the real-time quote pipeline hub.
 
-Pipeline (Commit 003)::
+Pipeline (Commit 003 + 006)::
 
     MarketDataAdapter  →  QuoteNormalizer (inside adapter)
+                       →  Quality Gate (Commit 006, optional)
                        →  QuoteValidator
                        →  QuoteService (latest quote per symbol)
                        →  Backend API
@@ -13,6 +14,14 @@ computes freshness (FRESH / WARNING / STALE / OFFLINE) against
 configurable thresholds.  QuoteFeed drives any adapter in a
 background thread, pushing each streamed quote through validation
 into the service.
+
+Quality Gate (Commit 006): when a gate is attached, every quote is
+evaluated before storage.  Rejected data (INVALID / QUARANTINED /
+duplicates) raises QualityRejectedError — the QuoteFeed logs it,
+the quote never reaches Bar aggregation or Strategy, and the full
+payload is preserved in the gate's quarantine.  Without a gate the
+service derives a stateless quality view on read so the Dashboard
+still shows honest quality information (Phase 1 mock feed).
 
 Phase 1 uses MockMarketDataAdapter; swapping in a real broker
 adapter later requires no changes downstream (the Paper → Shadow →
@@ -30,10 +39,14 @@ from typing import Optional
 from .adapters.base import MarketDataAdapter
 from .domain.instrument import Exchange
 from .domain.quote import MarketQuote, QuoteFreshness
-from .exceptions.market_data_error import MarketDataError
+from .exceptions.market_data_error import MarketDataError, QualityRejectedError
 from .validators.market_data_validator import MarketDataValidator
 
 logger = logging.getLogger(__name__)
+
+# Stateless gate used only for read-path quality derivation when no
+# write-path gate is attached (Phase 1 mock feed mode).
+_display_gate = None
 
 
 @dataclass(frozen=True)
@@ -56,6 +69,7 @@ class QuoteService:
         *,
         validator: Optional[MarketDataValidator] = None,
         thresholds: Optional[FreshnessThresholds] = None,
+        quality_gate: Optional[object] = None,
     ) -> None:
         self._lock = threading.Lock()
         self._quotes: dict[str, MarketQuote] = {}
@@ -63,22 +77,46 @@ class QuoteService:
             stale_seconds=600
         )
         self._thresholds = thresholds or FreshnessThresholds()
+        # Quality Gate (Commit 006).  None → derive-only mode.
+        self._quality_gate = quality_gate
         # stats
         self._accepted = 0
         self._rejected = 0
+        self._quality_rejected = 0
+
+    @property
+    def quality_gate(self) -> Optional[object]:
+        """The attached Quality Gate (or None)."""
+        return self._quality_gate
 
     # ── write path ──────────────────────────────────────────────
 
-    def update(self, quote: MarketQuote) -> MarketQuote:
-        """Validate + store the latest quote for its symbol.
+    def update(
+        self, quote: MarketQuote, *, sequence_id: Optional[str] = None
+    ) -> MarketQuote:
+        """Quality-gate + validate + store the latest quote.
 
         Stamps ``received_timestamp`` with the ICYQuant receive time.
-        Invalid quotes are rejected (exception propagates) and never
-        stored.  Quote age is NOT re-validated here beyond the
-        validator's staleness window so that old quotes can still be
-        queried for display (as STALE) — freshness is computed at
-        read time instead.
+        When the Quality Gate rejects the quote a
+        QualityRejectedError propagates (the payload is already
+        quarantined inside the gate) and nothing is stored.  Quote
+        age is NOT re-validated here beyond the validator's
+        staleness window so that old quotes can still be queried
+        for display (as STALE) — freshness is computed at read
+        time instead.
         """
+        if self._quality_gate is not None:
+            result = self._quality_gate.evaluate(
+                quote, sequence_id=sequence_id
+            )
+            if not result.passed:
+                with self._lock:
+                    self._quality_rejected += 1
+                raise QualityRejectedError(
+                    quote.symbol,
+                    result.status.value,
+                    result.reasons_summary,
+                )
         self._validator.validate(quote)
         received = datetime.now(timezone.utc)
         if quote.received_timestamp is None:
@@ -104,6 +142,7 @@ class QuoteService:
                 "status": QuoteFreshness.OFFLINE.value,
                 "quote": None,
                 "age_seconds": None,
+                "quality": None,
             }
         age = quote.age_seconds()
         freshness = quote.freshness(
@@ -120,7 +159,27 @@ class QuoteService:
             "status": data["status"],
             "quote": data,
             "age_seconds": round(age, 2),
+            "quality": self._quality_view(quote, symbol),
         }
+
+    def _quality_view(self, quote: MarketQuote, symbol: str) -> dict:
+        """Quality snapshot for the API view (Commit 006).
+
+        With an attached gate: the authoritative write-path verdict.
+        Without one: a stateless derivation computed on read so the
+        UI still shows honest quality (price / timestamp / session /
+        volume checks + freshness).
+        """
+        if self._quality_gate is not None:
+            result = self._quality_gate.last_result(symbol)
+            if result is not None:
+                return result.as_dict()
+        global _display_gate
+        if _display_gate is None:
+            from .quality.quality_gate import QualityGate
+
+            _display_gate = QualityGate()
+        return _display_gate.derive(quote).as_dict()
 
     def snapshot(self, symbols: Optional[list[str]] = None) -> list[dict]:
         """Latest quote views for the given symbols (default: all
@@ -141,6 +200,8 @@ class QuoteService:
                 "symbols_tracked": len(self._quotes),
                 "quotes_accepted": self._accepted,
                 "quotes_rejected": self._rejected,
+                "quality_rejected": self._quality_rejected,
+                "quality_gate_enabled": self._quality_gate is not None,
                 "thresholds": {
                     "fresh_seconds": self._thresholds.fresh_seconds,
                     "stale_seconds": self._thresholds.stale_seconds,
@@ -156,6 +217,9 @@ class QuoteService:
             self._quotes.clear()
             self._accepted = 0
             self._rejected = 0
+            self._quality_rejected = 0
+            if self._quality_gate is not None:
+                self._quality_gate.reset()
 
 
 class QuoteFeed:

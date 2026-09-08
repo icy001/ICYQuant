@@ -531,6 +531,13 @@
       return this.get("/dashboard/market-status");
     },
 
+    // ── Market Data Quality (Commit 006) ──────────────────────
+    /** Quality gate config + stats + quarantined items. */
+    marketQuality: async function (limit) {
+      var qs = limit ? "?limit=" + encodeURIComponent(limit) : "";
+      return this.get("/dashboard/quality" + qs);
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

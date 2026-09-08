@@ -44,6 +44,23 @@ class AdapterAlreadyConnectedError(MarketDataError):
     """connect() called when already connected."""
 
 
+class QualityRejectedError(MarketDataError):
+    """The Quality Gate rejected the data (Commit 006).
+
+    The verdict and the quarantined payload live on the gate; this
+    exception only signals the write path (QuoteFeed / BarService)
+    that the item must not flow downstream.
+    """
+
+    def __init__(self, symbol: str, status: str, reasons: str) -> None:
+        self.symbol = symbol
+        self.status = status
+        self.reasons = reasons
+        super().__init__(
+            f"quality gate rejected {symbol}: {status} ({reasons})"
+        )
+
+
 __all__ = [
     "MarketDataError",
     "InvalidQuoteError",
@@ -54,4 +71,5 @@ __all__ = [
     "TimestampRegressionError",
     "AdapterNotConnectedError",
     "AdapterAlreadyConnectedError",
+    "QualityRejectedError",
 ]

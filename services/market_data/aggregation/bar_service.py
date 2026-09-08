@@ -101,6 +101,14 @@ class BarService:
     def as_snapshot(self, symbol: str, limit: int = 200) -> dict:
         """Serializable view for API responses."""
         bars = self.bars(symbol, limit)
+        # Bar quality (Commit 006): structural OHLCV check per bar —
+        # marked, never modified.
+        from ..quality.bar_quality import validate_bar
+
+        invalid_bars: list[str] = []
+        for b in bars:
+            if not validate_bar(b).valid:
+                invalid_bars.append(b.bar_id)
         return {
             "symbol": symbol,
             "timeframe": "1m",
@@ -109,6 +117,11 @@ class BarService:
             "closed_count": sum(1 for b in bars if b.is_closed),
             "has_live": any(not b.is_closed for b in bars),
             "gaps": self.gaps(symbol),
+            "quality": {
+                "checked": len(bars),
+                "invalid_count": len(invalid_bars),
+                "invalid_bars": invalid_bars,
+            },
         }
 
 

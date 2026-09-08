@@ -1646,6 +1646,68 @@ def market_status(
     return calendar.status()
 
 
+# ===========================================================================
+# Commit 006 — Market Data Quality API
+#
+# The Quality Gate verdicts + quarantine for the whole universe:
+# config (env-driven thresholds), evaluation stats, and the most
+# recent rejected payloads.  Rejected data is never deleted — it is
+# quarantined so "why did ICYQuant produce no order?" is always
+# traceable:  Quote → Quality Gate → reason → order blocked.
+# ===========================================================================
+
+
+@router.get("/dashboard/quality")
+def market_data_quality(
+    limit: int = 50,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Market data quality gate status + quarantine.
+
+    Query params:
+        limit — max quarantined items to return (1–200, default 50)
+    """
+    if limit < 1 or limit > 200:
+        raise HTTPException(
+            status_code=400, detail="limit must be between 1 and 200"
+        )
+    from services.market_data.quality import QualityConfig
+    from services.market_data.quality.quarantine import QuarantineStore
+    from services.market_data.quote_service import quote_service
+
+    gate = quote_service.quality_gate
+    cfg = QualityConfig.from_env()
+    if gate is not None:
+        stats = gate.stats()
+        quarantine = gate.quarantine.recent(limit)
+        q_stats = gate.quarantine.stats()
+        gate_enabled = True
+    else:
+        # Phase 1 mock feed: no write-path gate attached; the quotes
+        # API still derives quality on read (see quotes_snapshot).
+        stats = {"evaluated": 0, "rejected": 0, "by_status": {}}
+        quarantine = []
+        q_stats = QuarantineStore().stats()
+        gate_enabled = False
+
+    return {
+        "gate_enabled": gate_enabled,
+        "config": cfg.as_dict(),
+        "config_source": {
+            "fresh_ms": "MARKET_DATA_FRESH_MS",
+            "warning_ms": "MARKET_DATA_WARNING_MS",
+            "stale_ms": "MARKET_DATA_STALE_MS",
+            "future_tolerance_ms": "MARKET_DATA_FUTURE_TOLERANCE_MS",
+            "outlier_pct": "MARKET_DATA_OUTLIER_PCT",
+            "allow_warning_trading": "MARKET_DATA_ALLOW_WARNING_TRADING",
+        },
+        "stats": stats,
+        "quote_service": quote_service.stats(),
+        "quarantine": q_stats,
+        "quarantine_items": quarantine,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Factor paper trading (Alpha021) - deterministic research-layer replay
 # ---------------------------------------------------------------------------
