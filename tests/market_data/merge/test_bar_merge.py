@@ -518,6 +518,153 @@ class TestSyntheticProvider:
             assert validate_bar(b).valid, b.as_dict()
 
 
+# ── §17 time continuity ─────────────────────────────────────────
+
+
+class TestTimeContinuity:
+    """§17 — within a continuous trading range Δt = 1 minute; the
+    11:29 → 13:00 lunch jump is a normal junction, not a gap."""
+
+    def _provider(self, now):
+        return SyntheticHistoricalProvider(clock=_FixedClock(now))
+
+    def test_one_minute_steps_within_session(self):
+        provider = self._provider(
+            datetime(2026, 9, 8, 2, 35, tzinfo=timezone.utc)
+        )
+        bars = provider.bars("159852", limit=30)
+        for prev, cur in zip(bars, bars[1:]):
+            assert cur.timestamp - prev.timestamp == timedelta(minutes=1)
+
+    def test_lunch_junction_is_91_minutes(self):
+        # 13:05 CST; limit 125 = PM 13:00–13:04 (5) + AM
+        # 09:30–11:29 (120) — exactly one seam
+        provider = self._provider(
+            datetime(2026, 9, 8, 5, 5, tzinfo=timezone.utc)
+        )
+        bars = provider.bars("159852", limit=125)
+        assert len(bars) == 125
+        diffs = [
+            cur.timestamp - prev.timestamp
+            for prev, cur in zip(bars, bars[1:])
+        ]
+        jumps = [d for d in diffs if d != timedelta(minutes=1)]
+        assert len(jumps) == 1                     # exactly one seam
+        assert jumps[0] == timedelta(minutes=91)   # 11:29 → 13:00
+
+    def test_day_boundary_is_overnight_jump(self):
+        # Tuesday 09:35 CST; limit 245 = Tue 09:30–09:34 (5) +
+        # Monday's full session (240) — exactly two seams
+        provider = self._provider(
+            datetime(2026, 9, 8, 1, 35, tzinfo=timezone.utc)
+        )
+        bars = provider.bars("159852", limit=245)
+        assert len(bars) == 245
+        diffs = [
+            cur.timestamp - prev.timestamp
+            for prev, cur in zip(bars, bars[1:])
+        ]
+        jumps = [d for d in diffs if d != timedelta(minutes=1)]
+        # exactly one overnight seam (Monday 14:59 → Tuesday 09:30
+        # = 1111 minutes) and one lunch seam (91 minutes)
+        assert sorted(jumps) == [
+            timedelta(minutes=91), timedelta(minutes=1111)
+        ]
+
+    def test_merged_series_junction_is_adjacent(self):
+        """§1 — history's last bucket and realtime's first bucket
+        are consecutive minutes of the same session."""
+        provider = FakeProvider(
+            [_bar(ts=m(i)) for i in range(3)]
+        )
+        realtime = FakeRealtime([_bar(ts=m(3), is_closed=False)])
+        result = _engine(provider, realtime).unified("159852")
+        bars = [b for b, _ in result["bars"]]
+        assert len(bars) == 4
+        for prev, cur in zip(bars, bars[1:]):
+            assert cur.timestamp - prev.timestamp == timedelta(minutes=1)
+
+
+# ── §13 Redis integration (real MarketCache) ─────────────────────
+
+
+class TestRedisIntegration:
+    """§19 Redis gate — historical/realtime/merged state → Redis,
+    old-bar protection, cache restart recovery."""
+
+    def _real_cache(self) -> MarketCache:
+        return MarketCache(
+            config=CacheConfig(enabled=True),
+            quality_config=QualityConfig(),
+        )
+
+    def test_historical_to_redis_cold_start(self):
+        """Cold start (§9): no realtime yet — the newest merged
+        historical bar already lands in the cache."""
+        cache = self._real_cache()
+        provider = FakeProvider(
+            [_bar(ts=m(i), close=Decimal(f"1.2{i}")) for i in range(3)]
+        )
+        _engine(provider, FakeRealtime([]), cache=cache).unified("159852")
+        cached = cache.get_latest_bar("159852")
+        assert cached is not None
+        assert cached["timestamp"] == m(2).isoformat()
+        assert cached["close"] == "1.22"
+
+    def test_old_bar_protection(self):
+        """Old bar protection — a merge whose latest bar is OLDER
+        than what the cache already holds must never regress it."""
+        cache = self._real_cache()
+        provider = FakeProvider([_bar(ts=m(0))])
+        realtime = FakeRealtime(
+            [_bar(ts=m(2), close=Decimal("1.234"))]
+        )
+        engine = _engine(provider, realtime, cache=cache)
+        engine.unified("159852")
+        assert cache.get_latest_bar("159852")["timestamp"] == m(2).isoformat()
+
+        # a later merge sees only stale/older realtime data (e.g. a
+        # lagging replica) — the cache must keep the newer state
+        engine._realtime = FakeRealtime([_bar(ts=m(1))])
+        engine.unified("159852")
+        assert cache.get_latest_bar("159852")["timestamp"] == m(2).isoformat()
+        assert cache.get_latest_bar("159852")["close"] == "1.234"
+
+    def test_cache_restart_recovery(self):
+        """§10 warm start — Redis restarts, the cache is empty, but
+        the series never restarts from zero: the next merge rebuilds
+        the same unified state and re-seeds the cache."""
+        provider = FakeProvider(
+            [_bar(ts=m(i)) for i in range(3)]
+        )
+        realtime = FakeRealtime(
+            [_bar(ts=m(3), is_closed=False)]
+        )
+
+        cache_a = self._real_cache()
+        engine_a = _engine(provider, realtime, cache=cache_a)
+        first = engine_a.unified("159852")
+        ts_a = [b.timestamp for b, _ in first["bars"]]
+        assert cache_a.get_latest_bar("159852") is not None
+
+        # ── Redis restart: brand-new empty cache ──
+        cache_b = self._real_cache()
+        assert cache_b.get_latest_bar("159852") is None
+
+        engine_b = _engine(provider, realtime, cache=cache_b)
+        second = engine_b.unified("159852")
+        ts_b = [b.timestamp for b, _ in second["bars"]]
+
+        # the series is identical — not "from zero"
+        assert ts_b == ts_a
+        assert second["counts"] == first["counts"]
+        assert second["junction"]["seamless"] is True
+        # and the restarted cache is re-seeded with the latest bar
+        reseeded = cache_b.get_latest_bar("159852")
+        assert reseeded is not None
+        assert reseeded["timestamp"] == m(3).isoformat()
+
+
 # ── E2E: engine + synthetic provider + real BarService + cache ──
 
 
