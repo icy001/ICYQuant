@@ -2559,3 +2559,90 @@ def test_d40_market_cache():
     # RBAC: no token → 401
     assert client.get("/api/dashboard/market-cache").status_code == 401
 
+
+# --- D-41 Historical + Real-time Merge (Commit 008) --------------------------
+
+
+def test_d41_historical_realtime_merge():
+    """Bars endpoint returns ONE unified series: historical + realtime
+    merged, seamless junction, honest merge diagnostics."""
+    import time as _time
+
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    # start the feed, then wait for the realtime side to appear
+    client.get("/api/dashboard/quotes", headers=h)
+    deadline = _time.time() + 12.0
+    body = None
+    while _time.time() < deadline:
+        res = client.get(
+            "/api/dashboard/bars/159852?limit=120", headers=h
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        if body["merge"]["realtime_count"] >= 1:
+            break
+        _time.sleep(0.5)
+    assert body is not None, "bars endpoint never responded"
+    assert (
+        body["merge"]["realtime_count"] >= 1
+    ), "realtime side never joined the series"
+
+    # §5 — strictly ASC, §6 — one bar per bucket
+    ts = [b["timestamp"] for b in body["bars"]]
+    assert ts == sorted(ts)
+    assert len(ts) == len(set(ts))
+
+    # §9 cold start — history is already there (no waiting for
+    # realtime to accumulate); counts obey the merge-key identity
+    # (total inputs = h + r - overlaps) and the response is
+    # tail-clipped to the limit
+    assert body["merge"]["historical_count"] > 0
+    mg0 = body["merge"]
+    inputs = (
+        mg0["historical_count"] + mg0["realtime_count"]
+        - mg0["overlaps"]
+    )
+    assert body["count"] == len(body["bars"]) <= 120
+    assert inputs >= body["count"]
+
+    # per-bar provenance + unified model (only MarketBar, §3)
+    sources = {b["source"] for b in body["bars"]}
+    assert sources <= {"HISTORICAL", "REALTIME"}
+    assert "REALTIME" in sources
+    for bar in body["bars"]:
+        for field in (
+            "symbol", "exchange", "timeframe", "timestamp",
+            "open", "high", "low", "close", "volume", "turnover",
+            "is_closed", "source",
+        ):
+            assert field in bar, f"missing {field}"
+        assert bar["symbol"] == "159852"
+        assert bar["exchange"] == "SZSE"
+
+    # seamless junction — history ends exactly where realtime begins
+    mg = body["merge"]
+    assert mg["mode"] == "MERGED"
+    assert mg["seamless"] is True
+    assert mg["overlaps"] == 0
+    assert mg["historical_last"] < mg["realtime_first"]
+    hist_ts = [
+        b["timestamp"] for b in body["bars"]
+        if b["source"] == "HISTORICAL"
+    ]
+    rt_ts = [
+        b["timestamp"] for b in body["bars"]
+        if b["source"] == "REALTIME"
+    ]
+    assert max(hist_ts) < min(rt_ts)
+
+    # §8 — no spurious revisions in the happy path
+    assert mg["revision_count"] == 0
+
+    # §11 — gaps reported with the aggregator id convention
+    assert isinstance(body["gaps"], list)
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/bars/159852").status_code == 401
+

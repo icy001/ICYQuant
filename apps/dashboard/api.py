@@ -1581,17 +1581,21 @@ def bars(
     limit: int = 200,
     principal: Principal = Depends(require_roles()),
 ) -> dict:
-    """1-minute OHLCV bars for a universe symbol.
+    """Unified 1-minute OHLCV series: historical + realtime merged.
 
     Query params:
         symbol     — 6-digit code (must be in universe)
-        timeframe  — "1m" (only 1m supported in Commit 004)
+        timeframe  — "1m" (only 1m supported)
         limit      — max bars to return (1–500, default 200)
 
-    Returns closed bars + the current in-progress bar (is_closed=
-    False) if one exists.
+    Commit 008: the response is one seamless series — the frontend
+    never knows which bars came from history and which from the live
+    feed.  Merge diagnostics (counts, junction, revisions, gaps) are
+    reported under ``merge``.
     """
-    from services.market_data.aggregation.bar_service import bar_service
+    from services.market_data.merge import merge_engine
+    from services.market_data.quality.bar_quality import validate_bar
+    from services.market_data.quote_service import quote_service
     from services.market_data.universe import universe
 
     sym = symbol.strip()
@@ -1612,10 +1616,62 @@ def bars(
             detail="limit must be between 1 and 500",
         )
     _ensure_quote_feed()
-    snapshot = bar_service.as_snapshot(sym, limit)
-    snapshot["name"] = inst.name
-    snapshot["instrument_type"] = inst.instrument_type.value
-    return snapshot
+    # cold start with no realtime yet → anchor the history walk on
+    # the latest quote so the chart lines up with the live price
+    anchor = None
+    try:
+        latest = quote_service.latest(sym)
+        if latest is not None:
+            anchor = latest.last
+    except Exception:
+        anchor = None
+    result = merge_engine.unified(
+        sym, timeframe, limit, anchor_price=anchor
+    )
+
+    bars_payload: list[dict] = []
+    invalid_bars: list[str] = []
+    for bar, source in result["bars"]:
+        d = bar.as_dict()
+        d["source"] = source
+        if not validate_bar(bar).valid:
+            invalid_bars.append(bar.bar_id)
+        bars_payload.append(d)
+
+    counts = result["counts"]
+    junction = result["junction"]
+    revisions = [r.as_dict() for r in result["revisions"]]
+    gaps = result["gaps"]
+    return {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "name": inst.name,
+        "instrument_type": inst.instrument_type.value,
+        "bars": bars_payload,
+        "count": len(bars_payload),
+        "closed_count": sum(1 for b in bars_payload if b["is_closed"]),
+        "has_live": any(not b["is_closed"] for b in bars_payload),
+        "gaps": gaps,
+        "quality": {
+            "checked": len(bars_payload),
+            "invalid_count": len(invalid_bars),
+            "invalid_bars": invalid_bars,
+        },
+        "merge": {
+            "enabled": merge_engine.config.enabled,
+            "provider": "synthetic",
+            "historical_count": counts["historical"],
+            "realtime_count": counts["realtime"],
+            "overlaps": counts["overlaps"],
+            "mode": junction["mode"],
+            "seamless": junction["seamless"],
+            "historical_last": junction["historical_last"],
+            "realtime_first": junction["realtime_first"],
+            "revision_count": len(revisions),
+            "revisions": revisions,
+            "gap_count": len(gaps),
+        },
+    }
 
 
 @router.get("/dashboard/bars/{symbol}")

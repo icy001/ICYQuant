@@ -5897,6 +5897,24 @@
       var chgDir = lastChg > 0 ? "pos" : lastChg < 0 ? "neg" : "neutral";
       var chgSign = lastChg > 0 ? "+" : "";
 
+      // Commit 008 — merge provenance: history + realtime are one
+      // continuous chart; gaps/revisions surface as warn badges.
+      var mg = barsData.merge || {};
+      var mergeBadge = '';
+      if (mg.historical_count != null || mg.realtime_count != null) {
+        mergeBadge = '<span class="md-kline-merge">HIST ' +
+          (mg.historical_count || 0) + ' + RT ' +
+          (mg.realtime_count || 0) + '</span>';
+      }
+      if (mg.gap_count) {
+        mergeBadge += '<span class="md-kline-warn">GAP ' +
+          mg.gap_count + '</span>';
+      }
+      if (mg.revision_count) {
+        mergeBadge += '<span class="md-kline-warn">REV ' +
+          mg.revision_count + '</span>';
+      }
+
       return (
         '<div class="md-kline-wrap">' +
         '<div class="md-kline-head">' +
@@ -5907,6 +5925,7 @@
         liveBadge +
         '<span class="md-kline-tf">1m</span>' +
         '<span class="md-kline-cnt t-num">' + (barsData.closed_count || 0) + ' closed</span>' +
+        mergeBadge +
         '</div>' +
         svg +
         '</div>'
@@ -5933,7 +5952,7 @@
       UI.panel("Latest Quote Snapshot / 最新行情",
         '<div class="md-quote-grid">' + cardsHtml + '</div>',
         { actions: "" }) +
-      UI.sectionHeading("1-Minute K-Line / 1 分钟 K 线", symButtons) +
+      UI.sectionHeading("1-Minute K-Line · Historical + Realtime / 历史与实时合并", symButtons) +
       UI.panel((barsData ? (barsData.name || klineSymbol) : klineSymbol) + " · 1m",
         barsData ? renderKline(barsData) : UI.stateEmpty("No bars",
           "Waiting for bar data. / 等待 K 线数据"),
