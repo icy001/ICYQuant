@@ -3572,6 +3572,88 @@ tr:focus-within {
 }
 
 /* ==================================================================
+ * Market Data page (Commit 003) — Real-time Quote pipeline
+ * ================================================================== */
+.md-quote-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--ds-space-3);
+}
+.md-quote-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-3);
+  min-width: 0;
+}
+.md-quote-card.md-quote-offline { opacity: 0.55; }
+.md-quote-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+.md-quote-sym {
+  font-family: var(--ds-num-font);
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+}
+.md-quote-name {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-quote-last {
+  font-family: var(--ds-num-font);
+  font-size: var(--ds-text-xl);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-2);
+}
+.md-quote-chg { font-size: var(--ds-text-sm); font-weight: var(--ds-font-bold); }
+.md-quote-chg.pos { color: var(--ds-profit); }
+.md-quote-chg.neg { color: var(--ds-loss); }
+.md-quote-chg.neutral { color: var(--ds-text-muted); }
+.md-quote-ba {
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-secondary);
+  font-family: var(--ds-num-font);
+}
+.md-quote-ba .pos { color: var(--ds-profit); }
+.md-quote-ba .neg { color: var(--ds-loss); }
+.md-quote-sub {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  font-family: var(--ds-num-font);
+}
+.md-quote-lat {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  font-family: var(--ds-num-font);
+  margin-top: var(--ds-space-1);
+}
+.md-feed-stats {
+  display: flex;
+  gap: var(--ds-space-5);
+  flex-wrap: wrap;
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-secondary);
+}
+.md-feed-stats b { color: var(--ds-text-primary); font-family: var(--ds-num-font); }
+
+@media (max-width: 1280px) {
+  .md-quote-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 960px) {
+  .md-quote-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ==================================================================
  * Alerts page (Commit 019) — Unified Alert Center
  * ================================================================== */
 .al-overview {

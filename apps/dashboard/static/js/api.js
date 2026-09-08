@@ -503,6 +503,19 @@
       return this.get("/dashboard/universe");
     },
 
+    // ── Real-time Quotes (Commit 003) ──────────────────────────
+    /** Latest quote snapshot for the whole universe.  Each row
+     *  carries the quote payload plus freshness metadata
+     *  (status LIVE/WARNING/STALE/OFFLINE, age_seconds, latency_ms). */
+    marketQuotes: async function () {
+      return this.get("/dashboard/quotes");
+    },
+
+    /** Latest quote for a single universe symbol. */
+    marketQuote: async function (symbol) {
+      return this.get("/dashboard/quotes/" + encodeURIComponent(symbol));
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

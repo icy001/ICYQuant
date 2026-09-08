@@ -1,7 +1,7 @@
 """Tests for MarketQuote domain model."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -121,3 +121,49 @@ class TestAllSeedSymbols:
             ask=Decimal("1.0"),
         )
         assert q.symbol == symbol
+
+
+class TestCommit003Extensions:
+    """turnover / received_timestamp / freshness (Commit 003)."""
+
+    def test_turnover_default_zero(self):
+        q = _make_quote()
+        assert q.turnover == Decimal("0")
+
+    def test_turnover_roundtrip(self):
+        q = _make_quote(turnover=Decimal("2930000.00"))
+        assert q.as_dict()["turnover"] == "2930000.00"
+
+    def test_received_timestamp_default_none(self):
+        q = _make_quote()
+        assert q.received_timestamp is None
+        # effective falls back to exchange timestamp
+        assert q.effective_received_at == q.timestamp
+
+    def test_received_timestamp_stamped(self):
+        ts = datetime.now(timezone.utc)
+        recv = ts + timedelta(milliseconds=53)
+        q = _make_quote(timestamp=ts, received_timestamp=recv)
+        assert q.latency_ms == 53
+
+    def test_received_timestamp_naive_raises(self):
+        with pytest.raises(ValueError, match="received_timestamp"):
+            _make_quote(received_timestamp=datetime.now())
+
+    def test_age_seconds(self):
+        q = _make_quote(
+            timestamp=datetime.now(timezone.utc) - timedelta(seconds=2)
+        )
+        assert 1.0 <= q.age_seconds() <= 3.0
+
+    def test_change_and_change_pct(self):
+        q = _make_quote(
+            last=Decimal("1.234"), pre_close=Decimal("1.200")
+        )
+        assert q.change == Decimal("0.034")
+        assert q.change_pct == Decimal("2.83")
+
+    def test_change_zero_without_pre_close(self):
+        q = _make_quote(pre_close=Decimal("0"))
+        assert q.change == Decimal("0")
+        assert q.change_pct == Decimal("0")

@@ -2557,6 +2557,7 @@
     "#/research/backtest": { group: "research", navKey: "research/backtest", label: "Backtest", zh: "回测", desc: "Backtest workspace" },
     "#/research/factors": { group: "research", navKey: "research/factors", label: "Factor Discovery", zh: "因子发现", desc: "Factor discovery engine" },
     "#/trading/universe": { group: "trading", navKey: "trading/universe", label: "Universe", zh: "标的池", desc: "Trading instrument master" },
+    "#/trading/market": { group: "trading", navKey: "trading/market", label: "Market Data", zh: "行情", desc: "Real-time quote pipeline" },
     "#/trading/paper": { group: "trading", navKey: "trading/paper", label: "Paper Trading", zh: "模拟", desc: "Paper trading workspace" },
     "#/trading/orders": { group: "trading", navKey: "trading/orders", label: "Orders", zh: "订单", desc: "Order management" },
     "#/trading/positions": { group: "trading", navKey: "trading/positions", label: "Positions", zh: "持仓", desc: "Position management" },
@@ -5254,14 +5255,14 @@
     try {
       data = await ICY_API.tradingUniverse();
     } catch (e) {
-      return UI.pageHeader("Trading Universe", "交易标的池", "trading/universe") +
+      return UI.pageHeader("Trading Universe", "交易标的池") +
         UI.stateError("Universe API unavailable",
           (e.message || String(e)) + " · The Instrument Master API did not respond.",
           "Retry", "nav:trading/universe");
     }
     var instruments = data.universe || [];
     if (!instruments.length) {
-      return UI.pageHeader("Trading Universe", "交易标的池", "trading/universe") +
+      return UI.pageHeader("Trading Universe", "交易标的池") +
         UI.stateEmpty("No instruments registered",
           "The Instrument Master is empty. / 标的池为空");
     }
@@ -5302,11 +5303,139 @@
     ]);
 
     return (
-      UI.pageHeader("Trading Universe", "交易标的池 — A-share ETF / LOF Instrument Master", "trading/universe") +
+      UI.pageHeader("Trading Universe", "交易标的池 — A-share ETF / LOF Instrument Master") +
       kpiHtml +
       UI.sectionHeading("Instrument Master") +
       UI.panel("Registered Instruments / 已注册标的", tableHtml,
         { actions: UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/universe" }) })
+    );
+  };
+
+  /* ==================================================================
+   * Commit 003 — Market Data / Real-time Quote pipeline
+   *
+   * Reads the latest validated quote snapshot from QuoteService via
+   * GET /api/dashboard/quotes.  The frontend never talks to the
+   * market data source directly — swap Mock → Real broker adapter
+   * without touching this page.  Page re-renders on the terminal's
+   * 5s auto-refresh loop; quote freshness is computed server-side.
+   * ================================================================== */
+  PAGE_FRAMEWORK["trading/market"] = async function () {
+    var data;
+    try {
+      data = await ICY_API.marketQuotes();
+    } catch (e) {
+      return UI.pageHeader("Market Data", "实时行情 — A-share ETF / LOF") +
+        UI.stateError("Quote API unavailable",
+          (e.message || String(e)) + " · The quote pipeline did not respond.",
+          "Retry", "nav:trading/market");
+    }
+
+    var universeInfo;
+    try {
+      universeInfo = await ICY_API.tradingUniverse();
+    } catch (e) {
+      universeInfo = null;
+    }
+    var nameOf = {};
+    (universeInfo && universeInfo.universe || []).forEach(function (inst) {
+      nameOf[inst.symbol] = inst.name;
+    });
+
+    var quotes = data.quotes || [];
+    var liveCount = 0, staleCount = 0, offlineCount = 0, warnCount = 0;
+    quotes.forEach(function (v) {
+      if (v.status === "LIVE") liveCount++;
+      else if (v.status === "WARNING") warnCount++;
+      else if (v.status === "STALE") staleCount++;
+      else offlineCount++;
+    });
+
+    // ── KPI row ──
+    var kpis = [
+      { label: "Live Feeds", value: String(liveCount), hint: "FRESH ≤ 3s" },
+      { label: "Warning", value: String(warnCount), hint: "3–10s" },
+      { label: "Stale", value: String(staleCount), hint: "> 10s" },
+      { label: "Offline", value: String(offlineCount), hint: "No quote" },
+    ].map(function (k) {
+      return UI.metricCard(k.label, k.value, k.hint,
+        k.label === "Live Feeds" ? (liveCount > 0 ? "pos" : "neg")
+        : k.label === "Warning" ? "warning"
+        : k.label === "Stale" ? "warning"
+        : offlineCount > 0 ? "neg" : "pos");
+    }).join("");
+
+    // ── Quote cards grid ──
+    function statusBadge(status) {
+      var variant = "neutral";
+      if (status === "LIVE") variant = "ok";
+      else if (status === "WARNING" || status === "STALE") variant = "warn";
+      else variant = "neutral";
+      return UI.badge(status === "LIVE" ? "LIVE" : status, variant);
+    }
+
+    function fmtQty(n) {
+      n = Number(n) || 0;
+      return n.toLocaleString("en-US");
+    }
+    function fmtTurnover(v) {
+      v = Number(v) || 0;
+      if (v >= 1e8) return "¥" + (v / 1e8).toFixed(2) + "亿";
+      if (v >= 1e4) return "¥" + (v / 1e4).toFixed(1) + "万";
+      return "¥" + v.toFixed(0);
+    }
+
+    var cardsHtml = quotes.map(function (v) {
+      var q = v.quote;
+      var symbol = v.symbol;
+      var name = nameOf[symbol] || "";
+      if (!q) {
+        return (
+          '<div class="ds-metric-card md-quote-card md-quote-offline">' +
+          '<div class="md-quote-head"><span class="md-quote-sym t-num">' + esc(symbol) + '</span>' +
+          statusBadge("OFFLINE") + '</div>' +
+          '<div class="md-quote-name">' + esc(name) + '</div>' +
+          '<div class="md-quote-last">—</div>' +
+          '<div class="md-quote-sub">Waiting for first tick</div>' +
+          '</div>'
+        );
+      }
+      var pct = Number(q.change_pct) || 0;
+      var dir = pct > 0 ? "pos" : pct < 0 ? "neg" : "neutral";
+      var sign = pct > 0 ? "+" : "";
+      return (
+        '<div class="ds-metric-card md-quote-card">' +
+        '<div class="md-quote-head"><span class="md-quote-sym t-num">' + esc(symbol) + '</span>' +
+        statusBadge(v.status) + '</div>' +
+        '<div class="md-quote-name">' + esc(name) + '</div>' +
+        '<div class="md-quote-last t-num">' + esc(q.last) +
+        '<span class="md-quote-chg ' + dir + ' t-num">' + sign + pct.toFixed(2) + '%</span></div>' +
+        '<div class="md-quote-ba t-num">B <span class="pos">' + esc(q.bid) + '</span> / A <span class="neg">' + esc(q.ask) + '</span></div>' +
+        '<div class="md-quote-sub t-num">Vol ' + fmtQty(q.volume) + ' · ' + fmtTurnover(q.turnover) + '</div>' +
+        '<div class="md-quote-lat t-num">' + (q.age_seconds != null ? q.age_seconds.toFixed(1) + "s · " : "") +
+        (q.latency_ms != null ? q.latency_ms + "ms" : "") + '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    var feedStats = data.stats || {};
+    var kpiHtml = UI.kpiGrid(kpis, 4);
+
+    return (
+      UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
+      kpiHtml +
+      UI.sectionHeading("Universe Quotes",
+        UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +
+      UI.panel("Latest Quote Snapshot / 最新行情",
+        '<div class="md-quote-grid">' + cardsHtml + '</div>',
+        { actions: "" }) +
+      UI.panel("Feed Statistics / 喂价统计",
+        '<div class="md-feed-stats">' +
+        '<span>Accepted: <b class="t-num">' + (feedStats.quotes_accepted || 0) + '</b></span>' +
+        '<span>Rejected: <b class="t-num">' + (feedStats.quotes_rejected || 0) + '</b></span>' +
+        '<span>Symbols: <b class="t-num">' + (feedStats.symbols_tracked || 0) + '</b></span>' +
+        '<span>Interval: <b class="t-num">200ms</b></span>' +
+        '</div>')
     );
   };
 

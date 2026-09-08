@@ -32,6 +32,10 @@ class StaleQuoteError(MarketDataError):
     """Quote timestamp is older than the configured staleness window."""
 
 
+class TimestampRegressionError(MarketDataError):
+    """Quote timestamp went backwards for the same symbol."""
+
+
 class AdapterNotConnectedError(MarketDataError):
     """subscribe / stream called before connect()."""
 
@@ -47,6 +51,7 @@ __all__ = [
     "InvalidTimestampError",
     "InvalidSymbolError",
     "StaleQuoteError",
+    "TimestampRegressionError",
     "AdapterNotConnectedError",
     "AdapterAlreadyConnectedError",
 ]

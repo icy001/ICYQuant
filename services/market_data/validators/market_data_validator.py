@@ -28,6 +28,7 @@ from ..exceptions.market_data_error import (
     InvalidSymbolError,
     InvalidTimestampError,
     StaleQuoteError,
+    TimestampRegressionError,
 )
 
 
@@ -49,9 +50,13 @@ class MarketDataValidator:
         *,
         stale_seconds: int = 60,
         allow_zero_price: bool = False,
+        check_universe: bool = False,
     ) -> None:
         self._stale = timedelta(seconds=stale_seconds)
         self._allow_zero_price = allow_zero_price
+        self._check_universe = check_universe
+        # symbol → last accepted exchange timestamp (monotonicity)
+        self._last_ts: dict[str, datetime] = {}
 
     def validate(self, quote: MarketQuote) -> MarketQuote:
         """Validate a quote.  Raises MarketDataError on failure.
@@ -62,6 +67,7 @@ class MarketDataValidator:
         self._check_timestamp(quote)
         self._check_prices(quote)
         self._check_sizes(quote)
+        self._check_monotonic(quote)
         return quote
 
     # ── individual checks ────────────────────────────────────────
@@ -84,6 +90,14 @@ class MarketDataValidator:
                 f"exchange {quote.exchange.value} does not match "
                 f"symbol prefix {quote.symbol[:2]}"
             )
+        # Universe membership (optional)
+        if self._check_universe:
+            from ..universe import universe
+
+            if not universe.contains(quote.symbol):
+                raise InvalidSymbolError(
+                    f"symbol {quote.symbol} is not in the trading universe"
+                )
 
     def _check_timestamp(self, quote: MarketQuote) -> None:
         if quote.timestamp.tzinfo is None:
@@ -136,6 +150,23 @@ class MarketDataValidator:
                 raise InvalidQuoteError(
                     f"{name} = {value} is negative"
                 )
+        if quote.turnover < 0:
+            raise InvalidQuoteError(
+                f"turnover = {quote.turnover} is negative"
+            )
+
+    def _check_monotonic(self, quote: MarketQuote) -> None:
+        """Reject exchange-timestamp regression (older tick arriving
+        after a newer one for the same symbol)."""
+        prev = self._last_ts.get(quote.symbol)
+        if prev is not None and quote.timestamp < prev:
+            raise TimestampRegressionError(
+                f"timestamp regression for {quote.symbol}: "
+                f"{quote.timestamp.isoformat()} < "
+                f"{prev.isoformat()}"
+            )
+        if prev is None or quote.timestamp > prev:
+            self._last_ts[quote.symbol] = quote.timestamp
 
 
 __all__ = ["MarketDataValidator"]

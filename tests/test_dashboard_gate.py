@@ -2167,3 +2167,114 @@ def test_d35_universe_api():
 
     # RBAC: no token → 401
     assert client.get("/api/dashboard/universe").status_code == 401
+
+
+# ===========================================================================
+# D-36 — Real-time Quote pipeline (Commit 003)
+# ===========================================================================
+
+def test_d36_quotes_api():
+    """Quotes endpoint starts the Mock feed lazily and returns
+    a full universe snapshot with freshness metadata."""
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    res = client.get("/api/dashboard/quotes", headers=h)
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    # 11 symbols in the snapshot
+    assert data["count"] == 11
+    assert len(data["quotes"]) == 11
+    assert data["source"] == "mock"
+
+    # every view has status + quote structure
+    for v in data["quotes"]:
+        assert v["status"] in ("LIVE", "WARNING", "STALE", "OFFLINE")
+        if v["quote"] is not None:
+            q = v["quote"]
+            for field in (
+                "symbol", "exchange", "timestamp", "last", "bid",
+                "ask", "bid_size", "ask_size", "volume", "turnover",
+                "latency_ms", "age_seconds",
+            ):
+                assert field in q, f"missing {field}"
+            assert q["bid"] <= q["ask"]
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/quotes").status_code == 401
+
+
+def test_d36_quotes_feed_populates():
+    """Waiting briefly, quotes arrive and the snapshot turns LIVE."""
+    import time as _time
+
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    # the first call starts the feed; poll until at least one LIVE
+    deadline = _time.time() + 8.0
+    live = 0
+    while _time.time() < deadline:
+        res = client.get("/api/dashboard/quotes", headers=h)
+        assert res.status_code == 200
+        data = res.json()
+        live = data["live_count"]
+        if live > 0:
+            break
+        _time.sleep(0.4)
+    assert live > 0, "Mock feed never produced a fresh quote"
+
+    # stats reflect accepted quotes
+    stats = data["stats"]
+    assert stats["quotes_accepted"] > 0
+    assert stats["symbols_tracked"] > 0
+    assert stats["thresholds"]["fresh_seconds"] == 3.0
+    assert stats["thresholds"]["stale_seconds"] == 10.0
+
+
+def test_d36_quote_detail():
+    """Single-symbol quote endpoint returns instrument metadata."""
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    res = client.get("/api/dashboard/quotes/159852", headers=h)
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["symbol"] == "159852"
+    assert data["name"] == "软件ETF"
+    assert data["instrument_type"] == "ETF"
+    assert data["lot_size"] == 100
+    assert data["tick_size"] == "0.001"
+    assert data["status"] in ("LIVE", "WARNING", "STALE", "OFFLINE")
+
+    # unknown symbol → 404
+    res = client.get("/api/dashboard/quotes/999999", headers=h)
+    assert res.status_code == 404
+
+
+def test_d36_quote_feed_rbac():
+    """Feed start/stop restricted to OPERATOR/ADMIN."""
+    tok_ro = _login("readonly", "readonly123")
+    tok_op = _login("operator", "operator123")
+    h_ro = _headers(tok_ro)
+    h_op = _headers(tok_op)
+
+    # readonly cannot stop
+    assert (
+        client.post("/api/dashboard/quotes/feed/stop", headers=h_ro).status_code
+        == 403
+    )
+    # operator can stop and restart
+    assert (
+        client.post("/api/dashboard/quotes/feed/stop", headers=h_op).status_code
+        == 200
+    )
+    assert (
+        client.post("/api/dashboard/quotes/feed/start", headers=h_op).status_code
+        == 200
+    )
+    # no token → 401
+    assert (
+        client.post("/api/dashboard/quotes/feed/start").status_code == 401
+    )

@@ -1450,6 +1450,111 @@ def trading_universe(
     }
 
 
+# ===========================================================================
+# Commit 003 — Real-time Quote pipeline
+#
+# QuoteFeed drives a MarketDataAdapter (Mock in Phase 1) in a
+# background thread; every quote passes QuoteValidator before being
+# stored in QuoteService.  The API only reads the latest validated
+# snapshot — the frontend never talks to the data source directly.
+# ===========================================================================
+
+_quote_feed: Optional[object] = None
+
+
+def _ensure_quote_feed() -> dict:
+    """Start the Mock quote feed on first use (idempotent).
+
+    Subscribes all universe symbols and streams at 0.2s intervals.
+    """
+    global _quote_feed
+    from services.market_data.adapters.mock import MockMarketDataAdapter
+    from services.market_data.quote_service import QuoteFeed, quote_service
+    from services.market_data.universe import universe
+
+    if _quote_feed is not None and _quote_feed.running:
+        return quote_service.stats()
+
+    adapter = MockMarketDataAdapter(seed=None)
+    feed = QuoteFeed(adapter, quote_service, interval=0.2)
+    feed.start(symbols=universe.symbols())
+    _quote_feed = feed
+    return quote_service.stats()
+
+
+@router.get("/dashboard/quotes")
+def quotes_snapshot(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Latest quote snapshot for the whole universe.
+
+    Each row carries the quote payload plus freshness metadata:
+    status ∈ {LIVE, WARNING, STALE, OFFLINE}, age_seconds, latency_ms.
+    Starts the Mock quote feed lazily on first call.
+    """
+    from services.market_data.quote_service import quote_service
+    from services.market_data.universe import universe
+
+    feed_stats = _ensure_quote_feed()
+    views = quote_service.snapshot(universe.symbols())
+    live_count = sum(
+        1 for v in views if v["status"] == "LIVE"
+    )
+    return {
+        "quotes": views,
+        "count": len(views),
+        "live_count": live_count,
+        "stats": feed_stats,
+        "source": "mock",
+    }
+
+
+@router.get("/dashboard/quotes/{symbol}")
+def quote_detail(
+    symbol: str,
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Latest quote for a single universe symbol."""
+    from services.market_data.quote_service import quote_service
+    from services.market_data.universe import universe
+
+    sym = symbol.strip()
+    inst = universe.get(sym)
+    if inst is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Symbol {sym} is not in the trading universe",
+        )
+    _ensure_quote_feed()
+    view = quote_service.snapshot([sym])[0]
+    view["name"] = inst.name
+    view["instrument_type"] = inst.instrument_type.value
+    view["lot_size"] = inst.lot_size
+    view["tick_size"] = str(inst.tick_size)
+    return view
+
+
+@router.post("/dashboard/quotes/feed/start")
+def quotes_feed_start(
+    principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
+) -> dict:
+    """Manually (re)start the quote feed (OPERATOR/ADMIN only)."""
+    stats = _ensure_quote_feed()
+    return {"status": "ok", "stats": stats}
+
+
+@router.post("/dashboard/quotes/feed/stop")
+def quotes_feed_stop(
+    principal: Principal = Depends(require_roles("OPERATOR", "ADMIN")),
+) -> dict:
+    """Stop the quote feed (OPERATOR/ADMIN only)."""
+    global _quote_feed
+    if _quote_feed is not None:
+        _quote_feed.stop()
+        _quote_feed = None
+    return {"status": "ok"}
+
+
 # ---------------------------------------------------------------------------
 # Factor paper trading (Alpha021) - deterministic research-layer replay
 # ---------------------------------------------------------------------------

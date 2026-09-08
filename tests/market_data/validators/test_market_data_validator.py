@@ -14,6 +14,7 @@ from services.market_data.exceptions.market_data_error import (
     InvalidSymbolError,
     InvalidTimestampError,
     StaleQuoteError,
+    TimestampRegressionError,
 )
 from services.market_data.validators.market_data_validator import (
     MarketDataValidator,
@@ -174,3 +175,71 @@ class TestNegativeSizes:
         validator = MarketDataValidator()
         with pytest.raises(InvalidQuoteError, match="volume"):
             validator.validate(_good_quote(volume=-100))
+
+    def test_negative_turnover_rejected(self):
+        validator = MarketDataValidator()
+        with pytest.raises(InvalidQuoteError, match="turnover"):
+            validator.validate(
+                _good_quote(turnover=Decimal("-1"))
+            )
+
+
+class TestTimestampRegression:
+    """Commit 003: timestamp cannot go backwards for a symbol."""
+
+    def test_regression_rejected(self):
+        validator = MarketDataValidator(stale_seconds=600)
+        t1 = datetime.now(timezone.utc)
+        t0 = t1 - timedelta(seconds=10)
+        validator.validate(_good_quote(timestamp=t1))
+        with pytest.raises(TimestampRegressionError, match="regression"):
+            validator.validate(_good_quote(timestamp=t0))
+
+    def test_equal_timestamp_allowed(self):
+        validator = MarketDataValidator(stale_seconds=600)
+        t = datetime.now(timezone.utc)
+        validator.validate(_good_quote(timestamp=t))
+        # same timestamp (duplicate delivery) is tolerated
+        validator.validate(_good_quote(timestamp=t))
+
+    def test_monotonic_progression_allowed(self):
+        validator = MarketDataValidator(stale_seconds=600)
+        t = datetime.now(timezone.utc)
+        validator.validate(_good_quote(timestamp=t))
+        validator.validate(_good_quote(timestamp=t + timedelta(seconds=1)))
+
+    def test_regression_tracked_per_symbol(self):
+        validator = MarketDataValidator(stale_seconds=600)
+        t1 = datetime.now(timezone.utc)
+        t0 = t1 - timedelta(seconds=5)
+        # 159852 advances to t1
+        validator.validate(_good_quote(timestamp=t1))
+        # 513050 arrives with an older clock — its own timeline, fine
+        validator.validate(
+            _good_quote(symbol="513050", exchange=Exchange.SSE, timestamp=t0)
+        )
+
+
+class TestUniverseCheck:
+    def test_outside_universe_rejected_when_enabled(self):
+        validator = MarketDataValidator(
+            stale_seconds=600, check_universe=True
+        )
+        # 510050 is a valid SSE fund code but not in the 11-symbol universe
+        with pytest.raises(InvalidSymbolError, match="universe"):
+            validator.validate(
+                _good_quote(symbol="510050", exchange=Exchange.SSE)
+            )
+
+    def test_universe_member_accepted(self):
+        validator = MarketDataValidator(
+            stale_seconds=600, check_universe=True
+        )
+        validator.validate(_good_quote())  # 159852 is registered
+
+    def test_universe_check_off_by_default(self):
+        validator = MarketDataValidator(stale_seconds=600)
+        # no universe check by default — only structural checks
+        validator.validate(
+            _good_quote(symbol="510050", exchange=Exchange.SSE)
+        )

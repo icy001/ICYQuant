@@ -70,6 +70,9 @@ class MockMarketDataAdapter(MarketDataAdapter):
         self._subscribed: set[str] = set()
         self._prices: dict[str, Decimal] = dict(_SEED_PRICES)
         self._volumes: dict[str, int] = {s: 0 for s in self._prices}
+        self._turnovers: dict[str, Decimal] = {s: Decimal("0") for s in self._prices}
+        # symbol → (open, high, low, pre_close)
+        self._ohlc: dict[str, tuple] = {}
         self._rng = random.Random(seed)
         self._max_quotes = max_quotes  # None = infinite
         self._quote_count = 0
@@ -155,8 +158,19 @@ class MockMarketDataAdapter(MarketDataAdapter):
         bid_size = self._rng.randint(10, 200) * 100
         ask_size = self._rng.randint(10, 200) * 100
 
-        # Volume: accumulate
-        self._volumes[sym] += self._rng.randint(100, 500) * 100
+        # Volume: accumulate; turnover = volume * price (approximate)
+        traded = self._rng.randint(100, 500) * 100
+        self._volumes[sym] += traded
+        turnover_add = (Decimal(traded) * new_price).quantize(Decimal("0.01"))
+        self._turnovers[sym] = self._turnovers.get(sym, Decimal("0")) + turnover_add
+
+        # OHLC session tracking (per adapter instance = session)
+        open_p, high_p, low_p, pre_close = self._ohlc.get(
+            sym, (new_price, new_price, new_price, base)
+        )
+        high_p = max(high_p, new_price)
+        low_p = min(low_p, new_price)
+        self._ohlc[sym] = (open_p, high_p, low_p, pre_close)
 
         exchange = Instrument.infer_exchange(sym)
 
@@ -170,6 +184,11 @@ class MockMarketDataAdapter(MarketDataAdapter):
             bid_size=bid_size,
             ask_size=ask_size,
             volume=self._volumes[sym],
+            turnover=self._turnovers[sym],
+            open=open_p,
+            high=high_p,
+            low=low_p,
+            pre_close=pre_close,
         )
 
 
