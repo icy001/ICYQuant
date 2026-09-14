@@ -2646,3 +2646,201 @@ def test_d41_historical_realtime_merge():
     # RBAC: no token → 401
     assert client.get("/api/dashboard/bars/159852").status_code == 401
 
+
+# --- D-42 Paper Trading Market Feed (Commit 009) -----------------------------
+
+
+def test_d42_paper_market_feed():
+    """Paper Trading is driven by the REAL market data pipeline (§14) and
+    must never be able to imply real money (§15).
+
+    Everything is asserted through the API: environment + disclaimer +
+    per-symbol gate decisions carrying their §17 reason code.
+    """
+    import time as _time
+
+    from services.market_data.universe import universe
+
+    # RBAC: no token → 401
+    assert client.get("/api/dashboard/paper-feed").status_code == 401
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+
+    # §16 — the first read subscribes the enabled universe, so the page
+    # can never render a half-attached feed
+    res = client.get("/api/dashboard/paper-feed", headers=h)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["instruments"] == len(universe.symbols())
+    assert len(body["rows"]) == body["instruments"]
+
+    # wait for the real quote pipeline to reach the feed
+    deadline = _time.time() + 12.0
+    while _time.time() < deadline:
+        body = client.get("/api/dashboard/paper-feed", headers=h).json()
+        if body["state"] != "OFFLINE":
+            break
+        _time.sleep(0.5)
+    assert (
+        body["state"] != "OFFLINE"
+    ), "no real quote ever reached the paper feed"
+    assert body["state"] in ("READY", "BLOCKED", "DEGRADED")
+
+    # §15 — environment and disclaimer are non-negotiable
+    assert body["environment"] == "PAPER"
+    assert body["disclaimer"] == "PAPER — NO REAL MONEY"
+    assert body["ready"] == (body["state"] == "READY")
+    # §12 — orders are only ever allowed out of READY / BLOCKED
+    assert body["new_orders_allowed"] == (
+        body["state"] in ("READY", "BLOCKED")
+    )
+
+    # §12 — the gates are surfaced, never hidden
+    gate = body["gate"]
+    for key in (
+        "session", "quality", "lot_size", "healthy_cache", "slippage_bps"
+    ):
+        assert key in gate, f"missing gate {key}"
+
+    # §17 — every block code is published so the UI can explain itself
+    codes = set(body["reason_codes"].values())
+    for code in (
+        "PAPER_MARKET_DATA_UNAVAILABLE",
+        "PAPER_MARKET_DATA_STALE",
+        "PAPER_MARKET_DATA_INVALID",
+        "PAPER_MARKET_SESSION_BLOCKED",
+        "PAPER_LOOKAHEAD_VIOLATION",
+        "PAPER_INVALID_LOT_SIZE",
+        "PAPER_QUOTE_UNAVAILABLE",
+        "PAPER_FEED_DEGRADED",
+    ):
+        assert code in codes, f"§17 code {code} is not published"
+
+    # §16 — honest counters: every instrument is either tradable or blocked
+    assert body["tradable"] + body["blocked"] == body["instruments"]
+    stats = body["stats"]
+    assert stats["subscriptions"] == body["instruments"]
+    assert stats["state"] == body["state"]
+
+    # §14 — one row per instrument with every field the page renders
+    for row in body["rows"]:
+        for field in (
+            "symbol", "name", "lot_size", "tradable", "blocked_reason",
+            "quality", "phase", "quote_age_ms", "last", "bid", "ask",
+            "fill_price", "fill_price_source",
+        ):
+            assert field in row, f"row missing {field}"
+        # §8 — the lot comes from the Instrument Master, not a constant
+        assert isinstance(row["lot_size"], int) and row["lot_size"] > 0
+        if row["tradable"]:
+            # §5 — a tradable symbol is priced from the book, never guessed
+            assert row["fill_price"] is not None
+            assert row["fill_price_source"] in ("ASK", "BID", "LAST")
+            assert row["blocked_reason"] is None
+        else:
+            # §17 — a blocked symbol always carries a machine reason
+            assert row["blocked_reason"] in codes
+
+    # a BLOCKED feed must explain the block on every blocked row
+    if body["state"] == "BLOCKED" and body["blocked"]:
+        assert all(
+            row["blocked_reason"] for row in body["rows"]
+            if not row["tradable"]
+        )
+
+
+# --- D-43 Market Data Dashboard (Commit 011) ----------------------------------
+
+
+def test_d43_market_data_dashboard():
+    """Commit 011: the Market Data page is the Dashboard's only view of
+    the Commit 010 REST surface (§18), and it must never fabricate a
+    price or reach past ICYQuant into a provider.
+
+    The page is a single SPA route wired into one shell; every panel is
+    fed by one client (``window.ICY_MD.api``), one status vocabulary and
+    one visibility-aware poller.  Asserted both on the served static
+    bundle and through the API it consumes.
+    """
+    from pathlib import Path
+
+    from apps.api import main as main_module
+    from services.market_data.universe import universe
+
+    static = (
+        Path(main_module.__file__).resolve().parent.parent / "dashboard" / "static"
+    )
+    index = (static / "index.html").read_text(encoding="utf-8")
+    app_js = (static / "js" / "app.js").read_text(encoding="utf-8")
+    md_js = (static / "js" / "market-data.js").read_text(encoding="utf-8")
+
+    # §1 — the module ships, is served, and loads before app.js
+    assert client.get("/dashboard/js/market-data.js").status_code == 200
+    assert "js/market-data.js" in index
+    assert index.index("js/market-data.js") < index.index("js/app.js")
+
+    # §6 — the poll cadence is configuration (meta / window), never a
+    # literal baked into a panel
+    assert 'name="market-data-poll-interval-ms"' in index
+    assert "MARKET_DATA_POLL_INTERVAL_MS" in md_js
+    assert "DEFAULT_POLL_MS" in md_js
+    assert "MIN_POLL_MS" in md_js
+
+    # §17 — one nav entry, one route, one page-framework entry
+    assert 'href="#/trading/market"' in index
+    assert 'data-nav="trading/market"' in index
+    assert '"#/trading/market": {' in app_js
+    assert 'PAGE_FRAMEWORK["trading/market"]' in app_js
+
+    # §2 — every committed region has a mount point in the shell
+    for region in (
+        "md-banner", "md-kpis", "md-session", "md-quote",
+        "md-selector", "md-kline", "md-watch", "md-quality",
+        "md-health", "md-provenance",
+    ):
+        assert ('id="%s"' % region) in app_js, f"missing region {region}"
+
+    # §18 — one client owns every path; the page never builds a URL and
+    # never touches the network itself
+    assert "window.ICY_MD" in md_js
+    for path in (
+        "/market-data/instruments", "/market-data/quotes",
+        "/market-data/bars", "/market-data/session",
+        "/market-data/quality", "/market-data/health",
+    ):
+        assert path in md_js, f"missing endpoint {path}"
+    assert "mdApiRef" in app_js
+    assert "fetch(" not in app_js
+    assert "XMLHttpRequest" not in app_js
+
+    # §12 — one status vocabulary drives the whole page
+    for status in (
+        "LIVE", "FRESH", "WARNING", "STALE", "INVALID", "QUARANTINED",
+    ):
+        assert status in md_js, f"missing status {status}"
+
+    # §6 — the poller has a real lifecycle and is torn down on leave
+    for fn in ("startPoll", "stopPoll", "stopAllPolls", "hasPoll"):
+        assert fn in md_js, f"missing poller fn {fn}"
+    assert "ICY_MD.stopAllPolls" in app_js
+
+    # §20 — a missing module is surfaced, never a silent blank page
+    assert "Market data module unavailable" in app_js
+
+    # §1 — the page is observational: it names no provider and can never
+    # be mistaken for a real-money path
+    lowered = md_js.lower()
+    for provider in ("broker", "tushare", "akshare", "xtquant", "sina"):
+        assert provider not in lowered, f"market-data.js leaks provider {provider}"
+
+    # RBAC + live wiring — the surface the page consumes needs a token
+    # and answers with the Instrument Master universe
+    assert client.get("/api/market-data/instruments").status_code == 401
+    tok = _login("readonly", "readonly123")
+    h = _headers(tok)
+    res = client.get("/api/market-data/instruments", headers=h)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["count"] == len(universe.symbols())
+    assert body["count"] == body["total"] == len(body["items"])
+

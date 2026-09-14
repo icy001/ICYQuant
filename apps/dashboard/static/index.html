@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Market Data REST polling cadence (§6).  Configurable, never a
+       literal inside a component; override with
+       window.MARKET_DATA_POLL_INTERVAL_MS. -->
+  <meta name="market-data-poll-interval-ms" content="1000">
   <title>ICYQuant / 量化交易平台</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230b1220'/><path d='M20 70 L40 45 L55 58 L80 28' stroke='%2300e5a0' stroke-width='6' fill='none' stroke-linecap='round'/></svg>">
   <link rel="stylesheet" href="/dashboard/css/tokens.css?v=I02">
-  <link rel="stylesheet" href="/dashboard/css/components.css?v=I07">
+  <link rel="stylesheet" href="/dashboard/css/components.css?v=I11">
   <link rel="stylesheet" href="/dashboard/css/app.css?v=I07">
 </head>
 <body>
@@ -88,6 +92,11 @@
         <!-- TRADING -->
         <div class="nav-section" data-group="trading">
           <div class="nav-section-label">TRADING</div>
+          <a href="#/trading/market" data-nav="trading/market" class="nav-link">
+            <span class="nav-ico">◧</span>
+            <span class="nav-text">Market Data</span>
+            <span class="nav-zh">行情</span>
+          </a>
           <a href="#/trading/paper" data-nav="trading/paper" class="nav-link">
             <span class="nav-ico">▦</span>
             <span class="nav-text">Paper Trading</span>
@@ -215,6 +224,8 @@
 
   <script src="/dashboard/js/api.js?v=I07"></script>
   <script src="/dashboard/js/ui.js?v=I02"></script>
-  <script src="/dashboard/js/app.js?v=I07"></script>
+  <!-- A-share market data: API client + status vocabulary + poller -->
+  <script src="/dashboard/js/market-data.js?v=I11"></script>
+  <script src="/dashboard/js/app.js?v=I11"></script>
 </body>
 </html>

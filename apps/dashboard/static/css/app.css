@@ -1007,6 +1007,142 @@ svg { display: block; width: 100%; height: auto; }
   margin-top: 6px;
 }
 
+/* ==========================================================================
+   Paper Trading — Commit 009
+   Paper Trading now runs on REAL market data but still spends no real
+   money. The banner below must be impossible to misread as LIVE/SHADOW.
+   ========================================================================== */
+.paper-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-5);
+  padding: var(--ds-space-4) var(--ds-space-5);
+  margin-bottom: var(--ds-space-4);
+  border: 1px solid var(--ds-warning);
+  border-left: 4px solid var(--ds-warning);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-warning-dim);
+}
+.paper-banner-badge {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-lg);
+  font-weight: var(--ds-font-extrabold);
+  letter-spacing: var(--ds-tracking-wide);
+  color: var(--ds-warning);
+  white-space: nowrap;
+}
+.paper-banner-warning {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-base);
+  font-weight: var(--ds-font-extrabold);
+  letter-spacing: var(--ds-tracking-wider);
+  color: var(--ds-loss);
+  white-space: nowrap;
+}
+.paper-banner-zh {
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-secondary);
+  margin-left: auto;
+  text-align: right;
+  line-height: var(--ds-leading-normal);
+}
+/* Backend-provided disclaimer (the one sentence §15 says the UI must
+   never lose). Rendered verbatim, never paraphrased. */
+.paper-banner-note {
+  margin: calc(-1 * var(--ds-space-3)) 0 var(--ds-space-4);
+  padding: var(--ds-space-2) var(--ds-space-5);
+  border: 1px solid var(--ds-border-soft);
+  border-top: none;
+  border-radius: 0 0 var(--ds-radius-md) var(--ds-radius-md);
+  background: var(--ds-bg-surface-sunken);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-xs);
+  letter-spacing: var(--ds-tracking-wide);
+  color: var(--ds-text-muted);
+}
+
+/* Feed strip: Market / Data / Quality / Quote / Bid / Ask */
+.paper-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  background: var(--ds-border-default);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-md);
+  overflow: hidden;
+  margin-bottom: var(--ds-space-4);
+}
+.paper-strip-cell {
+  background: var(--ds-bg-surface);
+  padding: var(--ds-space-3) var(--ds-space-4);
+}
+.paper-strip-label {
+  font-size: var(--ds-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--ds-tracking-wide);
+  color: var(--ds-text-muted);
+  margin-bottom: var(--ds-space-1);
+}
+.paper-strip-value {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-lg);
+  font-weight: var(--ds-font-semibold);
+  font-variant-numeric: var(--ds-num-variant);
+  color: var(--ds-text-primary);
+}
+
+/* Feed / symbol state chips */
+.paper-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-full);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-font-bold);
+  letter-spacing: var(--ds-tracking-wide);
+  border: 1px solid transparent;
+  /* Base = neutral, so an unmapped backend value degrades to "plain"
+     instead of rendering as invisible text. */
+  color: var(--ds-text-secondary);
+  background: var(--ds-neutral-dim);
+  border-color: var(--ds-border-strong);
+  white-space: nowrap;
+}
+.paper-chip-READY,
+.paper-chip-FRESH,
+.paper-chip-LIVE,
+.paper-chip-OPEN,
+.paper-chip-ALLOWED,
+.paper-chip-BOOK   { color: var(--ds-profit);  background: var(--ds-profit-dim);  border-color: var(--ds-profit); }
+.paper-chip-DEGRADED,
+.paper-chip-WARNING,
+.paper-chip-AUCTION,
+.paper-chip-CLOSE  { color: var(--ds-warning); background: var(--ds-warning-dim); border-color: var(--ds-warning); }
+.paper-chip-BLOCKED,
+.paper-chip-STALE,
+.paper-chip-INVALID,
+.paper-chip-QUARANTINED,
+.paper-chip-UNAVAILABLE,
+.paper-chip-UNKNOWN,
+.paper-chip-OFFLINE { color: var(--ds-loss);    background: var(--ds-loss-dim);    border-color: var(--ds-loss); }
+.paper-chip-CLOSED,
+.paper-chip-PRE_OPEN,
+.paper-chip-POST_CLOSE,
+.paper-chip-LUNCH_BREAK,
+.paper-chip-CONTINUOUS_AM,
+.paper-chip-CONTINUOUS_PM,
+.paper-chip-NON_TRADING,
+.paper-chip-LAST   { color: var(--ds-neutral); background: var(--ds-neutral-dim); border-color: var(--ds-border-strong); }
+/* A tradable continuous-auction phase is the only phase where Paper
+   Trading may act, so AM/PM are deliberately rendered like READY. */
+.paper-chip-CONTINUOUS_AM,
+.paper-chip-CONTINUOUS_PM { color: var(--ds-profit); background: var(--ds-profit-dim); border-color: var(--ds-profit); }
+.paper-reason {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-xs);
+  color: var(--ds-loss);
+}
+
 /* --- Responsive: collapsed sidebar --- */
 @media (max-width: 980px) {
   .nav-section-label { display: none; }

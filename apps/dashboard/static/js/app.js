@@ -5356,626 +5356,890 @@
     catch (e) { return null; }
   }
 
-  function renderMarketStatus(status) {
-    if (!status) {
-      return UI.stateEmpty("Market status unavailable",
-        "Trading calendar did not respond. / 交易日历服务未响应");
+  /* ==================================================================
+   * Commit 011 — Dashboard Market Data
+   *
+   * The Market Data page observes the real A-share pipeline through
+   * the Commit 010 REST API only — /api/market-data/*.  It never
+   * reads Redis, the database or the upstream adapter, and it never
+   * merges history with realtime on the client: /bars already returns
+   * one continuous series (Commit 008).  The bar store below only
+   * de-duplicates *successive polls of that same series* by
+   * timestamp, so an unchanged minute is never re-appended.
+   *
+   * Freshness comes from a visibility-aware REST poll (default
+   * 1000ms; override via the MARKET_DATA_POLL_INTERVAL_MS meta tag or
+   * window.MARKET_DATA_POLL_INTERVAL_MS) that patches the panels in
+   * place — the page is excluded from the terminal's 5s full-page
+   * refresh so the chart keeps its structure.  Quotes are read-only:
+   * placing orders belongs to Paper Trading, never to this page.
+   * ================================================================== */
+
+  /** Observational state for the Market Data page.  Deliberately kept
+   *  apart from `_tradingState.symbol` so that watching a quote here
+   *  never re-points the paper-trading order ticket. */
+  var _marketWatch = {
+    symbol: null,        // selected A-share symbol
+    instruments: null,   // ① GET /market-data/instruments
+    quotes: null,        // ③ GET /market-data/quotes  (whole universe)
+    session: null,       // ⑤ GET /market-data/session
+    quality: null,       // ⑥ GET /market-data/quality
+    health: null,        // ⑦ GET /market-data/health
+    bars: null,          // ④ GET /market-data/bars  (selected symbol)
+    barSymbol: null,     // symbol the store holds
+    store: null,         // timestamp-keyed series store
+    errors: {},          // endpoint -> message (§20 error state)
+    fastTicking: false,
+    slowTicking: false,
+    updatedAt: null,     // client clock of the last successful tick
+    barTouched: 0,       // bars changed by the last merge
+  };
+
+  var MD_FAST_POLL = "market:fast";
+  var MD_SLOW_POLL = "market:slow";
+  var MD_BAR_LIMIT = 200;
+  var MD_FALLBACK_SYMBOL = "159852";
+
+  function mdRef() { return window.ICY_MD || null; }
+  function mdApiRef() { var md = mdRef(); return md ? md.api : null; }
+  function mdOnPage() { return location.hash.indexOf("#/trading/market") === 0; }
+  function mdList(payload) { return (payload && payload.items) || []; }
+
+  function mdInstrument(symbol) {
+    var items = mdList(_marketWatch.instruments);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].symbol === symbol) return items[i];
     }
-    var state = marketStateOf(status.phase);
-    var sess = status.session || {};
-    var next = status.next_event || {};
-    var nextAt = next.at || "";
-    var nextDay = nextAt ? nextAt.substring(0, 10) : "";
-    var nextWhen = (nextDay && nextDay !== status.trading_date)
-      ? nextDay + " " + cstHM(nextAt)
-      : cstHM(nextAt);
+    return null;
+  }
+
+  /** Selected symbol: explicit choice → first API instrument → default ETF. */
+  function mdSymbol() {
+    if (_marketWatch.symbol) return _marketWatch.symbol;
+    var items = mdList(_marketWatch.instruments);
+    return items.length ? items[0].symbol : MD_FALLBACK_SYMBOL;
+  }
+
+  function mdQuoteRow(symbol) {
+    var items = mdList(_marketWatch.quotes);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].symbol === symbol) return items[i];
+    }
+    return null;
+  }
+
+  function mdName(symbol) {
+    var inst = mdInstrument(symbol);
+    return (inst && inst.name) || "";
+  }
+
+  /** Instrument tick size, falling back to the A-share ETF 0.001. */
+  function mdTick(symbol) {
+    var inst = mdInstrument(symbol);
+    return inst && inst.tick_size != null ? inst.tick_size : 0.001;
+  }
+
+  function mdPrice(value, symbol) {
+    var md = mdRef();
+    return md ? md.formatPrice(value, mdTick(symbol)) : "—";
+  }
+
+  function mdStat(label, value) {
+    return '<div class="md-stat">' +
+      '<span class="md-stat-label">' + esc(label) + '</span>' +
+      '<span class="md-stat-value t-num">' + value + '</span>' +
+      '</div>';
+  }
+
+  /** "09:30" — the date is prepended only when the event lands another day. */
+  function mdWhen(day, iso) {
+    if (!iso) return "—";
+    var d = String(iso).substring(0, 10);
+    var t = String(iso).substring(11, 16);
+    return d && d !== day ? d + " " + t : t;
+  }
+
+  function mdCaptureError(key, err) {
+    var body = err && err.body;
+    var msg = (body && body.detail) || (err && err.message) || String(err);
+    if (body && body.error) msg = body.error + ": " + msg;
+    if (body && body.parameter) {
+      msg += " (" + body.parameter + "=" + (body.value == null ? "?" : body.value) + ")";
+    }
+    _marketWatch.errors[key] = msg;
+  }
+
+  function mdClearError(key) { delete _marketWatch.errors[key]; }
+  function mdIsErr(value) { return !!(value && value.__err); }
+
+  /* ── fetches (§6 REST, one request per resource) ───────────────── */
+
+  async function mdLoadInstruments() {
+    var api = mdApiRef();
+    if (!api) return;
+    try {
+      _marketWatch.instruments = await api.getInstruments();
+      mdClearError("instruments");
+    } catch (e) {
+      mdCaptureError("instruments", e);
+    }
+    mdRenderSelector();
+  }
+
+  /** The fast tick: everything that moves every second. */
+  async function mdFastTick() {
+    var api = mdApiRef();
+    if (!api || !mdOnPage() || _marketWatch.fastTicking) return;
+    _marketWatch.fastTicking = true;
+
+    var symbol = mdSymbol();
+    // Switching instruments must never splice two series together.
+    if (_marketWatch.barSymbol && _marketWatch.barSymbol !== symbol) {
+      _marketWatch.store = null;
+      _marketWatch.barSymbol = null;
+      _marketWatch.bars = null;
+    }
+
+    var out = await Promise.all([
+      api.getQuotes().catch(function (e) { return { __err: e }; }),
+      api.getBars(symbol, "1m", MD_BAR_LIMIT).catch(function (e) { return { __err: e }; }),
+      api.getSession().catch(function (e) { return { __err: e }; }),
+    ]);
+    mdApplyQuotes(out[0]);
+    mdApplyBars(out[1], symbol);
+    mdApplySession(out[2]);
+
+    _marketWatch.fastTicking = false;
+    _marketWatch.updatedAt = new Date();
+    mdRenderFast();
+  }
+
+  /** The slow tick: health and the quality roll-up change rarely. */
+  async function mdSlowTick() {
+    var api = mdApiRef();
+    if (!api || !mdOnPage() || _marketWatch.slowTicking) return;
+    _marketWatch.slowTicking = true;
+    var out = await Promise.all([
+      api.getQualityOverview(20).catch(function (e) { return { __err: e }; }),
+      api.getHealth().catch(function (e) { return { __err: e }; }),
+    ]);
+    mdApplyQuality(out[0]);
+    mdApplyHealth(out[1]);
+    _marketWatch.slowTicking = false;
+    mdRenderSlow();
+  }
+
+  function mdApplyQuotes(data) {
+    if (mdIsErr(data)) { mdCaptureError("quotes", data.__err); return; }
+    mdClearError("quotes");
+    _marketWatch.quotes = data;
+  }
+
+  function mdApplySession(data) {
+    if (mdIsErr(data)) { mdCaptureError("session", data.__err); return; }
+    mdClearError("session");
+    _marketWatch.session = data;
+  }
+
+  function mdApplyQuality(data) {
+    if (mdIsErr(data)) { mdCaptureError("quality", data.__err); return; }
+    mdClearError("quality");
+    _marketWatch.quality = data;
+  }
+
+  function mdApplyHealth(data) {
+    if (mdIsErr(data)) { mdCaptureError("health", data.__err); return; }
+    mdClearError("health");
+    _marketWatch.health = data;
+  }
+
+  function mdApplyBars(data, symbol) {
+    if (mdIsErr(data)) { mdCaptureError("bars", data.__err); return; }
+    // A late response for a symbol the user already left must not paint.
+    if (data.symbol !== symbol) return;
+    mdClearError("bars");
+    var md = mdRef();
+    if (!md) return;
+    if (!_marketWatch.store || _marketWatch.barSymbol !== symbol) {
+      _marketWatch.store = md.createBarStore();
+      _marketWatch.barSymbol = symbol;
+    }
+    // §9 — idempotent update keyed by timestamp: an unchanged minute
+    // counts as 0 touched bars, so the chart only redraws on real data.
+    _marketWatch.barTouched = _marketWatch.store.merge(data.items || []);
+    _marketWatch.store.trim(MD_BAR_LIMIT);
+    _marketWatch.bars = data;
+  }
+
+  /* ── the page shell (stable ids patched by the poll) ───────────── */
+
+  function mdShell() {
+    var md = mdRef();
+    var cadence = md ? md.pollIntervalMs() : 1000;
     return (
-      '<div class="md-market-status">' +
-      '<div>' +
-      '<div class="md-ms-title">' + esc(status.market || "A-SHARE") + ' MARKET</div>' +
-      '<div class="md-ms-state"><span class="md-ms-dot md-ms-dot-' + state.tone + '"></span>' +
-      '<span class="md-ms-word">' + state.word + '</span></div>' +
-      '<div class="md-ms-phase">' + esc(status.phase_label || status.phase) + '</div>' +
-      '</div>' +
-      '<div class="md-ms-block">' +
-      '<div class="md-ms-label">Phase</div>' +
-      '<div class="md-ms-value">' + esc(status.phase || "—") + '</div>' +
-      '<div class="md-ms-sub">is_tradable: ' + (status.is_tradable ? "true" : "false") + '</div>' +
-      '</div>' +
-      '<div class="md-ms-block">' +
-      '<div class="md-ms-label">Session</div>' +
-      '<div class="md-ms-value t-num">' + cstHM(sess.start) + ' — ' + cstHM(sess.end) + '</div>' +
-      '<div class="md-ms-sub">' + esc(status.trading_date || "") + ' · ' + esc(status.timezone || "Asia/Shanghai") + '</div>' +
-      '</div>' +
-      '<div class="md-ms-block">' +
-      '<div class="md-ms-label">Next</div>' +
-      '<div class="md-ms-value">' + esc(next.label || next.phase || "—") + '</div>' +
-      '<div class="md-ms-sub t-num">' + nextWhen + '</div>' +
-      '</div>' +
-      '</div>'
+      UI.pageHeader("Market Data",
+        "实时行情 · A-share ETF / LOF · 单一入口 /api/market-data/* · 轮询 " + cadence + "ms") +
+      '<div id="md-banner">' + UI.stateLoading("Connecting", "连接 /api/market-data/* …") + '</div>' +
+      '<div id="md-kpis"></div>' +
+      UI.panel("Market Status / 市场状态",
+        '<div id="md-session">' + UI.stateLoading("Loading session", "读取交易时段…") + '</div>',
+        { actions: "" }) +
+      UI.panel("Quote / 最新行情",
+        '<div id="md-quote">' + UI.stateLoading("Loading quote", "读取最新行情…") + '</div>',
+        { actions: "" }) +
+      UI.sectionHeading("Symbol Selector / 品种选择",
+        '<span class="md-hint">universe 来自 GET /market-data/instruments</span>') +
+      UI.panel("Universe / 品种", '<div id="md-selector">' +
+        UI.stateLoading("Loading instruments", "读取品种…") + '</div>', { actions: "" }) +
+      UI.sectionHeading("1-Minute K-Line · Historical + Realtime / 历史与实时",
+        '<span class="md-hint">200 根 1m · 按 timestamp 合并 · 服务端已合并</span>') +
+      UI.panel("K-Line", '<div id="md-kline">' +
+        UI.stateLoading("Loading bars", "读取 1 分钟 K 线…") + '</div>', { actions: "" }) +
+      UI.sectionHeading("Market Watch / 行情监控",
+        '<span class="md-hint">整表一次批量请求 · 点击行切换 K 线</span>') +
+      UI.panel("Watch List", '<div id="md-watch">' +
+        UI.stateLoading("Loading quotes", "读取行情…") + '</div>', { actions: "" }) +
+      UI.panel("Data Quality / 数据质量", '<div id="md-quality">' +
+        UI.stateLoading("Loading quality", "读取数据质量…") + '</div>', { actions: "" }) +
+      UI.panel("Health / 健康状态", '<div id="md-health">' +
+        UI.stateLoading("Loading health", "读取健康状态…") + '</div>', { actions: "" }) +
+      '<div id="md-provenance"></div>'
     );
   }
 
-  /* A-share 6-digit symbol for the Market Data page K-line /
-   * quality drill-down; falls back to the default ETF when the
-   * global trading state holds a non-A-share symbol (e.g. NVDA). */
-  function marketKlineSymbol() {
-    var s = _tradingState.symbol;
-    return s && /^\d{6}$/.test(s) ? s : "159852";
+  /* ── panel renderers (§2 the five dashboard regions) ───────────── */
+
+  function mdRenderBanner() {
+    var el = document.getElementById("md-banner");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var selected = mdQuoteRow(mdSymbol());
+    var errs = Object.keys(_marketWatch.errors);
+
+    var modeBar =
+      '<div class="md-mode-bar">' +
+      '<span class="md-mode-badge md-mode-paper">PAPER TRADING · 模拟交易</span>' +
+      (selected && md.showsLiveBadge(selected.status)
+        ? '<span class="md-mode-badge md-mode-live">LIVE DATA · 实时行情</span>'
+        : '<span class="md-mode-badge md-mode-stale">DATA ' +
+          esc(selected ? md.getMarketDataStatusLabel(selected.status) : "OFFLINE") + '</span>') +
+      '<span class="md-mode-note">行情为真实 A 股数据，本页只做观测；下单在 Paper Trading（无真实资金）</span>' +
+      UI.button("Refresh", "ghost", { sm: true, action: "md:refresh" }) +
+      '</div>';
+
+    var alert = "";
+    if (errs.length) {
+      alert = '<div class="md-banner md-banner-error">API 请求失败 / request failed：' +
+        errs.map(function (k) {
+          return '<b>' + esc(k) + '</b> ' + esc(_marketWatch.errors[k]);
+        }).join(" · ") + '</div>';
+    } else if (!_marketWatch.quotes) {
+      alert = '<div class="md-banner md-banner-loading">加载中 / connecting …</div>';
+    } else if (selected && md.isMarketDataDegraded(selected.status)) {
+      // §20 — a stale / degraded quote says so, and says it is not tradeable input.
+      alert = '<div class="md-banner md-banner-stale">' +
+        esc(mdSymbol()) + ' 行情 ' + esc(md.getMarketDataStatusLabel(selected.status)) +
+        '（' + esc(md.getMarketDataStatusHint(selected.status)) + '）— 不作为交易依据</div>';
+    }
+    el.innerHTML = modeBar + alert;
   }
 
-  /* ==================================================================
-   * Commit 006 — Market Data Quality panel
-   *
-   * Quality Overview (per-status instrument counts), per-symbol
-   * drill-down (last quote / latency / age / duplicates / gaps /
-   * status), gate config (env-driven thresholds) and the quarantine
-   * list.  Rejected data is never deleted — it is quarantined so
-   * "why did ICYQuant produce no order?" is always traceable.
-   * ================================================================== */
-  function renderQualityPanel(data) {
-    if (!data) {
-      return UI.stateEmpty("Quality API unavailable",
-        "The market data quality gate did not respond. / 数据质量服务未响应");
-    }
-    var cfg = data.config || {};
-    var stats = data.stats || {};
-    var qs = data.quarantine || {};
-    var items = data.quarantine_items || [];
-    var overview = data.overview || { instruments: 0, counts: {}, offline: 0 };
-    var symbols = data.symbols || [];
-    var gateBadge = data.gate_enabled
-      ? UI.badge("GATE ON", "ok")
-      : UI.badge("DERIVE MODE", "neutral");
+  function mdRenderKpis() {
+    var el = document.getElementById("md-kpis");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var items = mdList(_marketWatch.quotes);
+    var fresh = 0, warn = 0, bad = 0, offline = 0;
+    items.forEach(function (q) {
+      var tone = md.getMarketDataStatusTone(q.status);
+      if (tone === "ok") fresh++;
+      else if (tone === "warn") warn++;
+      else if (tone === "bad") bad++;
+      else offline++;
+    });
+    var health = _marketWatch.health;
+    var universe = items.length || (health ? health.instruments : 0);
+    var kpis = [
+      { label: "Instruments", value: String(universe), hint: "GET /instruments", tone: "neutral" },
+      { label: "Fresh", value: String(fresh), hint: "FRESH / LIVE", tone: fresh ? "pos" : "neg" },
+      { label: "Warning", value: String(warn), hint: "WARNING / STALE", tone: "warning" },
+      { label: "Blocked", value: String(bad + offline), hint: "INVALID / QUARANTINED / OFFLINE", tone: (bad + offline) ? "neg" : "pos" },
+    ].map(function (k) {
+      return UI.metricCard(k.label, k.value, k.hint, k.tone);
+    }).join("");
+    el.innerHTML = UI.kpiGrid(kpis, 4);
+  }
 
-    // ── Quality Overview strip (§15) ──
-    var ovCounts = overview.counts || {};
-    var ovChips = [
-      ["FRESH", ovCounts.FRESH || 0, "ok"],
-      ["WARNING", ovCounts.WARNING || 0, "warn"],
-      ["STALE", ovCounts.STALE || 0, "warn"],
-      ["INVALID", ovCounts.INVALID || 0, "bad"],
-      ["QUARANTINED", ovCounts.QUARANTINED || 0, "bad"],
+  function mdRenderSession() {
+    var el = document.getElementById("md-session");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var s = _marketWatch.session;
+    if (!s) {
+      el.innerHTML = _marketWatch.errors.session
+        ? UI.stateError("Session unavailable", _marketWatch.errors.session, "Retry", "md:refresh")
+        : UI.stateLoading("Loading session", "读取交易时段…");
+      return;
+    }
+    var tone = md.sessionPhaseTone(s.phase);
+    var label = s.phase_label || md.sessionPhaseLabel(s.phase);
+    var next = s.next_event || {};
+    el.innerHTML =
+      '<div class="md-session">' +
+      '<div class="md-session-main">' +
+      '<div class="md-session-market">' + esc(s.market || "A-SHARE") + ' · ' + esc(s.exchange || "") + '</div>' +
+      '<div class="md-session-phase md-session-phase-' + tone + '">' +
+      '<span class="md-ms-dot md-ms-dot-' + tone + '"></span>' + esc(label) + '</div>' +
+      '<div class="md-session-sub">' + esc(s.trading_date || "") + ' · ' + esc(s.timezone || "Asia/Shanghai") + '</div>' +
+      '</div>' +
+      mdStat("Tradable", s.is_tradable
+        ? '<span class="md-qs md-qs-ok">● OPEN</span>'
+        : '<span class="md-qs md-qs-bad">● CLOSED</span>') +
+      mdStat("Session", esc(s.session_start || "—") + " — " + esc(s.session_end || "—")) +
+      mdStat("Next", esc(next.label || "—") + ' <span class="md-stat-sub">' + esc(mdWhen(s.trading_date, next.at)) + '</span>') +
+      mdStat("Server Time", esc(String(s.server_time || "").substring(11, 19) || "—")) +
+      '</div>';
+  }
+
+  function mdRenderQuote() {
+    var el = document.getElementById("md-quote");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var symbol = mdSymbol();
+    var q = mdQuoteRow(symbol);
+    if (!q) {
+      el.innerHTML = _marketWatch.errors.quotes
+        ? UI.stateError("Quote unavailable", _marketWatch.errors.quotes, "Retry", "md:refresh")
+        : UI.stateEmpty("No quote yet",
+          "该品种暂无行情快照 / waiting for the first tick");
+      return;
+    }
+    var tone = md.getMarketDataStatusTone(q.status);
+    var statusClass = md.getMarketDataStatusClass(q.status);
+    var mm = md.quoteChange(q);
+    var dir = md.directionOf(mm.change);
+    var inst = mdInstrument(symbol);
+
+    var stats =
+      mdStat("Bid", '<span class="pos">' + mdPrice(q.bid, symbol) + '</span>' +
+        (q.bid_size != null ? ' <span class="md-stat-sub">×' + md.formatCount(q.bid_size) + '</span>' : "")) +
+      mdStat("Ask", '<span class="neg">' + mdPrice(q.ask, symbol) + '</span>' +
+        (q.ask_size != null ? ' <span class="md-stat-sub">×' + md.formatCount(q.ask_size) + '</span>' : "")) +
+      mdStat("Open", mdPrice(q.open, symbol)) +
+      mdStat("High", mdPrice(q.high, symbol)) +
+      mdStat("Low", mdPrice(q.low, symbol)) +
+      mdStat("Pre Close", mdPrice(q.pre_close, symbol)) +
+      mdStat("Volume", md.formatCount(q.volume)) +
+      mdStat("Turnover", md.formatTurnover(q.turnover)) +
+      mdStat("Spread", q.spread != null ? mdPrice(q.spread, symbol) : "—") +
+      mdStat("Age", md.formatAge(q.quote_age_ms)) +
+      mdStat("Latency", q.latency_ms != null ? q.latency_ms + " ms" : "—") +
+      mdStat("Tick / Lot", esc(String(mdTick(symbol))) + " / " +
+        (inst && inst.lot_size != null ? inst.lot_size : "—"));
+
+    el.innerHTML =
+      '<div class="md-quote-detail">' +
+      '<div class="md-quote-detail-main">' +
+      '<div class="md-quote-detail-head">' +
+      '<span class="md-quote-detail-sym t-num">' + esc(q.symbol) + '</span>' +
+      '<span class="md-quote-detail-name">' + esc(q.name || mdName(symbol)) + '</span>' +
+      '<span class="' + statusClass + '">' + esc(md.getMarketDataStatusLabel(q.status)) + '</span>' +
+      (q.tradable === false ? '<span class="md-qs md-qs-bad">TRADING BLOCKED</span>' : '') +
+      (q.quality && q.quality !== q.status
+        ? '<span class="md-hint">quality ' + esc(q.quality) + '</span>' : '') +
+      '</div>' +
+      '<div class="md-quote-detail-price">' +
+      '<span class="md-quote-detail-last t-num">' + mdPrice(q.last, symbol) + '</span>' +
+      '<span class="md-quote-detail-chg ' + dir + ' t-num">' + md.formatPct(mm.pct) + '</span>' +
+      '<span class="md-quote-detail-abs ' + dir + ' t-num">' +
+      (mm.change == null ? "—" : (mm.change > 0 ? "+" : "") + mdPrice(mm.change, symbol)) +
+      '</span>' +
+      '</div>' +
+      '<div class="md-quote-detail-sub t-num">' +
+      esc(q.exchange || "") + ' · ' + esc(q.instrument_type || "") + ' · ' + esc(q.currency || "") +
+      (q.timestamp ? ' · t ' + esc(String(q.timestamp).substring(11, 19)) : '') +
+      '</div>' +
+      '</div>' +
+      '<div class="md-quote-detail-grid">' + stats + '</div>' +
+      '</div>';
+  }
+
+  function mdRenderSelector() {
+    var el = document.getElementById("md-selector");
+    if (!el) return;
+    var items = mdList(_marketWatch.instruments);
+    if (_marketWatch.errors.instruments) {
+      el.innerHTML = UI.stateError("Instruments unavailable",
+        _marketWatch.errors.instruments, "Retry", "md:refresh");
+      return;
+    }
+    if (!items.length) {
+      el.innerHTML = UI.stateEmpty("No instruments",
+        "universe 尚未就绪 / waiting for the universe");
+      return;
+    }
+    var payload = _marketWatch.instruments;
+    var active = mdSymbol();
+    var chips = items.map(function (inst) {
+      var on = inst.symbol === active;
+      return '<button type="button" class="md-symbol-chip' + (on ? " active" : "") + '"' +
+        ' data-action="setsym:' + esc(inst.symbol) + '"' +
+        ' title="' + esc(inst.name + " · " + inst.exchange + " · " + inst.instrument_type) + '">' +
+        '<span class="md-symbol-chip-code t-num">' + esc(inst.symbol) + '</span>' +
+        '<span class="md-symbol-chip-name">' + esc(inst.name || "") + '</span>' +
+        '<span class="md-symbol-chip-meta">' + esc(inst.exchange) + ' · ' + esc(inst.instrument_type) + '</span>' +
+        '</button>';
+    }).join("");
+    el.innerHTML = '<div class="md-symbolbar">' + chips + '</div>' +
+      '<div class="md-hint">' + (payload.count || items.length) + ' / ' +
+      (payload.total || items.length) + ' instruments · ' +
+      esc((payload.exchanges || []).join("+")) + ' · ' +
+      esc((payload.instrument_types || []).join(" / ")) + '</div>';
+  }
+
+  function mdRenderKline() {
+    var el = document.getElementById("md-kline");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var symbol = mdSymbol();
+    var payload = _marketWatch.bars;
+    var store = _marketWatch.store;
+
+    if (!payload || payload.symbol !== symbol || !store || !store.size()) {
+      el.innerHTML = (_marketWatch.errors.bars && (!payload || payload.symbol !== symbol))
+        ? UI.stateError("Bars unavailable", _marketWatch.errors.bars, "Retry", "md:refresh")
+        : UI.stateEmpty("No bars yet",
+          "等待第一根 1 分钟 K 线 / waiting for the first 1m bar");
+      return;
+    }
+
+    var bars = store.bars();
+    if (bars.length > MD_BAR_LIMIT) bars = bars.slice(bars.length - MD_BAR_LIMIT);
+    bars = bars.filter(function (b) {
+      return b && b.open != null && b.high != null && b.low != null && b.close != null;
+    });
+    if (!bars.length) {
+      el.innerHTML = UI.stateEmpty("No bars yet", "等待第一根 1 分钟 K 线");
+      return;
+    }
+
+    var n = bars.length;
+    var pMin = Infinity, pMax = -Infinity, vMax = 0;
+    bars.forEach(function (b) {
+      var hi = Number(b.high), lo = Number(b.low);
+      if (isFinite(hi) && hi > pMax) pMax = hi;
+      if (isFinite(lo) && lo < pMin) pMin = lo;
+      if (Number(b.volume) > vMax) vMax = Number(b.volume);
+    });
+    if (!isFinite(pMin) || !isFinite(pMax)) { pMin = 0; pMax = 1; }
+    if (pMin === pMax) { pMin -= 0.01; pMax += 0.01; }
+    var pad = (pMax - pMin) * 0.1;
+    pMin -= pad; pMax += pad;
+    if (vMax <= 0) vMax = 1;
+
+    var W = 900, VP = 190, VB = 50, GAP = 36;
+    var step = (W - GAP * 2) / Math.max(n, 1);
+    var bw = Math.max(1, Math.min(step * 0.7, 9));
+
+    function yP(p) { return VP - ((Number(p) - pMin) / (pMax - pMin)) * VP; }
+    function yV(v) { return VB - (Number(v) / vMax) * VB; }
+
+    var svg = '<svg class="md-kline-svg" viewBox="0 0 ' + W + ' ' + (VP + VB + 24) +
+      '" preserveAspectRatio="none" role="img" aria-label="1m K line">';
+    for (var g = 0; g <= 4; g++) {
+      var gy = (VP / 4) * g;
+      var gp = pMax - (g / 4) * (pMax - pMin);
+      svg += '<line x1="' + GAP + '" y1="' + gy + '" x2="' + (W - GAP) + '" y2="' + gy +
+        '" stroke="var(--ds-border)" stroke-width="0.5" opacity="0.5"/>';
+      svg += '<text x="' + (W - GAP + 6) + '" y="' + (gy + 4) + '" class="md-kline-axis">' +
+        gp.toFixed(3) + '</text>';
+    }
+    bars.forEach(function (b, i) {
+      var x = GAP + step * i + step / 2;
+      var yO = yP(b.open), yC = yP(b.close), yH = yP(b.high), yL = yP(b.low);
+      var up = Number(b.close) >= Number(b.open);
+      var color = up ? "var(--ds-profit)" : "var(--ds-loss)";
+      svg += '<line x1="' + x + '" y1="' + yH + '" x2="' + x + '" y2="' + yL +
+        '" stroke="' + color + '" stroke-width="1"/>';
+      svg += '<rect x="' + (x - bw / 2) + '" y="' + Math.min(yO, yC) + '" width="' + bw +
+        '" height="' + Math.max(Math.abs(yO - yC), 1) + '" fill="' + color +
+        '" opacity="' + (b.is_closed ? "0.9" : "0.55") + '"/>';
+      svg += '<rect x="' + (x - bw / 2) + '" y="' + (yV(b.volume) + VP + 10) + '" width="' + bw +
+        '" height="' + Math.max(VB - yV(b.volume), 0.5) + '" fill="' + color + '" opacity="0.4"/>';
+    });
+    svg += '<text x="' + GAP + '" y="' + (VP + 20) + '" class="md-kline-axis">Volume</text>';
+    svg += '</svg>';
+
+    var mg = payload.merge || {};
+    var lastBar = bars[bars.length - 1];
+    var head =
+      '<div class="md-kline-head">' +
+      '<span class="md-kline-sym t-num">' + esc(payload.symbol) + '</span>' +
+      '<span class="md-kline-name">' + esc(payload.name || mdName(payload.symbol)) + '</span>' +
+      '<span class="md-kline-close t-num">' + mdPrice(lastBar.close, payload.symbol) + '</span>' +
+      (lastBar.change_pct != null
+        ? '<span class="md-kline-chg t-num ' + md.directionOf(lastBar.change_pct) + '">' +
+          md.formatPct(lastBar.change_pct) + '</span>'
+        : '') +
+      (payload.has_live ? '<span class="ds-badge ds-badge-ok">LIVE BAR</span>' : '') +
+      '<span class="md-kline-tf">' + esc(payload.timeframe || "1m") + '</span>' +
+      '<span class="md-kline-cnt t-num">' + n + ' / ' + (payload.count || n) + ' bars · ' +
+      (payload.closed_count || 0) + ' closed</span>' +
+      '<span class="md-kline-merge">HIST ' + (mg.historical_count || 0) +
+      ' + RT ' + (mg.realtime_count || 0) + '</span>' +
+      (mg.overlaps ? '<span class="md-kline-merge">OVERLAP ' + mg.overlaps + '</span>' : '') +
+      (mg.gap_count ? '<span class="md-kline-warn">GAP ' + mg.gap_count + '</span>' : '') +
+      (mg.revision_count ? '<span class="md-kline-warn">REV ' + mg.revision_count + '</span>' : '') +
+      (mg.seamless === false ? '<span class="md-kline-warn">NOT SEAMLESS</span>' : '') +
+      '</div>';
+
+    el.innerHTML =
+      '<div class="md-kline-wrap">' + head + svg +
+      '<div class="md-hint">来源 ' + esc(payload.source || "—") +
+      ' · 合并模式 ' + esc(mg.mode || "—") +
+      ' · 本次新增/更新 ' + _marketWatch.barTouched + ' 根' +
+      (payload.gaps && payload.gaps.length ? ' · gaps ' + payload.gaps.length : '') +
+      (payload.quality && payload.quality.invalid_count
+        ? ' · 剔除 ' + payload.quality.invalid_count : '') +
+      '</div></div>';
+  }
+
+  function mdRenderWatch() {
+    var el = document.getElementById("md-watch");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var payload = _marketWatch.quotes;
+    var items = mdList(payload);
+    if (!items.length) {
+      el.innerHTML = _marketWatch.errors.quotes
+        ? UI.stateError("Quotes unavailable", _marketWatch.errors.quotes, "Retry", "md:refresh")
+        : UI.stateLoading("Loading quotes", "读取行情…");
+      return;
+    }
+    var active = mdSymbol();
+    var rows = items.map(function (q) {
+      var mm = md.quoteChange(q);
+      var on = q.symbol === active;
+      return (
+        '<div class="md-watch-row' + (on ? " active" : "") + '"' +
+        ' data-action="setsym:' + esc(q.symbol) + '" role="button" tabindex="0"' +
+        ' title="点击查看 ' + esc(q.symbol) + ' 的 1 分钟 K 线">' +
+        '<span class="md-watch-sym t-num">' + esc(q.symbol) + '</span>' +
+        '<span class="md-watch-name">' + esc(q.name || mdName(q.symbol)) + '</span>' +
+        '<span class="t-num">' + mdPrice(q.last, q.symbol) + '</span>' +
+        '<span class="t-num ' + md.directionOf(mm.pct) + '">' + md.formatPct(mm.pct) + '</span>' +
+        '<span class="t-num">' + mdPrice(q.bid, q.symbol) + '</span>' +
+        '<span class="t-num">' + mdPrice(q.ask, q.symbol) + '</span>' +
+        '<span class="t-num">' + md.formatCount(q.volume) + '</span>' +
+        '<span class="t-num">' + md.formatTurnover(q.turnover) + '</span>' +
+        '<span class="' + md.getMarketDataStatusClass(q.status) + '">' +
+        esc(md.getMarketDataStatusLabel(q.status)) + '</span>' +
+        '<span class="t-num">' + md.formatAge(q.quote_age_ms) + '</span>' +
+        '</div>'
+      );
+    }).join("");
+    el.innerHTML =
+      '<div class="md-watch">' +
+      '<div class="md-watch-head">' +
+      '<span>Symbol</span><span>Name</span><span>Last</span><span>Chg%</span>' +
+      '<span>Bid</span><span>Ask</span><span>Volume</span><span>Turnover</span>' +
+      '<span>Quality</span><span>Age</span>' +
+      '</div>' + rows + '</div>' +
+      '<div class="md-hint">' + items.length + ' instruments · 批量请求 1 次 · live ' +
+      (payload.live_count || 0) + '/' + (payload.requested || items.length) +
+      ' · source ' + esc(payload.source || "—") + '</div>';
+  }
+
+  function mdRenderQuality() {
+    var el = document.getElementById("md-quality");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var data = _marketWatch.quality;
+    if (!data) {
+      el.innerHTML = _marketWatch.errors.quality
+        ? UI.stateError("Quality unavailable", _marketWatch.errors.quality, "Retry", "md:refresh")
+        : UI.stateLoading("Loading quality", "读取数据质量…");
+      return;
+    }
+    var counts = data.counts || {};
+    var chips = [
+      ["FRESH", counts.FRESH || 0, "ok"],
+      ["WARNING", counts.WARNING || 0, "warn"],
+      ["STALE", counts.STALE || 0, "warn"],
+      ["INVALID", counts.INVALID || 0, "bad"],
+      ["QUARANTINED", counts.QUARANTINED || 0, "bad"],
+      ["OFFLINE", counts.OFFLINE || 0, "neutral"],
     ].map(function (c) {
       return '<span class="md-qo-chip md-qo-' + c[2] + '">' +
         '<span class="md-qo-count t-num">' + c[1] + '</span>' +
         '<span class="md-qo-label">' + c[0] + '</span></span>';
     }).join("");
-    var overviewHtml =
-      '<div class="md-qo-strip">' +
-      '<span class="md-qo-total"><b class="t-num">' + esc(overview.instruments) + '</b> Instruments</span>' +
-      ovChips +
-      (overview.offline
-        ? '<span class="md-qo-chip md-qo-bad"><span class="md-qo-count t-num">' + overview.offline + '</span><span class="md-qo-label">OFFLINE</span></span>'
-        : "") +
-      '</div>';
+    var strip = '<div class="md-qo-strip">' +
+      '<span class="md-qo-total"><b class="t-num">' + esc(data.instruments) + '</b> Instruments</span>' +
+      chips + '</div>';
 
-    // ── per-symbol drill-down table (§15) ──
-    function fmtAge(ms) {
-      if (ms == null) return "—";
-      return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
-    }
-    var tableRows = symbols.map(function (s) {
-      var tone = s.status === "FRESH" ? "ok"
-        : s.status === "INVALID" || s.status === "QUARANTINED" ? "bad"
-        : "warn";
-      var active = s.symbol === marketKlineSymbol();
-      return (
-        '<div class="md-qsym-row' + (active ? " active" : "") + '" data-action="setsym:' + esc(s.symbol) + '">' +
+    var active = mdSymbol();
+    var rows = (data.symbols || []).map(function (s) {
+      var on = s.symbol === active;
+      return '<div class="md-qsym-row md-quality-row' + (on ? " active" : "") + '"' +
+        ' data-action="setsym:' + esc(s.symbol) + '">' +
         '<span class="md-qsym-sym t-num">' + esc(s.symbol) + '</span>' +
-        '<span class="md-qs md-qs-' + tone + '">' + esc(s.status) + '</span>' +
-        '<span class="t-num">' + (s.last != null ? esc(s.last) : "—") + '</span>' +
-        '<span class="t-num">' + (s.latency_ms != null ? s.latency_ms + "ms" : "—") + '</span>' +
-        '<span class="t-num">' + fmtAge(s.quote_age_ms) + '</span>' +
-        '<span class="t-num">' + (s.duplicates > 0 ? s.duplicates : "0") + '</span>' +
-        '<span class="t-num' + (s.gaps > 0 ? " md-qsym-alert" : "") + '">' + (s.gaps > 0 ? s.gaps : "0") + '</span>' +
-        '</div>'
-      );
-    }).join("");
-    var tableHtml =
-      '<div class="md-qsym-head">' +
-      '<span>Symbol</span><span>Quality</span><span>Last</span>' +
-      '<span>Latency</span><span>Age</span><span>Dup</span><span>Gaps</span>' +
-      '</div>' +
-      '<div class="md-qsym-body">' + (tableRows ||
-        UI.stateEmpty("No instruments", "Waiting for the universe. / 等待品种数据")) + '</div>';
-
-    var html = overviewHtml +
-      '<div class="md-quality-wrap">' +
-      '<div class="md-quality-config">' +
-      '<div class="md-ms-label">Thresholds <span class="md-ms-sub">(env)</span></div>' +
-      '<div class="md-quality-thresholds t-num">' +
-      '<span>fresh &lt; <b>' + esc(cfg.fresh_ms) + 'ms</b></span>' +
-      '<span>stale ≥ <b>' + esc(cfg.stale_ms) + 'ms</b></span>' +
-      '<span>future ± <b>' + esc(cfg.future_tolerance_ms) + 'ms</b></span>' +
-      '<span>outlier &gt; <b>' + esc(cfg.outlier_pct) + '%</b></span>' +
-      '</div>' +
-      '<div class="md-ms-sub">' + gateBadge +
-      ' WARNING trading: ' + (cfg.allow_warning_trading ? "allowed" : "blocked (default)") +
-      '</div>' +
-      '</div>' +
-      '<div class="md-quality-stats">' +
-      '<div class="md-ms-label">Evaluations</div>' +
-      '<div class="md-quality-nums t-num">' +
-      '<span>evaluated <b>' + esc(stats.evaluated || 0) + '</b></span>' +
-      '<span>rejected <b>' + esc(stats.rejected || 0) + '</b></span>' +
-      '<span>quarantined <b>' + esc(qs.total_rejected || 0) + '</b></span>' +
-      '</div>' +
-      '<div class="md-ms-sub">' +
-      (items.length ? items.length + " recent item(s) below" : "No rejected data — clean feed") +
-      '</div>' +
-      '</div>' +
-      '</div>' +
-      '<div class="md-qsym-table">' + tableHtml + '</div>';
-
-    if (items.length) {
-      var rows = items.map(function (it) {
-        var tone = it.status === "INVALID" || it.status === "QUARANTINED" ? "neg" : "warn";
-        return (
-          '<div class="md-quar-row">' +
-          '<span class="md-quar-sym t-num">' + esc(it.symbol) + '</span>' +
-          '<span class="md-quar-status ' + tone + '">' + esc(it.status) + '</span>' +
-          '<span class="md-quar-reasons">' + esc((it.reasons || []).join(", ")) + '</span>' +
-          '<span class="md-quar-time t-num">' +
-          (it.received_at ? it.received_at.substring(11, 19) : "—") + '</span>' +
-          '</div>'
-        );
-      }).join("");
-      html += '<div class="md-quar-list">' + rows + '</div>';
-    }
-    return html;
-  }
-
-  /* ==================================================================
-   * Commit 007 — Market Cache panel
-   *
-   * The shared latest market state (Redis in production, honest
-   * in-memory fallback for local dev).  The frontend never touches
-   * Redis directly — it reads through the Market Data API.  The
-   * panel shows infrastructure health (backend + quote / bar /
-   * session / quality caches + trading path), per-state counts
-   * and one cache row per symbol (state / last / age / latency /
-   * quality).  A degraded cache reports BLOCKED, never fake calm.
-   * ================================================================== */
-  function renderCachePanel(data) {
-    if (!data) {
-      return UI.stateEmpty("Market cache unavailable",
-        "The market cache service did not respond. / 行情缓存服务未响应");
-    }
-    var health = data.health || {};
-    var components = data.components || {};
-    var overview = data.overview || { instruments: 0, cached_symbols: 0, counts: {} };
-    var symbols = data.symbols || [];
-    var stats = data.stats || {};
-    var cfg = data.config || {};
-
-    function statusDot(status) {
-      var tone = status === "HEALTHY" ? "ok"
-        : status === "DEGRADED" ? "bad" : "neutral";
-      var word = status === "HEALTHY" ? "HEALTHY"
-        : status === "DEGRADED" ? "DEGRADED" : status;
-      return '<span class="md-ci-dot md-ci-dot-' + tone + '"></span>' +
-        '<span class="md-ci-status">' + esc(word) + '</span>';
-    }
-
-    // ── infrastructure rows (§13) ──
-    var backendLabel = (cfg.backend === "redis")
-      ? "Redis" : "Memory (local dev)";
-    var infraRows = [
-      ["Cache Backend", backendLabel, statusDot(health.status)]
-    ].concat([
-      ["Quote Cache", "quotes: " + (stats.writes && stats.writes.quote || 0),
-        statusDot((components.quote || {}).status || "EMPTY")],
-      ["Bar Cache", "bars: " + (stats.writes && stats.writes.bar || 0),
-        statusDot((components.bar || {}).status || "EMPTY")],
-      ["Session Cache", "sessions: " + (stats.writes && stats.writes.session || 0),
-        statusDot((components.session || {}).status || "EMPTY")],
-    ]);
-    var infraHtml = infraRows.map(function (r) {
-      return '<div class="md-ci-row">' +
-        '<span class="md-ci-name">' + esc(r[0]) + '</span>' +
-        '<span class="md-ci-meta">' + esc(r[1]) + '</span>' +
-        '<span class="md-ci-state">' + r[2] + '</span>' +
+        '<span class="md-watch-name">' + esc(s.name || "") + '</span>' +
+        '<span class="' + md.getMarketDataStatusClass(s.status) + '">' +
+        esc(md.getMarketDataStatusLabel(s.status)) + '</span>' +
+        '<span class="t-num">' + mdPrice(s.last, s.symbol) + '</span>' +
+        '<span class="t-num">' + md.formatAge(s.quote_age_ms) + '</span>' +
+        '<span class="t-num">' + (s.latency_ms != null ? s.latency_ms + " ms" : "—") + '</span>' +
+        '<span class="md-qs md-qs-' + (s.tradable ? "ok" : "bad") + '">' +
+        (s.tradable ? "TRADABLE" : "BLOCKED") + '</span>' +
         '</div>';
     }).join("");
 
-    // trading path (§15): degraded cache blocks the trading path
-    var tradingOk = health.trading_allowed !== false;
-    var tradingHtml = '<div class="md-ci-row md-ci-row-path' + (tradingOk ? "" : " blocked") + '">' +
-      '<span class="md-ci-name">Trading Path</span>' +
-      '<span class="md-ci-meta">TTL ' + esc(cfg.ttl_trading_s || "—") +
-      's / ' + esc(cfg.ttl_closed_s || "—") + 's</span>' +
-      '<span class="md-ci-state">' +
-      (tradingOk
-        ? '<span class="md-qs md-qs-ok">● NORMAL</span>'
-        : '<span class="md-qs md-qs-bad">● BLOCKED</span>') +
-      '</span></div>';
+    var items = data.quarantine_items || [];
+    var quarantine = items.length
+      ? '<div class="md-quar-list">' + items.map(function (it) {
+          var bad = it.status === "INVALID" || it.status === "QUARANTINED";
+          return '<div class="md-quar-row">' +
+            '<span class="md-quar-sym t-num">' + esc(it.symbol || "—") + '</span>' +
+            '<span class="md-quar-status ' + (bad ? "neg" : "warn") + '">' + esc(it.status || "—") + '</span>' +
+            '<span class="md-quar-reasons">' + esc((it.reasons || []).join(", ")) + '</span>' +
+            '<span class="md-quar-time t-num">' +
+            esc(String(it.received_at || "").substring(11, 19) || "—") + '</span>' +
+            '</div>';
+        }).join("") + '</div>'
+      : '<div class="md-hint">No rejected data — clean feed / 无被拒数据</div>';
 
-    // ── per-state counts strip (§13) ──
-    var counts = overview.counts || {};
-    var cached = overview.cached_symbols || 0;
-    var total = overview.instruments || 0;
-    var chips = [
-      ["LIVE", counts.LIVE || 0, "ok"],
-      ["STALE", counts.STALE || 0, "warn"],
-      ["PAUSED", counts.MARKET_PAUSED || 0, "warn"],
-      ["CLOSED", counts.MARKET_CLOSED || 0, "neutral"],
-      ["MISS", counts.MISS || 0, "bad"],
-    ].map(function (c) {
-      return '<span class="md-qo-chip md-qo-' + c[2] + '">' +
-        '<span class="md-qo-count t-num">' + c[1] + '</span>' +
-        '<span class="md-qo-label">' + c[0] + '</span></span>';
-    }).join("");
-    var stripHtml =
-      '<div class="md-qo-strip">' +
-      '<span class="md-qo-total"><b class="t-num">' + cached + '</b> / ' +
-      '<span class="t-num">' + total + '</span> Cached Symbols</span>' +
-      chips +
-      '</div>';
-
-    // ── per-symbol cache rows (§12: Fresh / Age / Latency) ──
-    function fmtAgeS(s) {
-      if (s == null) return "—";
-      return s >= 1000 ? (s / 1000).toFixed(1) + "k s" : s.toFixed(1) + "s";
-    }
-    var rows = symbols.map(function (s) {
-      var tone = s.state === "LIVE" ? "ok"
-        : s.state === "MISS" ? "bad" : "warn";
-      var active = s.symbol === marketKlineSymbol();
-      return (
-        '<div class="md-cache-row' + (active ? " active" : "") + '" data-action="setsym:' + esc(s.symbol) + '">' +
-        '<span class="md-qsym-sym t-num">' + esc(s.symbol) + '</span>' +
-        '<span class="md-qs md-qs-' + tone + '">' + esc(s.state) + '</span>' +
-        '<span class="t-num">' + (s.last != null ? esc(s.last) : "—") + '</span>' +
-        '<span class="t-num">' + fmtAgeS(s.age_seconds) + '</span>' +
-        '<span class="t-num">' + (s.latency_ms != null ? s.latency_ms + "ms" : "—") + '</span>' +
-        '<span class="md-cache-q">' + esc(s.quality_status || "—") + '</span>' +
-        '</div>'
-      );
-    }).join("");
-    var tableHtml =
-      '<div class="md-cache-head">' +
-      '<span>Symbol</span><span>Cache</span><span>Last</span>' +
-      '<span>Age</span><span>Latency</span><span>Quality</span>' +
-      '</div>' +
+    el.innerHTML = strip +
+      '<div class="md-qsym-table md-quality-table">' +
+      '<div class="md-qsym-head">' +
+      '<span>Symbol</span><span>Name</span><span>Quality</span><span>Last</span>' +
+      '<span>Age</span><span>Latency</span><span>Trading</span></div>' +
       '<div class="md-qsym-body">' + (rows ||
-        UI.stateEmpty("No cached symbols", "Waiting for the first tick. / 等待首笔行情")) + '</div>';
-
-    return (
-      stripHtml +
-      '<div class="md-cache-infra">' + infraHtml + tradingHtml + '</div>' +
-      (health.last_error
-        ? '<div class="md-cache-error">Last error: ' + esc(health.last_error) + '</div>'
-        : "") +
-      '<div class="md-qsym-table md-cache-table">' + tableHtml + '</div>'
-    );
+        UI.stateEmpty("No instruments", "等待品种数据")) + '</div>' +
+      '</div>' + quarantine;
   }
 
+  function mdRenderHealth() {
+    var el = document.getElementById("md-health");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    var data = _marketWatch.health;
+    if (!data) {
+      el.innerHTML = _marketWatch.errors.health
+        ? UI.stateError("Health unavailable", _marketWatch.errors.health, "Retry", "md:refresh")
+        : UI.stateLoading("Loading health", "读取健康状态…");
+      return;
+    }
+    var counts = data.symbols || {};
+    var components = [
+      ["Adapter", data.adapter, "数据源适配器"],
+      ["Redis", data.redis, "缓存后端"],
+      ["Quality", data.quality, "质量门 roll-up"],
+    ].map(function (c) {
+      return '<div class="md-health-row">' +
+        '<span class="md-health-name">' + esc(c[0]) + '</span>' +
+        '<span class="md-health-hint">' + esc(c[2]) + '</span>' +
+        '<span class="' + md.getHealthStatusClass(c[1]) + '">' +
+        esc(md.componentStatusLabel(c[1])) + '</span>' +
+        '</div>';
+    }).join("");
+
+    var symbolChips = [
+      ["fresh", counts.fresh, "ok"], ["warning", counts.warning, "warn"],
+      ["stale", counts.stale, "warn"], ["invalid", counts.invalid, "bad"],
+      ["quarantined", counts.quarantined, "bad"], ["offline", counts.offline, "neutral"],
+    ].map(function (c) {
+      return '<span class="md-qo-chip md-qo-' + c[2] + '">' +
+        '<span class="md-qo-count t-num">' + (c[1] || 0) + '</span>' +
+        '<span class="md-qo-label">' + c[0].toUpperCase() + '</span></span>';
+    }).join("");
+
+    var feed = data.feed || {};
+    var stats = feed.stats || {};
+    var cache = data.cache || {};
+
+    el.innerHTML =
+      '<div class="md-health">' +
+      '<div class="md-health-head">' +
+      '<span class="' + md.getHealthStatusClass(data.status) + '">' +
+      esc(md.healthStatusLabel(data.status)) + '</span>' +
+      '<span class="md-health-meta t-num">' + esc(data.instruments) + ' instruments · ' +
+      esc((data.timeframes || []).join(" / ")) + ' · checked ' +
+      esc(String(data.checked_at || "").substring(11, 19)) + '</span>' +
+      '</div>' +
+      '<div class="md-health-rows">' + components + '</div>' +
+      '<div class="md-qo-strip">' +
+      '<span class="md-qo-total"><b class="t-num">' + (counts.total || 0) + '</b> Symbols</span>' +
+      symbolChips + '</div>' +
+      '<div class="md-hint t-num">feed ' +
+      (feed.running
+        ? '<span class="md-qs md-qs-ok">RUNNING</span>'
+        : '<span class="md-qs md-qs-bad">STOPPED</span>') +
+      ' · adapter ' + esc(feed.adapter || "—") +
+      ' · every ' + esc(feed.interval_seconds != null ? feed.interval_seconds + "s" : "—") +
+      ' · accepted ' + md.formatCount(stats.quotes_accepted) +
+      ' · rejected ' + md.formatCount(stats.quotes_rejected) +
+      (cache.backend ? ' · cache ' + esc(cache.backend) : '') +
+      '</div>' +
+      '</div>';
+  }
+
+  /** §22 — provenance, shown only when dev mode is on. */
+  function mdRenderProvenance() {
+    var el = document.getElementById("md-provenance");
+    if (!el) return;
+    var md = mdRef();
+    if (!md) return;
+    if (!md.devMode()) { el.innerHTML = ""; return; }
+    var api = mdApiRef();
+    var base = (api && api.base) || "/market-data";
+    var q = _marketWatch.quotes || {};
+    var b = _marketWatch.bars || {};
+    var mg = b.merge || {};
+    var h = _marketWatch.health || {};
+    var rows = [
+      ["API base", esc((ICY_API.config.apiBaseUrl || "") + base)],
+      ["Poll interval", md.pollIntervalMs() + " ms"],
+      ["Last tick", esc(_marketWatch.updatedAt ? _marketWatch.updatedAt.toLocaleTimeString() : "—")],
+      ["Quote source", esc(q.source || "—") + " · live " + (q.live_count || 0) + "/" +
+        (q.requested || q.count || 0)],
+      ["Bar source", esc(b.source || "—") + " · mode " + esc(mg.mode || "—") +
+        " · store " + (_marketWatch.store ? _marketWatch.store.size() : 0) +
+        " · updated " + _marketWatch.barTouched],
+      ["Feed", esc((h.feed || {}).adapter || "—") + " · cache " +
+        esc(((h.cache || {}).backend) || "—")],
+    ].map(function (r) {
+      return '<div class="md-provenance-row"><span class="md-provenance-key">' + esc(r[0]) +
+        '</span><span class="md-provenance-val t-num">' + r[1] + '</span></div>';
+    }).join("");
+    el.innerHTML = '<div class="md-provenance">' +
+      '<div class="md-provenance-title">Provenance · dev mode</div>' + rows + '</div>';
+  }
+
+  function mdRenderFast() {
+    if (!mdOnPage()) return;
+    mdRenderBanner();
+    mdRenderKpis();
+    mdRenderSession();
+    mdRenderQuote();
+    mdRenderKline();
+    mdRenderWatch();
+    mdRenderProvenance();
+  }
+
+  function mdRenderSlow() {
+    if (!mdOnPage()) return;
+    mdRenderQuality();
+    mdRenderHealth();
+    mdRenderKpis();
+    mdRenderProvenance();
+  }
+
+  /** §6 — start the two polls; the poller itself is visibility-aware. */
+  function mdStartPolls() {
+    var md = mdRef();
+    if (!md) return;
+    md.startPoll(MD_FAST_POLL, mdFastTick, md.pollIntervalMs());
+    md.startPoll(MD_SLOW_POLL, mdSlowTick, Math.max(5000, md.pollIntervalMs() * 5));
+  }
+
+  /** Entry point — scheduled by the page renderer once the shell is in
+   *  the DOM (a 0ms timeout inside render()'s continuation). */
+  async function mdStart() {
+    if (!mdOnPage()) return;
+    var md = mdRef();
+    if (!md) {
+      var host = document.getElementById("page-content");
+      if (host) {
+        host.innerHTML = UI.pageHeader("Market Data", "实时行情") +
+          UI.stateError("Market data module unavailable",
+            "market-data.js did not load — the page cannot reach /api/market-data/*.",
+            "Retry", "md:refresh");
+      }
+      return;
+    }
+    await mdLoadInstruments();
+    if (!mdOnPage()) return;
+    mdFastTick();
+    mdSlowTick();
+    mdStartPolls();
+  }
+
+  /* §17 — one delegated handler keeps dynamically re-rendered rows and
+   *  chips clickable without re-binding on every poll tick. */
+  document.addEventListener("click", function (ev) {
+    var target = ev.target;
+    if (!target || !target.closest) return;
+    var el = target.closest("[data-action]");
+    if (!el) return;
+    var action = el.getAttribute("data-action") || "";
+    if (action.indexOf("setsym:") === 0) {
+      var symbol = action.slice(7);
+      if (!symbol || symbol === _marketWatch.symbol) return;
+      ev.preventDefault();
+      _marketWatch.symbol = symbol;
+      render();
+    } else if (action === "md:refresh") {
+      ev.preventDefault();
+      render();
+    }
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    var target = ev.target;
+    if (!target || !target.closest) return;
+    var el = target.closest('[data-action^="setsym:"]');
+    if (!el) return;
+    ev.preventDefault();
+    el.click();
+  });
+
   /* ==================================================================
-   * Commit 003 — Market Data / Real-time Quote pipeline
-   *
-   * Reads the latest validated quote snapshot from QuoteService via
-   * GET /api/dashboard/quotes.  The frontend never talks to the
-   * market data source directly — swap Mock → Real broker adapter
-   * without touching this page.  Page re-renders on the terminal's
-   * 5s auto-refresh loop; quote freshness is computed server-side.
+   * Commit 011 — Market Data page entry
    * ================================================================== */
   PAGE_FRAMEWORK["trading/market"] = async function () {
-    var data;
-    try {
-      data = await ICY_API.marketQuotes();
-    } catch (e) {
-      return UI.pageHeader("Market Data", "实时行情 — A-share ETF / LOF") +
-        UI.stateError("Quote API unavailable",
-          (e.message || String(e)) + " · The quote pipeline did not respond.",
-          "Retry", "nav:trading/market");
+    var md = mdRef();
+    if (!md) {
+      return UI.pageHeader("Market Data", "实时行情") +
+        UI.stateError("Market data module unavailable",
+          "market-data.js did not load — the page cannot reach /api/market-data/*.",
+          "Retry", "md:refresh");
     }
-
-    // ── Market status (Commit 005) — trading session strip ──
-    var marketStatus = await useMarketStatus();
-    var marketStatusPanel = UI.panel("Market Status / 市场状态",
-      renderMarketStatus(marketStatus), { actions: "" });
-
-    // ── Data Quality (Commit 006) — gate config + quarantine ──
-    var qualityData = null;
-    try {
-      qualityData = await ICY_API.marketQuality(20);
-    } catch (e) {
-      qualityData = null;
-    }
-    var qualityPanel = UI.panel("Data Quality / 数据质量",
-      renderQualityPanel(qualityData), { actions: "" });
-
-    // ── Market Cache (Commit 007) — shared latest market state ──
-    var cacheData = null;
-    try {
-      cacheData = await ICY_API.marketCache();
-    } catch (e) {
-      cacheData = null;
-    }
-    var cachePanel = UI.panel("Market Cache / 行情缓存",
-      renderCachePanel(cacheData), { actions: "" });
-
-    var universeInfo;
-    try {
-      universeInfo = await ICY_API.tradingUniverse();
-    } catch (e) {
-      universeInfo = null;
-    }
-    var nameOf = {};
-    (universeInfo && universeInfo.universe || []).forEach(function (inst) {
-      nameOf[inst.symbol] = inst.name;
-    });
-
-    var quotes = data.quotes || [];
-    var liveCount = 0, staleCount = 0, offlineCount = 0, warnCount = 0;
-    quotes.forEach(function (v) {
-      if (v.status === "LIVE") liveCount++;
-      else if (v.status === "WARNING") warnCount++;
-      else if (v.status === "STALE") staleCount++;
-      else offlineCount++;
-    });
-
-    // ── KPI row ──
-    var kpis = [
-      { label: "Live Feeds", value: String(liveCount), hint: "FRESH ≤ 3s" },
-      { label: "Warning", value: String(warnCount), hint: "3–10s" },
-      { label: "Stale", value: String(staleCount), hint: "> 10s" },
-      { label: "Offline", value: String(offlineCount), hint: "No quote" },
-    ].map(function (k) {
-      return UI.metricCard(k.label, k.value, k.hint,
-        k.label === "Live Feeds" ? (liveCount > 0 ? "pos" : "neg")
-        : k.label === "Warning" ? "warning"
-        : k.label === "Stale" ? "warning"
-        : offlineCount > 0 ? "neg" : "pos");
-    }).join("");
-
-    // ── Quote cards grid ──
-    function statusBadge(status) {
-      var variant = "neutral";
-      if (status === "LIVE") variant = "ok";
-      else if (status === "WARNING" || status === "STALE") variant = "warn";
-      else variant = "neutral";
-      return UI.badge(status === "LIVE" ? "LIVE" : status, variant);
-    }
-
-    function fmtQty(n) {
-      n = Number(n) || 0;
-      return n.toLocaleString("en-US");
-    }
-    function fmtTurnover(v) {
-      v = Number(v) || 0;
-      if (v >= 1e8) return "¥" + (v / 1e8).toFixed(2) + "亿";
-      if (v >= 1e4) return "¥" + (v / 1e4).toFixed(1) + "万";
-      return "¥" + v.toFixed(0);
-    }
-
-    var cardsHtml = quotes.map(function (v) {
-      var q = v.quote;
-      var symbol = v.symbol;
-      var name = nameOf[symbol] || "";
-      if (!q) {
-        return (
-          '<div class="ds-metric-card md-quote-card md-quote-offline">' +
-          '<div class="md-quote-head"><span class="md-quote-sym t-num">' + esc(symbol) + '</span>' +
-          statusBadge("OFFLINE") + '</div>' +
-          '<div class="md-quote-name">' + esc(name) + '</div>' +
-          '<div class="md-quote-last">—</div>' +
-          '<div class="md-quote-sub">Waiting for first tick</div>' +
-          '</div>'
-        );
-      }
-      var pct = Number(q.change_pct) || 0;
-      var dir = pct > 0 ? "pos" : pct < 0 ? "neg" : "neutral";
-      var sign = pct > 0 ? "+" : "";
-      // ── Data Quality block (Commit 006) ──
-      var qualityHtml = "";
-      var quality = v.quality;
-      if (quality && quality.checks) {
-        var qsTone = quality.status === "FRESH" ? "ok"
-          : quality.status === "INVALID" || quality.status === "QUARANTINED" ? "bad"
-          : "warn";
-        qualityHtml = '<div class="md-quote-quality">' +
-          '<span class="md-qs md-qs-' + qsTone + '">● ' + esc(quality.status) + '</span>';
-        var checkRows = [
-          ["Price", quality.checks.price],
-          ["Timestamp", quality.checks.timestamp],
-          ["Session", quality.checks.session],
-          ["Volume", quality.checks.volume],
-        ].map(function (c) {
-          return '<span class="md-qc ' + (c[1] ? "ok" : "bad") + '">' +
-            (c[1] ? "✓" : "✗") + " " + c[0] + '</span>';
-        }).join("");
-        qualityHtml += '<span class="md-qc-row">' + checkRows + '</span>';
-        if (quality.tradable === false) {
-          qualityHtml += '<span class="md-quote-blocked">Trading: BLOCKED' +
-            (quality.reasons && quality.reasons.length
-              ? " · " + esc(quality.reasons.join(", ")) : "") + '</span>';
-        }
-        qualityHtml += '</div>';
-      }
-      return (
-        '<div class="ds-metric-card md-quote-card">' +
-        '<div class="md-quote-head"><span class="md-quote-sym t-num">' + esc(symbol) + '</span>' +
-        statusBadge(v.status) + '</div>' +
-        '<div class="md-quote-name">' + esc(name) + '</div>' +
-        '<div class="md-quote-last t-num">' + esc(q.last) +
-        '<span class="md-quote-chg ' + dir + ' t-num">' + sign + pct.toFixed(2) + '%</span></div>' +
-        '<div class="md-quote-ba t-num">B <span class="pos">' + esc(q.bid) + '</span> / A <span class="neg">' + esc(q.ask) + '</span></div>' +
-        '<div class="md-quote-sub t-num">Vol ' + fmtQty(q.volume) + ' · ' + fmtTurnover(q.turnover) + '</div>' +
-        '<div class="md-quote-lat t-num">' + (q.age_seconds != null ? q.age_seconds.toFixed(1) + "s · " : "") +
-        (q.latency_ms != null ? q.latency_ms + "ms" : "") + '</div>' +
-        qualityHtml +
-        '</div>'
-      );
-    }).join("");
-
-    var feedStats = data.stats || {};
-    var kpiHtml = UI.kpiGrid(kpis, 4);
-
-    // ── 1m K-line section (Commit 004) ──
-    var klineSymbol = marketKlineSymbol();
-    var barsData = null;
-    try {
-      barsData = await ICY_API.bars(klineSymbol, 60);
-    } catch (e) {
-      barsData = null;
-    }
-
-    function renderKline(barsData) {
-      if (!barsData || !barsData.bars || !barsData.bars.length) {
-        return UI.stateEmpty("No bars yet",
-          "Waiting for the first 1-minute bar to close. / 等待第一根 1 分钟 K 线");
-      }
-      var bars = barsData.bars;
-      var n = bars.length;
-      // ── price range ──
-      var pMin = Infinity, pMax = -Infinity;
-      var vMax = 0;
-      for (var i = 0; i < n; i++) {
-        var b = bars[i];
-        var hi = Number(b.high), lo = Number(b.low);
-        if (hi > pMax) pMax = hi;
-        if (lo < pMin) pMin = lo;
-        if (b.volume > vMax) vMax = b.volume;
-      }
-      if (pMin === pMax) { pMin -= 0.01; pMax += 0.01; }
-      var pPad = (pMax - pMin) * 0.1;
-      pMin -= pPad; pMax += pPad;
-
-      // ── layout ──
-      var W = 800, H = 240, VP = 170, VB = 50, GAP = 30;
-      var bw = n > 0 ? (W - GAP * 2) / n : 0;
-      if (bw > 12) bw = 12;
-      var step = (W - GAP * 2) / Math.max(n, 1);
-
-      function yP(p) {
-        return VP - ((Number(p) - pMin) / (pMax - pMin)) * VP;
-      }
-      function yV(v) {
-        if (vMax <= 0) return VB;
-        return VB - (Number(v) / vMax) * VB;
-      }
-
-      var svg = '<svg class="md-kline-svg" viewBox="0 0 ' + W + ' ' + (VP + VB + 20) + '" preserveAspectRatio="none">';
-      // price grid lines
-      for (var g = 0; g <= 4; g++) {
-        var gy = (VP / 4) * g;
-        var gp = pMax - (g / 4) * (pMax - pMin);
-        svg += '<line x1="' + GAP + '" y1="' + gy + '" x2="' + (W - GAP) + '" y2="' + gy + '" stroke="var(--ds-border)" stroke-width="0.5" opacity="0.5"/>';
-        svg += '<text x="' + (W - GAP + 4) + '" y="' + (gy + 4) + '" class="md-kline-axis">' + gp.toFixed(3) + '</text>';
-      }
-      // bars
-      for (var i = 0; i < n; i++) {
-        var b = bars[i];
-        var x = GAP + step * i + step / 2;
-        var yO = yP(b.open), yC = yP(b.close), yH = yP(b.high), yL = yP(b.low);
-        var isUp = Number(b.close) >= Number(b.open);
-        var color = isUp ? "var(--ds-profit)" : "var(--ds-loss)";
-        // wick
-        svg += '<line x1="' + x + '" y1="' + yH + '" x2="' + x + '" y2="' + yL + '" stroke="' + color + '" stroke-width="1"/>';
-        // body
-        var bodyTop = Math.min(yO, yC);
-        var bodyHt = Math.max(Math.abs(yO - yC), 1);
-        var bw2 = Math.min(bw * 0.7, 8);
-        svg += '<rect x="' + (x - bw2 / 2) + '" y="' + bodyTop + '" width="' + bw2 + '" height="' + bodyHt + '" fill="' + color + '" opacity="' + (b.is_closed ? "0.9" : "0.5") + '"/>';
-        // volume bar
-        var vy = yV(b.volume) + VP + 10;
-        var vh = VB - yV(b.volume);
-        svg += '<rect x="' + (x - bw2 / 2) + '" y="' + vy + '" width="' + bw2 + '" height="' + Math.max(vh, 0.5) + '" fill="' + color + '" opacity="0.4"/>';
-      }
-      // volume axis label
-      svg += '<text x="' + GAP + '" y="' + (VP + 18) + '" class="md-kline-axis">Volume</text>';
-      svg += '</svg>';
-
-      var liveBar = bars[bars.length - 1];
-      var liveBadge = liveBar && !liveBar.is_closed
-        ? ' <span class="ds-badge ds-badge-ok">LIVE</span>'
-        : '';
-      var lastClose = liveBar ? Number(liveBar.close) : 0;
-      var lastChg = liveBar ? Number(liveBar.change_pct) : 0;
-      var chgDir = lastChg > 0 ? "pos" : lastChg < 0 ? "neg" : "neutral";
-      var chgSign = lastChg > 0 ? "+" : "";
-
-      // Commit 008 — merge provenance: history + realtime are one
-      // continuous chart; gaps/revisions surface as warn badges.
-      var mg = barsData.merge || {};
-      var mergeBadge = '';
-      if (mg.historical_count != null || mg.realtime_count != null) {
-        mergeBadge = '<span class="md-kline-merge">HIST ' +
-          (mg.historical_count || 0) + ' + RT ' +
-          (mg.realtime_count || 0) + '</span>';
-      }
-      if (mg.gap_count) {
-        mergeBadge += '<span class="md-kline-warn">GAP ' +
-          mg.gap_count + '</span>';
-      }
-      if (mg.revision_count) {
-        mergeBadge += '<span class="md-kline-warn">REV ' +
-          mg.revision_count + '</span>';
-      }
-
-      return (
-        '<div class="md-kline-wrap">' +
-        '<div class="md-kline-head">' +
-        '<span class="md-kline-sym t-num">' + esc(barsData.symbol || klineSymbol) + '</span>' +
-        '<span class="md-kline-name">' + esc(barsData.name || "") + '</span>' +
-        '<span class="md-kline-close t-num">' + (lastClose ? lastClose.toFixed(3) : '—') + '</span>' +
-        '<span class="md-kline-chg t-num ' + chgDir + '">' + chgSign + lastChg.toFixed(2) + '%</span>' +
-        liveBadge +
-        '<span class="md-kline-tf">1m</span>' +
-        '<span class="md-kline-cnt t-num">' + (barsData.closed_count || 0) + ' closed</span>' +
-        mergeBadge +
-        '</div>' +
-        svg +
-        '</div>'
-      );
-    }
-
-    // symbol selector buttons
-    var symButtons = quotes.map(function (v) {
-      var active = v.symbol === klineSymbol ? "primary" : "ghost";
-      return UI.button(v.symbol, active, {
-        sm: true,
-        action: "setsym:" + v.symbol,
-      });
-    }).join(" ");
-
-    return (
-      UI.pageHeader("Market Data", "实时行情 — Quote pipeline · source: " + (data.source || "mock") + " · thresholds 3s / 10s") +
-      marketStatusPanel +
-      qualityPanel +
-      cachePanel +
-      kpiHtml +
-      UI.sectionHeading("Universe Quotes",
-        UI.button("Refresh", "ghost", { sm: true, action: "nav:trading/market" })) +
-      UI.panel("Latest Quote Snapshot / 最新行情",
-        '<div class="md-quote-grid">' + cardsHtml + '</div>',
-        { actions: "" }) +
-      UI.sectionHeading("1-Minute K-Line · Historical + Realtime / 历史与实时合并", symButtons) +
-      UI.panel((barsData ? (barsData.name || klineSymbol) : klineSymbol) + " · 1m",
-        barsData ? renderKline(barsData) : UI.stateEmpty("No bars",
-          "Waiting for bar data. / 等待 K 线数据"),
-        { actions: "" }) +
-      UI.panel("Feed Statistics / 喂价统计",
-        '<div class="md-feed-stats">' +
-        '<span>Accepted: <b class="t-num">' + (feedStats.quotes_accepted || 0) + '</b></span>' +
-        '<span>Rejected: <b class="t-num">' + (feedStats.quotes_rejected || 0) + '</b></span>' +
-        '<span>Symbols: <b class="t-num">' + (feedStats.symbols_tracked || 0) + '</b></span>' +
-        '<span>Interval: <b class="t-num">200ms</b></span>' +
-        '</div>')
-    );
+    // A fresh visit starts from a clean slate: a new page instance must
+    // never inherit the previous visit's series or error banners.
+    _marketWatch.bars = null;
+    _marketWatch.barSymbol = null;
+    _marketWatch.store = null;
+    _marketWatch.errors = {};
+    _marketWatch.updatedAt = null;
+    _marketWatch.barTouched = 0;
+    // The poll lives here (not in the 5s terminal refresh), so the first
+    // load is scheduled for right after render() swaps this shell in.
+    window.setTimeout(mdStart, 0);
+    return mdShell();
   };
 
   PAGE_FRAMEWORK["trading/paper"] = async function () {
     var symbol = _tradingState.symbol;
 
-    // ── Parallel fetch: quote + dashboard + orders + executions ──
+    // ── Parallel fetch: quote + dashboard + orders + executions + paper feed ──
+    // Commit 009: the paper feed is the real market data pipeline
+    // (quote → session → quality gate → cache → merge) exposed to Paper
+    // Trading. Nothing on this page fabricates a price.
     var fetched = await Promise.all([
       useQuote(symbol).catch(function () { return null; }),
       useDashboard().catch(function () { return null; }),
       api.get("/dashboard/orders").catch(function () { return { orders: [] }; }),
       api.get("/dashboard/executions").catch(function () { return { executions: [] }; }),
+      api.paperFeed().catch(function () { return null; }),
     ]);
     var quote = fetched[0] || {
       symbol: symbol, last_price: 0, bid: 0, ask: 0, spread: 0,
@@ -5991,6 +6255,10 @@
     };
     var ordersList = (fetched[2] && fetched[2].orders) || [];
     var execsList = (fetched[3] && fetched[3].executions) || [];
+    var feed = fetched[4] || null;
+    var feedRows = (feed && feed.rows) || [];
+    var feedMarket = (feed && feed.market) || {};
+    var feedRow = feedRows[0] || null;
 
     // Persist for the event bindings
     _tradingState.quote = quote;
@@ -6060,6 +6328,66 @@
       'Quotes are showing nominal/last-known prices.' +
       '</div>';
 
+    // ── Commit 009 (§15) — PAPER · NO REAL MONEY identity ───────
+    // Paper Trading now runs on real quotes, real trading hours and a
+    // real quality gate, but still spends no real money. This banner is
+    // not decoration: the same page will later host SHADOW / LIVE, so
+    // the environment must be impossible to misread.
+    var paperBanner =
+      '<div class="paper-banner">' +
+      '<span class="paper-banner-badge">PAPER TRADING / 模拟交易</span>' +
+      '<span class="paper-banner-warning">PAPER — NO REAL MONEY</span>' +
+      '<span class="paper-banner-zh">真实行情 · 真实交易时段 · 真实质量门禁' +
+      '<br/>模拟成交，不涉及真实资金</span>' +
+      '</div>' +
+      // The backend ships the disclaimer (DISCLAIMER = "PAPER — NO REAL
+      // MONEY"); we render it verbatim so the sentence can never be
+      // paraphrased away by a UI edit.
+      '<div class="paper-banner-note">' +
+      esc((feed && feed.disclaimer) || "PAPER — NO REAL MONEY") +
+      ' · environment ' + esc((feed && feed.environment) || "PAPER") +
+      ' · broker none · shadow/live not enabled' +
+      '</div>';
+
+    // ── Commit 009 (§14) — feed strip: Market / Data / Quality / Book ──
+    function paperChip(v, label) {
+      var s = (v == null || v === "") ? "OFFLINE" : String(v).toUpperCase();
+      return '<span class="paper-chip paper-chip-' + esc(s) + '">' +
+        esc(label == null ? s : label) + '</span>';
+    }
+    function paperPrice(v) {
+      var n = Number(v);
+      return (isFinite(n) && n > 0) ? n.toFixed(3) : "—";
+    }
+    function stripCell(label, value) {
+      return '<div class="paper-strip-cell">' +
+        '<div class="paper-strip-label">' + label + '</div>' +
+        '<div class="paper-strip-value">' + value + '</div></div>';
+    }
+    var feedState = feed ? feed.state : "OFFLINE";
+    // "Data" is LIVE only while the feed is genuinely attached to the
+    // real pipeline (READY, or BLOCKED merely by session/quality); a
+    // degraded/offline feed reports its own state instead of pretending.
+    var dataState = (feedState === "READY" || feedState === "BLOCKED") ? "LIVE" : feedState;
+    // Market phase comes from the A-share trading calendar (§7). Without
+    // a feed we fall back to the session flag — we never invent a phase.
+    var phase = feedMarket.phase || (quote.session_running ? "CONTINUOUS_AM" : "CLOSED");
+    var bookOk = !!(feedRow && Number(feedRow.bid) > 0 && Number(feedRow.ask) > 0);
+    var paperStrip =
+      '<div class="paper-strip">' +
+      stripCell("Market / 市场", paperChip(phase)) +
+      stripCell("Data / 数据", paperChip(dataState)) +
+      stripCell("Quality / 质量", paperChip(feedRow ? feedRow.quality : "—")) +
+      stripCell("Quote / 最新价", esc(paperPrice(feedRow ? feedRow.last : quote.last_price))) +
+      stripCell("Bid / 买一", esc(paperPrice(feedRow ? feedRow.bid : quote.bid))) +
+      stripCell("Ask / 卖一", esc(paperPrice(feedRow ? feedRow.ask : quote.ask))) +
+      stripCell("Book / 盘口", paperChip(bookOk ? "BOOK" : "LAST", bookOk ? "BOOK" : "LAST ONLY")) +
+      stripCell(
+        "Paper Orders / 模拟下单",
+        paperChip(feedRow ? (feedRow.tradable ? "ALLOWED" : "BLOCKED") : "OFFLINE")
+      ) +
+      '</div>';
+
     var topRow =
       '<div class="tr-grid-3">' +
       '<div class="tr-col-left">' +
@@ -6097,15 +6425,16 @@
     });
     var posTable = posRows.length ? UI.table({
       columns: [
-        { key: "symbol", label: "Symbol" },
+        { key: "symbol", label: "Paper Position" },
         { key: "qty", label: "Qty", numeric: true },
-        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
-        { key: "last", label: "Last", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
-        { key: "pnl", label: "P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
-        { key: "pnlPct", label: "P&L %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "avgPrice", label: "Avg Price", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "last", label: "Last", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "pnl", label: "Unrealized P&L", numeric: true, format: function (v) { return UI.signedMoney(v); }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
+        { key: "pnlPct", label: "Unrealized %", numeric: true, format: function (v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }, color: function (v) { return v >= 0 ? "pos" : "neg"; } },
       ],
       rows: posRows,
-    }) : UI.empty("No Open Positions", "No positions in the current pipeline snapshot.");
+      emptyDesc: "No paper positions. Paper Trading only fills against live quotes.",
+    }) : UI.empty("No Paper Positions / 无模拟持仓", "No positions in the current paper pipeline snapshot.");
 
     // ── Orders table from real /dashboard/orders ─────────────────
     var orderRows = ordersList.map(function (o) {
@@ -6126,10 +6455,14 @@
       columns: [
         { key: "id", label: "Order ID" },
         { key: "symbol", label: "Symbol" },
-        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        // §14 — the order line must read "PAPER BUY 159852 200 @ 1.231
+        // FILLED": the environment prefix travels with every fill so a
+        // screenshot can never be mistaken for a live order.
+        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; },
+          format: function (v) { return esc("PAPER " + (v || "—")); } },
         { key: "qty", label: "Qty", numeric: true },
         { key: "type", label: "Type" },
-        { key: "price", label: "Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
+        { key: "price", label: "Price", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
         { key: "status", label: "Status", format: function (v) {
           var m = { FILLED: "pos", PENDING: "warning", SUBMITTED: "warning", NEW: "warning", CANCELLED: "neutral", REJECTED: "neg" };
           return '<span class="ds-status-pill ds-status-' + (m[v] || "neutral") + '"><span class="ds-status-dot"></span>' + esc(v) + '</span>';
@@ -6159,14 +6492,69 @@
         { key: "id", label: "Exec ID" },
         { key: "orderId", label: "Order ID" },
         { key: "symbol", label: "Symbol" },
-        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; } },
+        { key: "side", label: "Side", color: function (v) { return v === "BUY" ? "pos" : "neg"; },
+          format: function (v) { return esc("PAPER " + (v || "—")); } },
         { key: "qty", label: "Filled Qty", numeric: true },
-        { key: "price", label: "Fill Price", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
-        { key: "fee", label: "Fee", numeric: true, format: function (v) { return "$" + (v || 0).toFixed(2); } },
+        { key: "price", label: "Fill Price", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "fee", label: "Fee", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
         { key: "time", label: "Time" },
       ],
       rows: execRows,
     }) : UI.empty("No Executions", "No executions in the current session.");
+
+    // ── Commit 009 (§14) — Paper market feed panel ──────────────
+    // One row per subscribed instrument: phase, quality, book, quote
+    // age and — most importantly — whether Paper Trading may act, with
+    // the §17 reason code when it may not.
+    var feedTable = feedRows.length ? UI.table({
+      columns: [
+        { key: "symbol", label: "Symbol" },
+        { key: "name", label: "Name" },
+        { key: "lot", label: "Lot", numeric: true },
+        { key: "phase", label: "Phase" },
+        { key: "quality", label: "Quality", format: function (v) { return paperChip(v); } },
+        { key: "last", label: "Last", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "bid", label: "Bid", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "ask", label: "Ask", numeric: true, format: function (v) { return esc(paperPrice(v)); } },
+        { key: "fillSource", label: "Fill Source" },
+        { key: "age", label: "Quote Age", numeric: true, format: function (v) { return (v == null ? "—" : fmtNum(v) + " ms"); } },
+        { key: "tradable", label: "Paper Order", format: function (v) { return paperChip(v ? "ALLOWED" : "BLOCKED"); } },
+        { key: "reason", label: "Blocked Reason", format: function (v) { return v ? '<span class="paper-reason">' + esc(v) + '</span>' : "—"; } },
+      ],
+      rows: feedRows.map(function (r) {
+        return {
+          symbol: r.symbol || "—",
+          name: r.name || "—",
+          lot: r.lot_size == null ? "—" : r.lot_size,
+          phase: r.phase || "—",
+          quality: r.quality,
+          last: r.last,
+          bid: r.bid,
+          ask: r.ask,
+          fillSource: r.fill_price_source || "—",
+          age: r.quote_age_ms,
+          tradable: !!r.tradable,
+          reason: r.blocked_reason,
+        };
+      }),
+    }) : UI.empty("Paper Feed Offline / 模拟行情源离线", "No subscribed symbols in the paper feed.");
+
+    var gate = (feed && feed.gate) || {};
+    var feedMeta = feed ? (
+      '<div class="paper-feed-meta" style="margin-bottom:var(--ds-space-3);font-size:var(--ds-text-xs);color:var(--ds-text-muted);">' +
+      '<span>Backend: <b>' + esc(feed.backend || "none") + '</b></span> · ' +
+      '<span>Instruments: <b>' + fmtNum(feed.instruments || 0) + '</b></span> · ' +
+      '<span>Tradable: <b>' + fmtNum(feed.tradable || 0) + '</b></span> · ' +
+      '<span>Blocked: <b>' + fmtNum(feed.blocked || 0) + '</b></span> · ' +
+      '<span>Slippage: <b>' + esc(gate.slippage_bps == null ? "0" : String(gate.slippage_bps)) + ' bps</b></span> · ' +
+      '<span>Gates: session <b>' + (gate.session ? "ON" : "OFF") + '</b>, quality <b>' + (gate.quality ? "ON" : "OFF") + '</b>, ' +
+      'lot <b>' + (gate.lot_size ? "ON" : "OFF") + '</b>, cache <b>' + (gate.healthy_cache ? "ON" : "OFF") + '</b></span>' +
+      '<br/><span>Broker: <b>NONE</b> · Shadow/Live: <b>NOT ENABLED</b> — Paper Trading fills against real quotes only.' +
+      '</span></div>'
+    ) : "";
+    var feedPanel = feed
+      ? UI.panel("Paper Market Feed / 模拟行情源", feedMeta + feedTable)
+      : UI.empty("Paper Feed Unavailable / 模拟行情源不可用", "GET /dashboard/paper-feed returned no payload.");
 
     // ── Bottom tabs: Positions / Orders / Executions ───────────
     var bottomTabs =
@@ -6183,11 +6571,15 @@
       '<div class="ds-tab-content" id="tr-tab-executions" style="display:none;">' + execsTable + '</div>';
 
     return (
-      UI.pageHeader("Trading", "Trading terminal — Paper trading · " + esc(dash.meta.account_name || "—"),
+      UI.pageHeader("Trading", "Paper trading terminal · PAPER — NO REAL MONEY · " + esc(dash.meta.account_name || "—"),
         UI.button("New Order", "primary", { sm: true, action: "tr:focus-order" })) +
+      paperBanner +
+      paperStrip +
       sessionBanner +
       topRow +
-      UI.sectionHeading("Positions · Orders · Executions") +
+      UI.sectionHeading("Paper Market Feed · 模拟行情源") +
+      feedPanel +
+      UI.sectionHeading("Paper Positions · Orders · Executions") +
       bottomTabs + bottomContent
     );
   };
@@ -9777,6 +10169,11 @@
     document.getElementById("login-view").classList.add("hidden");
     document.getElementById("app-view").classList.remove("hidden");
 
+    // Commit 011 — any page render (navigation, retry, symbol switch)
+    // tears the previous page down, so its REST polls must stop first.
+    // The Market Data page re-arms its own polls in `mdStart`.
+    if (window.ICY_MD) window.ICY_MD.stopAllPolls();
+
     var hash = location.hash || "#/dashboard";
     var user = api.user;
     document.getElementById("user-badge").innerHTML =
@@ -10117,17 +10514,10 @@
       });
     });
 
-    // Market Data: setsym:* — switch the K-line / quality-table symbol
-    // (Commit 004 symbol selector + Commit 006 quality drill-down rows)
-    document.querySelectorAll('[data-action^="setsym:"]').forEach(function (el) {
-      el.addEventListener("click", function () {
-        var sym = el.getAttribute("data-action").slice(7);
-        if (sym && sym !== _tradingState.symbol) {
-          _tradingState.symbol = sym;
-          render();
-        }
-      });
-    });
+    // Market Data: `setsym:*` and `md:refresh` are handled by a single
+    // delegated listener registered once at module init (Commit 011 §17),
+    // because the poll replaces watch rows and chips in place — binding
+    // them here would drop the handlers on every tick.
 
     // Dashboard: refresh button (visual feedback only — mock data)
     var refreshBtn = document.querySelector('[data-action="dash:refresh"]');
@@ -10694,10 +11084,13 @@
       if (api.isAuthenticated() && location.hash && location.hash !== "#/login") {
         // static / interactive pages skip the 5s re-render:
         // factor = historical replay; backtest & settings hold form state
+        // market = own visibility-aware REST poll (§6), so re-rendering
+        //          here would rebuild the DOM under the chart every 5s
         if (location.hash.indexOf("#/factor") === 0) return;
         if (location.hash.indexOf("#/backtest") === 0) return;
         if (location.hash.indexOf("#/settings") === 0) return;
         if (location.hash.indexOf("#/audit") === 0) return;
+        if (location.hash.indexOf("#/trading/market") === 0) return;
         render();
       }
     }, state.refreshMs);

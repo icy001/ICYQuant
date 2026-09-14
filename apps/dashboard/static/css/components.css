@@ -3732,6 +3732,7 @@ tr:focus-within {
 .md-qs-ok   { color: var(--ds-profit); }
 .md-qs-warn { color: var(--ds-warning); }
 .md-qs-bad  { color: var(--ds-loss); }
+.md-qs-neutral { color: var(--ds-text-muted); }
 .md-qc-row {
   display: inline-flex;
   flex-wrap: wrap;
@@ -4059,6 +4060,319 @@ tr:focus-within {
   .md-quote-grid { grid-template-columns: repeat(2, 1fr); }
   .md-market-status { grid-template-columns: 1fr 1fr; }
   .md-market-status .md-ms-block { border-left: none; padding-left: 0; }
+}
+
+/* ==================================================================
+ * Market Data page (Commit 011) — Dashboard ↔ /api/market-data/*
+ *
+ * The page renders the exact status vocabulary of Commit 010:
+ * `.md-qs-*` for quote quality, `.md-hs-*` for health.  Nothing here
+ * invents a colour — a warning is amber, a blocked feed is red, and a
+ * missing quote stays muted rather than looking "calm".
+ * ================================================================== */
+
+/* ── §21 mode bar: PAPER TRADING vs LIVE DATA ── */
+.md-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2) var(--ds-space-3);
+  margin-bottom: var(--ds-space-3);
+}
+.md-mode-badge {
+  font-size: 10px;
+  font-weight: var(--ds-font-bold);
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--ds-border);
+  white-space: nowrap;
+}
+.md-mode-paper { color: var(--ds-warning); border-color: rgba(255, 176, 32, 0.4); background: rgba(255, 176, 32, 0.08); }
+.md-mode-live  { color: var(--ds-profit); border-color: rgba(0, 229, 160, 0.4); background: rgba(0, 229, 160, 0.08); }
+.md-mode-stale { color: var(--ds-text-muted); }
+.md-mode-note {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+  flex: 1 1 260px;
+}
+
+/* ── §20 loading / error / STALE states ── */
+.md-banner {
+  font-size: var(--ds-text-sm);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: 4px;
+  margin-bottom: var(--ds-space-3);
+}
+.md-banner-error { color: var(--ds-loss); border: 1px solid rgba(255, 90, 90, 0.35); background: rgba(255, 90, 90, 0.08); }
+.md-banner-stale { color: var(--ds-warning); border: 1px solid rgba(255, 176, 32, 0.35); background: rgba(255, 176, 32, 0.08); }
+.md-banner-loading { color: var(--ds-text-muted); border: 1px solid var(--ds-border); background: var(--ds-surface); }
+
+.md-hint { font-size: var(--ds-text-xs); color: var(--ds-text-muted); }
+
+/* ── §7 Symbol Selector (universe comes from /instruments) ── */
+.md-symbolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+.md-symbol-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 116px;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: 4px;
+  background: var(--ds-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.md-symbol-chip:hover { border-color: var(--ds-text-muted); }
+.md-symbol-chip.active {
+  border-color: var(--ds-profit);
+  background: var(--ds-surface-active, rgba(0, 229, 160, 0.06));
+}
+.md-symbol-chip-code {
+  font-family: var(--ds-num-font);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  font-size: var(--ds-text-sm);
+}
+.md-symbol-chip-name {
+  font-size: 11px;
+  color: var(--ds-text-secondary);
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-symbol-chip-meta { font-size: 10px; color: var(--ds-text-muted); }
+
+/* ── §3 Quote Panel ── */
+.md-quote-detail {
+  display: grid;
+  grid-template-columns: 1.1fr 1.6fr;
+  gap: var(--ds-space-5);
+}
+.md-quote-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  min-width: 0;
+}
+.md-quote-detail-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+.md-quote-detail-sym {
+  font-family: var(--ds-num-font);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  font-size: var(--ds-text-lg);
+}
+.md-quote-detail-name { color: var(--ds-text-secondary); font-size: var(--ds-text-sm); }
+.md-quote-detail-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-2);
+}
+.md-quote-detail-last {
+  font-family: var(--ds-num-font);
+  font-weight: var(--ds-font-bold);
+  font-size: 34px;
+  line-height: 1.1;
+  color: var(--ds-text-primary);
+}
+.md-quote-detail-chg {
+  font-family: var(--ds-num-font);
+  font-size: var(--ds-text-lg);
+  font-weight: var(--ds-font-bold);
+}
+.md-quote-detail-abs { font-family: var(--ds-num-font); font-size: var(--ds-text-sm); }
+.md-quote-detail-chg.pos, .md-quote-detail-abs.pos { color: var(--ds-profit); }
+.md-quote-detail-chg.neg, .md-quote-detail-abs.neg { color: var(--ds-loss); }
+.md-quote-detail-chg.neutral, .md-quote-detail-abs.neutral { color: var(--ds-text-muted); }
+.md-quote-detail-sub { font-size: var(--ds-text-xs); color: var(--ds-text-muted); }
+.md-quote-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ds-space-2) var(--ds-space-4);
+  align-content: start;
+}
+.md-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--ds-border);
+  min-width: 0;
+}
+.md-stat-label {
+  font-size: var(--ds-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+.md-stat-value {
+  font-size: var(--ds-text-sm);
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-primary);
+  text-align: right;
+}
+.md-stat-value .pos { color: var(--ds-profit); }
+.md-stat-value .neg { color: var(--ds-loss); }
+.md-stat-sub { font-size: 10px; font-weight: normal; color: var(--ds-text-muted); margin-left: 4px; }
+
+/* ── §10 session panel ── */
+.md-session {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1.2fr 1fr 1fr;
+  gap: var(--ds-space-4);
+  align-items: start;
+}
+.md-session-main { display: flex; flex-direction: column; gap: 2px; }
+.md-session-market {
+  font-size: var(--ds-text-xs);
+  letter-spacing: 0.08em;
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-muted);
+}
+.md-session-phase {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-text-xl);
+  font-weight: var(--ds-font-bold);
+  letter-spacing: 0.04em;
+  color: var(--ds-text-primary);
+}
+.md-session-phase-ok   { color: var(--ds-profit); }
+.md-session-phase-warn { color: var(--ds-warning); }
+.md-session-sub { font-size: var(--ds-text-xs); color: var(--ds-text-muted); }
+.md-ms-dot-ok      { background: var(--ds-profit); box-shadow: 0 0 8px rgba(0, 229, 160, 0.55); }
+.md-ms-dot-warn    { background: var(--ds-warning); box-shadow: 0 0 8px rgba(255, 176, 32, 0.45); }
+.md-ms-dot-bad     { background: var(--ds-loss); box-shadow: 0 0 8px rgba(255, 90, 90, 0.45); }
+.md-ms-dot-neutral { background: var(--ds-text-muted); }
+
+/* ── §16 Market Watch (one batch request for the whole table) ── */
+.md-watch {
+  border: 1px solid var(--ds-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.md-watch-head,
+.md-watch-row {
+  display: grid;
+  grid-template-columns: 74px 1.4fr 80px 68px 80px 80px 86px 94px 94px 62px;
+  gap: var(--ds-space-2);
+  align-items: center;
+  padding: 4px var(--ds-space-2);
+  font-size: var(--ds-text-xs);
+}
+.md-watch-head {
+  color: var(--ds-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+}
+.md-watch-row {
+  color: var(--ds-text-secondary);
+  border-bottom: 1px solid var(--ds-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.md-watch-row:last-child { border-bottom: none; }
+.md-watch-row:hover { background: var(--ds-surface-hover, rgba(255, 255, 255, 0.03)); }
+.md-watch-row.active {
+  background: var(--ds-surface-active, rgba(0, 229, 160, 0.06));
+  box-shadow: inset 2px 0 0 var(--ds-profit);
+}
+.md-watch-sym { color: var(--ds-text-primary); font-weight: var(--ds-font-bold); }
+.md-watch-name {
+  color: var(--ds-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-watch-row .t-num.pos { color: var(--ds-profit); font-weight: var(--ds-font-bold); }
+.md-watch-row .t-num.neg { color: var(--ds-loss); font-weight: var(--ds-font-bold); }
+
+/* ── §13 health panel ── */
+.md-health { display: flex; flex-direction: column; gap: var(--ds-space-3); }
+.md-health-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--ds-space-3); }
+.md-health-meta { font-size: var(--ds-text-xs); color: var(--ds-text-muted); }
+.md-health-rows {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ds-space-2) var(--ds-space-4);
+}
+.md-health-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-2);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--ds-border);
+}
+.md-health-name {
+  font-size: var(--ds-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+.md-health-hint { font-size: 10px; color: var(--ds-text-muted); flex: 1; }
+.md-hs { font-size: var(--ds-text-xs); font-weight: var(--ds-font-bold); letter-spacing: 0.04em; }
+.md-hs-ok      { color: var(--ds-profit); }
+.md-hs-warn    { color: var(--ds-warning); }
+.md-hs-bad     { color: var(--ds-loss); }
+.md-hs-neutral { color: var(--ds-text-muted); }
+
+/* ── §22 provenance strip (dev mode only) ── */
+.md-provenance {
+  margin-top: var(--ds-space-4);
+  padding: var(--ds-space-3);
+  border: 1px dashed var(--ds-border);
+  border-radius: 4px;
+  background: var(--ds-surface);
+}
+.md-provenance-title {
+  font-size: var(--ds-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: var(--ds-font-bold);
+  color: var(--ds-text-muted);
+  margin-bottom: var(--ds-space-2);
+}
+.md-provenance-row { display: flex; gap: var(--ds-space-3); font-size: var(--ds-text-xs); padding: 2px 0; }
+.md-provenance-key { color: var(--ds-text-muted); min-width: 110px; }
+.md-provenance-val { color: var(--ds-text-secondary); }
+
+/* quality drill-down table — 7 explicit columns (§12) */
+.md-quality-table .md-qsym-head,
+.md-quality-row { grid-template-columns: 80px 1fr 110px 90px 78px 78px 90px; }
+
+@media (max-width: 1280px) {
+  .md-quote-detail { grid-template-columns: 1fr; }
+  .md-quote-detail-grid { grid-template-columns: repeat(2, 1fr); }
+  .md-session { grid-template-columns: 1.4fr 1fr 1fr; }
+  .md-session .md-stat:nth-child(5) { display: none; }
+  .md-watch-head,
+  .md-watch-row { grid-template-columns: 70px 1.2fr 72px 62px 72px 72px 80px 86px 86px 58px; }
+}
+@media (max-width: 960px) {
+  .md-quote-detail-grid { grid-template-columns: 1fr; }
+  .md-session { grid-template-columns: 1fr 1fr; }
+  .md-health-rows { grid-template-columns: 1fr; }
+  .md-watch { overflow-x: auto; }
+  .md-watch-head,
+  .md-watch-row { min-width: 920px; }
 }
 
 /* ==================================================================
