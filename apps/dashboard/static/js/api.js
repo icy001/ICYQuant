@@ -546,6 +546,14 @@
       return this.get("/dashboard/market-cache");
     },
 
+    // ── Paper Trading Market Feed (Commit 009) ────────────────
+    /** Paper Trading feed state: real quotes + real session + real
+     *  quality gate, simulated fills only. Always PAPER — NO REAL
+     *  MONEY; every blocked symbol carries a reason code. */
+    paperFeed: async function () {
+      return this.get("/dashboard/paper-feed");
+    },
+
     health: async function () {
       // skipPrefix=false (default)  ->  <baseUrl>/api + "/health"  = /api/health
       // skipAuth=true to avoid sending token for a probe that works anonymously.

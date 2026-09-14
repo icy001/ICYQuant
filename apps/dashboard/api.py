@@ -1923,6 +1923,68 @@ def market_cache_status(
 
 
 # ---------------------------------------------------------------------------
+# Paper Trading Market Feed (Commit 009)
+#
+# Paper Trading is no longer a self-contained simulation: it consumes the
+# real pipeline (quote → session → quality gate → cache → merge) and only
+# simulates the FILL.  The response always carries the environment and the
+# "PAPER — NO REAL MONEY" disclaimer so the UI can never imply real money,
+# and every blocked symbol carries its §17 reason code.
+# ---------------------------------------------------------------------------
+_paper_feed_subscribed = False
+
+
+def _ensure_paper_feed(feed) -> None:
+    """Subscribe the enabled universe to the Paper feed once (§16).
+
+    Idempotent: the 11 A-share ETFs are subscribed on the first read so
+    the Paper page can never show a half-attached feed.
+    """
+    global _paper_feed_subscribed
+    if _paper_feed_subscribed:
+        return
+    _ensure_quote_feed()
+    from services.market_data.universe import universe
+
+    feed.subscribe(universe.symbols())
+    _paper_feed_subscribed = True
+
+
+@router.get("/dashboard/paper-feed")
+def paper_feed_status(
+    principal: Principal = Depends(require_roles()),
+) -> dict:
+    """Paper Trading market feed state (Commit 009).
+
+    Real quotes + real session + real quality gate, simulated fills only.
+    """
+    from services.market_data.paper import paper_market_feed
+
+    _ensure_paper_feed(paper_market_feed)
+    payload = paper_market_feed.status()
+    payload["stats"] = paper_market_feed.stats()
+    payload["gate"] = {
+        "session": paper_market_feed.config.enforce_session,
+        "quality": paper_market_feed.config.enforce_quality,
+        "lot_size": paper_market_feed.config.enforce_lot_size,
+        "healthy_cache": paper_market_feed.config.require_healthy_cache,
+        "slippage_bps": paper_market_feed.config.slippage_bps,
+    }
+    payload["reason_codes"] = {
+        "unavailable": "PAPER_MARKET_DATA_UNAVAILABLE",
+        "warning": "PAPER_MARKET_DATA_WARNING",
+        "stale": "PAPER_MARKET_DATA_STALE",
+        "invalid": "PAPER_MARKET_DATA_INVALID",
+        "session": "PAPER_MARKET_SESSION_BLOCKED",
+        "lookahead": "PAPER_LOOKAHEAD_VIOLATION",
+        "lot_size": "PAPER_INVALID_LOT_SIZE",
+        "quote": "PAPER_QUOTE_UNAVAILABLE",
+        "degraded": "PAPER_FEED_DEGRADED",
+    }
+    return payload
+
+
+# ---------------------------------------------------------------------------
 # Factor paper trading (Alpha021) - deterministic research-layer replay
 # ---------------------------------------------------------------------------
 _factor_paper_cache: Optional[dict] = None
