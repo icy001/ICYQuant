@@ -52,14 +52,26 @@ app.add_middleware(
 
 from apps.api.metrics import router as metrics_router  # noqa: E402
 from apps.api.routers import router as ping_router  # noqa: E402
+from apps.api.routers.market_data import (  # noqa: E402
+    market_data_error_handler,
+    router as market_data_router,
+)
 from apps.api.routers.reconciliation import router as reconciliation_router  # noqa: E402
 from apps.api.health import router as health_router  # noqa: E402
 from apps.dashboard import dashboard_router  # noqa: E402
+from services.market_data.market_data_service import (  # noqa: E402
+    MarketDataServiceError,
+)
+
+# Commit 010 §13 — one typed error envelope for the whole Market Data
+# API (400 invalid parameter / 404 unknown symbol / 503 unavailable).
+app.add_exception_handler(MarketDataServiceError, market_data_error_handler)
 
 app.include_router(metrics_router)
 app.include_router(ping_router)
 app.include_router(health_router)
 app.include_router(reconciliation_router)
+app.include_router(market_data_router)
 app.include_router(dashboard_router)
 
 @app.get("/")

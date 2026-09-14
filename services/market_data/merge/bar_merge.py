@@ -119,9 +119,14 @@ class BarMergeEngine:
                 anchor = realtime[0].open
             elif anchor_price is not None:
                 anchor = anchor_price
+            # Budget the history walk so the *union* fits the limit.
+            # Asking both sides for ``limit`` and only then tail-clipping
+            # would return a series shorter than the inputs it reports,
+            # breaking the merge-key identity (total = h + r - overlaps)
+            # and silently dropping history the caller asked to see.
             try:
                 historical = self._provider.bars(
-                    symbol, timeframe, limit,
+                    symbol, timeframe, limit - len(realtime),
                     before=before, anchor_price=anchor,
                 )
             except Exception:
