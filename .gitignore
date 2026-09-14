@@ -38,3 +38,6 @@ research/discovery/output/factor-paper-snapshots/
 # Trading-UI runtime config (paper account + risk rules) - defaults are
 # seeded in code; saved values are runtime state, not source.
 data/config/
+
+# Alert disposition ledger (Phase 1 persistence) - runtime state, not source.
+data/alerts/

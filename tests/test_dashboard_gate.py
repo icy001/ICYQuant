@@ -1498,7 +1498,13 @@ def test_d30_data_api_integration():
     assert real_ds is not None, "Real Daily dataset missing"
     assert real_ds["type"] == "Real"
     assert real_ds["assets"] == 3  # NVDA, QQQ, SPY
-    assert real_ds["bars"] == 665 * 3  # 665 rows each per manifest
+    # rows are summed straight from the on-disk manifest, so a data
+    # refresh (e.g. Snapshot #4) never has to touch this assertion.
+    import json
+    manifest_path = (Path(apps_api_main.__file__).resolve().parents[2]
+                     / "data" / "real" / "d1" / "manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert real_ds["bars"] == sum(a["rows"] for a in manifest["assets"].values())
 
     # symbols: every symbol has asset_class / exchange / market / tf / range
     symbols = d["symbols"]
@@ -1517,13 +1523,14 @@ def test_d30_data_api_integration():
 
     # NVDA / QQQ / SPY are flagged real (sourced from data/real/d1).
     # Date range is the union of processed (2023-01-02 → 2025-12-31)
-    # and real (2024-01-02 → 2026-08-26) manifests.
+    # and real (per the data/real/d1 manifest) manifests.
     for sym in ("NVDA", "QQQ", "SPY"):
         row = next(s for s in symbols if s["symbol"] == sym)
         assert row["real"] is True
         assert row["bars"] >= 665
         assert row["first_date"] == "2023-01-02"  # processed manifest start
-        assert row["last_date"] == "2026-08-26"   # real manifest end
+        # real manifest end — follows the data snapshot, not a literal
+        assert row["last_date"] == manifest["assets"][sym]["last"]
 
     # quality: aggregates over the processed manifests' quality_gate
     q = d["quality"]
@@ -1557,11 +1564,13 @@ def test_d30_data_api_integration():
     # real_daily mirrors the on-disk manifest
     rd = d["real_daily"]
     assert rd["fetched_at"]
-    assert rd["range"] == ["2024-01-01", "2026-08-27"]
+    assert rd["range"] == manifest["range"]
     assert len(rd["rows"]) == 3
+    expected_rows = {a["rows"] for a in manifest["assets"].values()}
+    assert len(expected_rows) == 1  # one snapshot, same span per asset
     for r in rd["rows"]:
         assert r["status"] == "READY"
-        assert r["bars"] == 665
+        assert r["bars"] == next(iter(expected_rows))
 
 
 def test_d30_data_api_access():
