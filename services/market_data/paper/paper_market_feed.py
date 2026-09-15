@@ -54,6 +54,10 @@ is allowed to act on:
     cache blocks *new* orders rather than trading on blind guesses.
 *   §17 — every block returns a machine-readable reason, never a bare
     ``False``.
+*   §18 — the feed does not care *where* real data came from.  Commit
+    012 §17 gives it two sources, ``LIVE`` and ``REPLAY``: one is
+    today's pipeline, the other is history replayed on a virtual clock.
+    Strategy is never told which one it is looking at.
 
 Note on the quality accessor: :meth:`PaperMarketFeed.get_quality`
 returns the same dict view QuoteService / the Dashboard expose
@@ -91,6 +95,14 @@ logger = logging.getLogger(__name__)
 # The one sentence the UI must never lose (§15).
 DISCLAIMER = "PAPER — NO REAL MONEY"
 
+# Commit 012 §17 — the two market-data sources Paper Trading can run on.
+# A REPLAY feed is fed by ReplayMarketDataAdapter and clocked by the
+# replay engine's virtual clock, so every session / lookahead / freshness
+# decision is taken in *historical* time rather than today's.
+LIVE_SOURCE = "LIVE"
+REPLAY_SOURCE = "REPLAY"
+_SOURCES = (LIVE_SOURCE, REPLAY_SOURCE)
+
 _BPS = Decimal("10000")
 _UNSET = object()
 
@@ -121,8 +133,24 @@ class PaperMarketFeed:
         trading_calendar: Optional[TradingCalendar] = None,
         instrument_master: object = None,
         clock: object = None,
+        source: str = LIVE_SOURCE,
     ) -> None:
         self._cfg = config or PaperFeedConfig.from_env()
+        self._source = str(source).upper()
+        if self._source not in _SOURCES:
+            raise ValueError(
+                f"unsupported paper feed source {source!r}; "
+                f"expected one of {list(_SOURCES)}"
+            )
+        if self._source == REPLAY_SOURCE and clock is None:
+            # Commit 012 §26 — replay time and real time must never mix.
+            # A REPLAY feed that silently fell back to ``datetime.now()``
+            # would judge a 2026-09-10 order against today's session and
+            # block (or allow) it for the wrong reason.
+            raise ValueError(
+                "source=REPLAY requires an explicit virtual clock so the "
+                "session/lookahead gates run on replay time, not wall time"
+            )
         self._cal = trading_calendar or calendar
         self._clock = clock or _default_clock
         self._instruments = instrument_master or default_universe
@@ -166,6 +194,15 @@ class PaperMarketFeed:
     @property
     def config(self) -> PaperFeedConfig:
         return self._cfg
+
+    @property
+    def source(self) -> str:
+        """``LIVE`` or ``REPLAY`` (Commit 012 §17).
+
+        Purely informational for the UI: the feed's behaviour is
+        identical either way, which is the entire point.
+        """
+        return self._source
 
     @property
     def disclaimer(self) -> str:
@@ -722,6 +759,7 @@ class PaperMarketFeed:
         return {
             "environment": "PAPER",
             "disclaimer": DISCLAIMER,
+            "source": self._source,
             "state": self.state.value,
             "ready": self.ready,
             "new_orders_allowed": self.state
@@ -868,4 +906,10 @@ class PaperMarketFeed:
 # ── Singleton used by the Dashboard API / Paper runtime ─────────
 paper_market_feed = PaperMarketFeed()
 
-__all__ = ["PaperMarketFeed", "paper_market_feed", "DISCLAIMER"]
+__all__ = [
+    "PaperMarketFeed",
+    "paper_market_feed",
+    "DISCLAIMER",
+    "LIVE_SOURCE",
+    "REPLAY_SOURCE",
+]
