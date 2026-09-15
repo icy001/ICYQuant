@@ -2567,6 +2567,7 @@
     "#/operations/accounts": { group: "operations", navKey: "operations/accounts", label: "Accounts", zh: "账户", desc: "Account management" },
     "#/operations/execution": { group: "operations", navKey: "operations/execution", label: "Execution", zh: "执行", desc: "Execution management" },
     "#/operations/reconciliation": { group: "operations", navKey: "operations/reconciliation", label: "Reconciliation", zh: "对账", desc: "Reconciliation management" },
+    "#/operations/account-sync": { group: "operations", navKey: "operations/account-sync", label: "Account Sync", zh: "账户同步", desc: "Broker account & position sync" },
     "#/system": { group: "system", navKey: "system", label: "System", zh: "系统", desc: "System health" },
     "#/system/data": { group: "system", navKey: "system/data", label: "Data", zh: "数据", desc: "Market data center" },
     "#/settings": { group: "system", navKey: "settings", label: "Settings", zh: "设置", desc: "System settings" },
@@ -6201,6 +6202,413 @@
     ev.preventDefault();
     el.click();
   });
+
+  /* ==================================================================
+   * Commit 015 — Account / Position Sync page (§16)
+   *
+   * §17 — this page reads /api/accounts/* only.  It holds no broker
+   * client, no vendor field names and no broker endpoint, so the front
+   * end stays decoupled: swapping brokers is a server-side change.
+   *
+   * §16 asks for four things, and the page shows exactly those:
+   * Account Overview, Position Table, Sync Status, and a Mismatch banner
+   * that cannot be missed.  Nothing is derived here that the API did not
+   * send — an absent valuation renders as "—", never as 0 (§18).
+   * ================================================================== */
+
+  var AC_ROOT_ID = "acsync-root";
+
+  var _acState = {
+    accountId: null,
+    accounts: null,   // GET /api/accounts
+    detail: null,     // GET /api/accounts/{id}
+    snapshots: null,  // GET /api/accounts/{id}/snapshots
+    health: null,     // GET /api/accounts/health
+    error: null,
+  };
+
+  function acMod() {
+    return window.ICY_ACCOUNTS || null;
+  }
+
+  function acOnPage() {
+    return location.hash.indexOf("#/operations/account-sync") === 0;
+  }
+
+  function acSelected() {
+    var list = (_acState.accounts && _acState.accounts.accounts) || [];
+    for (var i = 0; i < list.length; i += 1) {
+      if (list[i].account_id === _acState.accountId) return _acState.accountId;
+    }
+    return list.length ? list[0].account_id : null;
+  }
+
+  function acLoad() {
+    var ac = acMod();
+    if (!ac) return Promise.reject(new Error("accounts.js is not loaded"));
+    return ac.api.list().then(function (list) {
+      _acState.accounts = list;
+      var id = acSelected();
+      _acState.accountId = id;
+      if (!id) {
+        _acState.detail = null;
+        _acState.snapshots = null;
+        _acState.health = null;
+        return null;
+      }
+      return Promise.all([
+        ac.api.detail(id),
+        ac.api.getSnapshots(id, 20),
+        ac.api.health().then(
+          function (h) { return h; },
+          function () { return null; }
+        ),
+      ]).then(function (res) {
+        _acState.detail = res[0];
+        _acState.snapshots = res[1];
+        _acState.health = res[2];
+        return res;
+      });
+    });
+  }
+
+  function acRefresh() {
+    if (!acOnPage()) return Promise.resolve();
+    return acLoad().then(
+      function () { _acState.error = null; return render(); },
+      function (err) {
+        _acState.error = (err && err.message) || String(err);
+        return render();
+      }
+    );
+  }
+
+  function acSyncNow(btn) {
+    var ac = acMod();
+    var id = acSelected();
+    if (!ac || !id) return;
+    if (btn) { btn.disabled = true; btn.textContent = "Syncing…"; }
+    ac.api.sync(id).then(
+      function (res) {
+        var recon = res && res.reconciliation;
+        var failed = !!recon && recon.outcome === "FAIL";
+        showToast(
+          "Snapshot #" + (res && res.sequence != null ? res.sequence : "?") +
+            " 已同步 · " + (failed ? "RECONCILIATION FAIL" : "RECONCILED"),
+          failed ? "error" : "ok"
+        );
+        return acRefresh();
+      },
+      function (err) {
+        showToast((err && err.message) || "Snapshot sync failed", "error");
+        if (btn) { btn.disabled = false; btn.textContent = "Sync now"; }
+      }
+    );
+  }
+
+  function acConnection(open) {
+    var ac = acMod();
+    if (!ac) return;
+    var call = open ? ac.api.connect() : ac.api.disconnect();
+    call.then(
+      function (res) {
+        showToast("Broker account channel: " + res.connection_state, "ok");
+        return acRefresh();
+      },
+      function (err) {
+        showToast((err && err.message) || "Connection action failed", "error");
+      }
+    );
+  }
+
+  /* ── §16 Mismatch / staleness banner ───────────────────────────── */
+
+  function acBanner() {
+    var ac = acMod();
+    var detail = _acState.detail;
+    var status = detail ? detail.sync_status : null;
+    var recon = detail ? detail.reconciliation : null;
+
+    if (recon && recon.outcome === "FAIL") {
+      var worst = recon.mismatch
+        ? recon.mismatch + " 项差异"
+        : recon.status;
+      return UI.stateError(
+        "RECONCILIATION: " + recon.status,
+        "券商持仓与 ICYQuant Position Ledger 不一致（" + worst +
+          "）。§11 已阻断新的 Shadow/Live 订单；系统不会自动修改券商，也不会静默修改账本。",
+        "Refresh", "acsync:refresh"
+      );
+    }
+    if (status && (status.status === "STALE" || status.status === "ERROR")) {
+      return UI.stateError(
+        "ACCOUNT " + status.status,
+        status.status === "STALE"
+          ? "最近一次同步已超过 " + Math.round(status.stale_after_seconds || 0) +
+            "s，账户状态不能视为可信。"
+          : "账户同步失败，请检查券商通道后重试。",
+        "Refresh", "acsync:refresh"
+      );
+    }
+    if (status && status.status === "OFFLINE") {
+      return UI.stateEmpty(
+        "Broker channel OFFLINE",
+        "尚未建立券商账户通道，或通道已关闭。以 OPERATOR 身份点击 Connect 后执行一次同步。",
+        UI.button("Connect", "primary", { sm: true, action: "acsync:connect" })
+      );
+    }
+    return "";
+  }
+
+  /* ── §16 Sync Status ──────────────────────────────────────────── */
+
+  function acSyncStatusPanel() {
+    var ac = acMod();
+    var detail = _acState.detail;
+    var status = detail ? detail.sync_status : null;
+    if (!status) {
+      return UI.panel("Sync Status / 同步状态", UI.empty("No status", "Select an account."));
+    }
+    var sm = ac.statusMeta(status.status);
+    var hm = ac.healthMeta(status.health);
+    var rm = status.reconciliation_status ? ac.reconMeta(status.reconciliation_status) : null;
+    var rows = [
+      { label: "Broker / 券商通道", value: status.connection_state + (status.broker_connected ? " (connected)" : ""), variant: status.broker_connected ? "pos" : "neg" },
+      { label: "Account / 账户", value: sm.label + " · " + sm.zh },
+      { label: "Position / 持仓", value: status.position_count + " positions" + (status.invalid_count ? " · " + status.invalid_count + " INVALID" : "") },
+      { label: "Provider / 数据源", value: status.provider + " · " + status.source },
+      { label: "Last Sync / 最近同步", value: ac.fmtTime(status.last_successful_sync) + "  (" + ac.fmtAge(status.last_sync_age_seconds) + " ago)" },
+      { label: "Latency / 同步耗时", value: ac.fmtLatency(status.sync_latency_ms) + "  (interval " + status.sync_interval_seconds + "s)" },
+      { label: "Reconciliation / 对账", value: rm ? rm.label + " · " + (status.reconciliation_outcome || "") : "—", variant: rm ? (rm.tone === "profit" ? "pos" : "neg") : "default" },
+      { label: "Snapshots / 快照数", value: status.snapshot_count + " (§7 保留历史)" },
+      { label: "Shadow/Live Orders", value: status.new_orders_blocked ? "BLOCKED (§11)" : "ALLOWED", variant: status.new_orders_blocked ? "neg" : "pos" },
+    ];
+    var body = UI.statRows(rows);
+    if (hm.tone !== "profit") {
+      body = UI.statusPill(hm.label + " · " + hm.zh, hm.tone) + body;
+    }
+    return UI.panel("Sync Status / 同步状态", body, {
+      actions: status.reconciliation_status ? UI.statusPill(rm ? rm.label : "", rm ? rm.tone : "neutral") : "",
+    });
+  }
+
+  /* ── §16 Account Overview ─────────────────────────────────────── */
+
+  function acAccountOverview() {
+    var ac = acMod();
+    var detail = _acState.detail;
+    if (!detail) return "";
+    var balance = detail.balance;
+    var positions = detail.positions || [];
+    var d = ac.DASH;
+
+    var cards =
+      UI.metricCard("总资产 / Total Asset", balance ? ac.fmtMoney(balance.total_asset) : d, balance ? balance.currency : "", "pos") +
+      UI.metricCard("可用资金 / Available Cash", balance ? ac.fmtMoney(balance.available_cash) : d, balance && !balance.consistent ? "cash identities broken" : "", balance && !balance.consistent ? "neg" : "pos") +
+      UI.metricCard("冻结资金 / Frozen Cash", balance ? ac.fmtMoney(balance.frozen_cash) : d, "", "pos") +
+      UI.metricCard("持仓市值 / Position Market Value", balance ? ac.fmtMoney(balance.market_value) : d, "§18 Market Data 估值", "pos");
+
+    var rows = [
+      { label: "Account / 账户", value: detail.account.account_id },
+      { label: "Name / 名称", value: detail.account.name || d },
+      { label: "Broker / 券商", value: detail.account.broker || d },
+      { label: "Currency / 币种", value: detail.account.currency },
+      { label: "Cash / 资金余额", value: balance ? ac.fmtMoney(balance.cash) : d },
+      { label: "Available / 可用", value: balance ? ac.fmtMoney(balance.available_cash) : d },
+      { label: "Frozen / 冻结", value: balance ? ac.fmtMoney(balance.frozen_cash) : d },
+      { label: "Market Value / 证券市值", value: balance ? ac.fmtMoney(balance.market_value) : d },
+      { label: "Total Asset / 总资产", value: balance ? ac.fmtMoney(balance.total_asset) : d, variant: "pos" },
+      { label: "Buying Power / 购买力", value: balance ? ac.fmtMoney(balance.buying_power) : d },
+      { label: "Broker Time / 券商时间 (§13)", value: balance ? ac.fmtTime(balance.broker_timestamp) : d },
+      { label: "Received Time / 接收时间 (§13)", value: balance ? ac.fmtTime(balance.received_timestamp) : d },
+    ];
+
+    return UI.kpiGrid(cards, 4) + UI.panel("Account Overview / 账户概览", UI.statRows(rows));
+  }
+
+  /* ── §16 Position Table ───────────────────────────────────────── */
+
+  function acPositionPanel() {
+    var ac = acMod();
+    var detail = _acState.detail;
+    if (!detail) return "";
+    var positions = detail.positions || [];
+    var actions = "";
+    if (positions.some(function (p) { return !p.consistent; })) {
+      actions = UI.statusPill("INVALID POSITION", "danger");
+    }
+    var body = UI.table({
+      columns: ac.POSITION_COLUMNS,
+      rows: positions,
+      emptyDesc: "券商账户当前没有持仓（§20 — 11 个 Universe 标的 ≠ 11 个持仓）。",
+    });
+    body +=
+      '<p class="ds-text-muted" style="margin-top:var(--ds-space-3);font-size:var(--ds-text-xs);">' +
+      "数量 / 可用 / 冻结来自券商账户（§19 T+1 以券商返回为准）；现价、市值与浮盈由统一 Market Data 计算（§18）。" +
+      '显示 “' + ac.DASH + '” 表示暂无可用行情，而非 0。' +
+      "</p>";
+    return UI.panel("Position Table / 持仓明细", body, { actions: actions });
+  }
+
+  /* ── §10 Reconciliation detail ────────────────────────────────── */
+
+  function acReconciliationPanel() {
+    var ac = acMod();
+    var detail = _acState.detail;
+    var recon = detail ? detail.reconciliation : null;
+    if (!recon) {
+      return UI.panel(
+        "Reconciliation / 对账",
+        UI.empty("尚未对账", "完成一次同步后，这里展示 Broker 与 Position Ledger 的逐项核对。")
+      );
+    }
+    var m = ac.reconMeta(recon.status);
+    var head =
+      '<div style="display:flex;gap:var(--ds-space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--ds-space-3);">' +
+      UI.statusPill(m.label + " · " + m.zh, m.tone) +
+      '<span class="ds-text-muted">checks ' + recon.checked +
+      " · matched " + recon.matched +
+      " · mismatch " + recon.mismatch_count +
+      " · missing@broker " + recon.missing_broker +
+      " · missing@ledger " + recon.missing_ledger +
+      " · invalid " + recon.invalid +
+      "</span></div>";
+    var body = recon.items && recon.items.length
+      ? UI.table({ columns: ac.RECON_ITEM_COLUMNS, rows: recon.items })
+      : UI.empty("No checks", "本次同步没有可比对的账本记录。");
+    body +=
+      '<p class="ds-text-muted" style="margin-top:var(--ds-space-3);font-size:var(--ds-text-xs);">' +
+      "差异只报告、不修正（§9）：ICYQuant 不会自动改动券商持仓，也不会静默改动 Position Ledger。" +
+      "</p>";
+    return UI.panel("Reconciliation / 对账", head + body);
+  }
+
+  /* ── §7 Snapshot traceability ─────────────────────────────────── */
+
+  function acSnapshotPanel() {
+    var ac = acMod();
+    var payload = _acState.snapshots;
+    if (!payload) return "";
+    var rows = payload.snapshots || [];
+    return UI.panel(
+      "Snapshots / 快照历史 (§7)",
+      UI.table({
+        columns: ac.SNAPSHOT_COLUMNS,
+        rows: rows,
+        emptyDesc: "还没有任何快照 — 执行一次 Sync now 后即可追溯。",
+      }),
+      {
+        actions: '<span class="ds-text-muted" style="font-size:var(--ds-text-xs);">' +
+          rows.length + " / " + payload.limit + " newest first</span>",
+      }
+    );
+  }
+
+  function acShell() {
+    var ac = acMod();
+    if (!ac) {
+      return UI.pageHeader("Account Sync", "账户同步 · Commit 015") +
+        UI.stateError(
+          "Account module unavailable",
+          "accounts.js did not load — the page cannot reach /api/accounts/*.",
+          "Retry", "acsync:refresh"
+        );
+    }
+    var header = UI.pageHeader(
+      "Account Sync",
+      "Broker 账户 / 持仓只读同步 · Reconciliation · 零真实下单",
+      UI.button("Refresh", "ghost", { sm: true, action: "acsync:refresh" }) +
+        UI.button("Sync now", "primary", { sm: true, action: "acsync:sync", disabled: !acSelected() })
+    );
+
+    var scope = "";
+    if (_acState.error) {
+      scope = UI.stateError("Account sync unavailable", _acState.error, "Retry", "acsync:refresh");
+    }
+
+    var info = _acState.accounts || {};
+    var accountSelector = "";
+    if (info.accounts && info.accounts.length > 1) {
+      accountSelector = UI.field(
+        "Account / 账户",
+        UI.select({
+          id: "acsync-account",
+          value: acSelected(),
+          options: info.accounts.map(function (a) {
+            return { value: a.account_id, label: a.account_id + (a.name ? " · " + a.name : "") };
+          }),
+        })
+      );
+    }
+
+    return (
+      header +
+      scope +
+      (accountSelector ? UI.panel("Account / 账户", accountSelector) : "") +
+      acBanner() +
+      acAccountOverview() +
+      acSyncStatusPanel() +
+      acPositionPanel() +
+      acReconciliationPanel() +
+      acSnapshotPanel()
+    );
+  }
+
+  /* Snapshot cadence is seconds-to-minutes (§6), not tick-level, so this
+     page refreshes at 30s instead of riding the global 5s re-render — the
+     account selector would otherwise be rebuilt under the cursor. */
+  var AC_REFRESH_MS = 30000;
+  var _acTimer = null;
+
+  function acStartPolling() {
+    if (_acTimer) return;
+    _acTimer = setInterval(function () {
+      if (document.visibilityState !== "visible") return;
+      if (!acOnPage()) {
+        clearInterval(_acTimer);
+        _acTimer = null;
+        return;
+      }
+      acRefresh();
+    }, AC_REFRESH_MS);
+  }
+
+  PAGE_FRAMEWORK["operations/account-sync"] = async function () {
+    _acState.error = null;
+    try {
+      await acLoad();
+    } catch (err) {
+      _acState.error = (err && err.message) || String(err);
+    }
+    window.setTimeout(bindAccountSyncPage, 0);
+    acStartPolling();
+    return '<div id="' + AC_ROOT_ID + '">' + acShell() + "</div>";
+  };
+
+  function bindAccountSyncPage() {
+    var root = document.getElementById(AC_ROOT_ID);
+    if (!root || root.dataset.bound === "1") return;
+    root.dataset.bound = "1";
+    root.addEventListener("click", function (ev) {
+      var target = ev.target;
+      if (!target || !target.closest) return;
+      var el = target.closest('[data-action^="acsync:"]');
+      if (!el) return;
+      ev.preventDefault();
+      var cmd = el.getAttribute("data-action").slice("acsync:".length);
+      if (cmd === "refresh") acRefresh();
+      else if (cmd === "sync") acSyncNow(el);
+      else if (cmd === "connect") acConnection(true);
+      else if (cmd === "disconnect") acConnection(false);
+    });
+    var sel = document.getElementById("acsync-account");
+    if (sel) {
+      sel.addEventListener("change", function () {
+        _acState.accountId = sel.value;
+        acRefresh();
+      });
+    }
+  }
 
   /* ==================================================================
    * Commit 011 — Market Data page entry
@@ -11091,6 +11499,9 @@
         if (location.hash.indexOf("#/settings") === 0) return;
         if (location.hash.indexOf("#/audit") === 0) return;
         if (location.hash.indexOf("#/trading/market") === 0) return;
+        // account-sync = snapshot-status page holding an account selector;
+        // it runs its own 30s visibility-aware refresh (§15 / §16).
+        if (location.hash.indexOf("#/operations/account-sync") === 0) return;
         render();
       }
     }, state.refreshMs);

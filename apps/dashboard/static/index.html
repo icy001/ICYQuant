@@ -152,6 +152,11 @@
             <span class="nav-text">Reconciliation</span>
             <span class="nav-zh">对账</span>
           </a>
+          <a href="#/operations/account-sync" data-nav="operations/account-sync" class="nav-link">
+            <span class="nav-ico">▥</span>
+            <span class="nav-text">Account Sync</span>
+            <span class="nav-zh">账户同步</span>
+          </a>
         </div>
 
         <!-- SYSTEM -->
@@ -226,6 +231,9 @@
   <script src="/dashboard/js/ui.js?v=I02"></script>
   <!-- A-share market data: API client + status vocabulary + poller -->
   <script src="/dashboard/js/market-data.js?v=I11"></script>
-  <script src="/dashboard/js/app.js?v=I11"></script>
+  <!-- Commit 015: broker account / position sync client + verdict vocabulary.
+       Talks to /api/accounts/* only — never to a broker (§17). -->
+  <script src="/dashboard/js/accounts.js?v=C15"></script>
+  <script src="/dashboard/js/app.js?v=C15"></script>
 </body>
 </html>
