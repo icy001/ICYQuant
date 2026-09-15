@@ -2,10 +2,8 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    MarketRecorder,
-    Quote,
-)
+from services.market_data.quote import Quote
+from services.market_data.recorder import MarketRecorder
 
 
 class DummyRecordingRepository:

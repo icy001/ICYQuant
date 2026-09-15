@@ -4,8 +4,19 @@ Market feed engine.
 
 from __future__ import annotations
 
-from .metrics import FeedMetrics
+from dataclasses import dataclass
+
 from .validator import MarketDataValidator
+
+
+@dataclass
+class FeedMetrics:
+    # Restored from the original metrics module: the Commit 16 rewrite
+    # repurposed services/market_data/metrics.py for Prometheus, so this
+    # three-field counter lives with its only consumer now.
+    received: int = 0
+    published: int = 0
+    rejected: int = 0
 
 
 class MarketFeedEngine:

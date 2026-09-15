@@ -1,14 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    Instrument,
-    InstrumentType,
-    MarketSnapshot,
-    Quote,
-    Tick,
-    Candle,
-)
+from services.market_data.candle import Candle
+from services.market_data.instrument import Instrument, InstrumentType
+from services.market_data.quote import Quote
+from services.market_data.snapshot import MarketSnapshot
+from services.market_data.tick import Tick
 
 
 def test_market_snapshot():

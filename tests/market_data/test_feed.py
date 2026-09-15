@@ -2,18 +2,30 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    InMemoryMarketCache,
-    MarketFeedEngine,
-    MarketPublisher,
-    Quote,
-    SubscriptionManager,
-)
+from services.market_data.feed import MarketFeedEngine
+from services.market_data.publisher import MarketPublisher
+from services.market_data.quote import Quote
+from services.market_data.subscription_manager import SubscriptionManager
+
+
+class DummyCache:
+    """The original InMemoryMarketCache was removed by the redis-cache
+    commit (5d92613); the feed engine only needs the repository
+    protocol, so a plain dict stands in."""
+
+    def __init__(self):
+        self._quotes = {}
+
+    async def save_quote(self, quote):
+        self._quotes[quote.symbol] = quote
+
+    async def get_quote(self, symbol):
+        return self._quotes.get(symbol)
 
 
 @pytest.mark.asyncio
 async def test_feed():
-    repository = InMemoryMarketCache()
+    repository = DummyCache()
     publisher = MarketPublisher(SubscriptionManager())
     engine = MarketFeedEngine(repository, publisher)
 
@@ -34,7 +46,7 @@ async def test_feed():
 
 @pytest.mark.asyncio
 async def test_feed_invalid_quote():
-    repository = InMemoryMarketCache()
+    repository = DummyCache()
     publisher = MarketPublisher(SubscriptionManager())
     engine = MarketFeedEngine(repository, publisher)
 
@@ -54,7 +66,7 @@ async def test_feed_invalid_quote():
 
 @pytest.mark.asyncio
 async def test_feed_cache_update():
-    repository = InMemoryMarketCache()
+    repository = DummyCache()
     publisher = MarketPublisher(SubscriptionManager())
     engine = MarketFeedEngine(repository, publisher)
 

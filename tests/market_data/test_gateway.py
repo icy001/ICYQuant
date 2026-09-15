@@ -1,11 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    MarketGateway,
-    MarketProvider,
-    QuoteNormalizer,
-)
+from services.market_data.gateway import MarketGateway
+from services.market_data.provider import MarketProvider
+from services.market_data.quote import Quote
 
 
 class MockAdapter:
@@ -18,7 +16,16 @@ class MockAdapter:
         return None
 
     def normalize(self, payload):
-        return QuoteNormalizer().from_mapping(payload)
+        # The original QuoteNormalizer.from_mapping was replaced by the
+        # Commit 001 symbol normalizer; building the Quote directly keeps
+        # the test on the gateway contract itself.
+        return Quote(
+            symbol=payload["symbol"],
+            bid=Decimal(payload["bid"]),
+            ask=Decimal(payload["ask"]),
+            last=Decimal(payload["last"]),
+            timestamp=payload.get("timestamp") or datetime.utcnow(),
+        )
 
 
 def test_gateway_normalize():
@@ -36,19 +43,3 @@ def test_gateway_normalize():
 
     assert quote.symbol == "AAPL"
     assert quote.last == Decimal("200.15")
-
-
-def test_normalizer_default_timestamp():
-    normalizer = QuoteNormalizer()
-
-    quote = normalizer.from_mapping(
-        {
-            "symbol": "MSFT",
-            "bid": "378",
-            "ask": "379",
-            "last": "378.5",
-        }
-    )
-
-    assert quote.symbol == "MSFT"
-    assert quote.timestamp is not None

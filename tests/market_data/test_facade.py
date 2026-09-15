@@ -1,10 +1,7 @@
 import pytest
 
-from services.market_data import (
-    MarketDataFacade,
-    MarketHealthMonitor,
-    MarketStatus,
-)
+from services.market_data.facade import MarketDataFacade, MarketHealthMonitor
+from services.market_data.status import MarketStatus
 
 
 class DummyRealtime:

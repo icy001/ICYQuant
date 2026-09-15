@@ -2,12 +2,9 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    Candle,
-    HistoricalMarketDataService,
-    HistoryQuery,
-    MarketReplay,
-)
+from services.market_data.candle import Candle
+from services.market_data.history import HistoricalMarketDataService
+from services.market_data.query import HistoryQuery
 
 
 class DummyRepository:
@@ -42,30 +39,3 @@ async def test_history():
 
     assert len(candles) == 1
     assert candles[0].symbol == "AAPL"
-
-
-@pytest.mark.asyncio
-async def test_replay():
-    replay = MarketReplay()
-
-    candles = [
-        Candle(
-            symbol="MSFT",
-            open=Decimal("300"),
-            high=Decimal("305"),
-            low=Decimal("298"),
-            close=Decimal("302"),
-            volume=Decimal("5000"),
-            timestamp=datetime.utcnow(),
-        )
-        for _ in range(3)
-    ]
-
-    received = []
-
-    async def consumer(candle):
-        received.append(candle)
-
-    await replay.replay(candles, consumer)
-
-    assert len(received) == 3

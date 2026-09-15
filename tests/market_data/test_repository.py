@@ -2,16 +2,28 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    InMemoryMarketCache,
-    MarketDataService,
-    Quote,
-)
+from services.market_data.quote import Quote
+from services.market_data.service import MarketDataService
+
+
+class DummyCache:
+    """The original InMemoryMarketCache was removed by the redis-cache
+    commit (5d92613); the service only needs the repository protocol,
+    so a plain dict stands in."""
+
+    def __init__(self):
+        self._quotes = {}
+
+    async def save_quote(self, quote):
+        self._quotes[quote.symbol] = quote
+
+    async def get_quote(self, symbol):
+        return self._quotes.get(symbol)
 
 
 @pytest.mark.asyncio
 async def test_market_cache():
-    cache = InMemoryMarketCache()
+    cache = DummyCache()
     service = MarketDataService(cache)
 
     quote = Quote(
@@ -32,7 +44,7 @@ async def test_market_cache():
 
 @pytest.mark.asyncio
 async def test_market_cache_not_found():
-    cache = InMemoryMarketCache()
+    cache = DummyCache()
     service = MarketDataService(cache)
 
     latest = await service.latest_quote("UNKNOWN")
@@ -42,7 +54,7 @@ async def test_market_cache_not_found():
 
 @pytest.mark.asyncio
 async def test_market_cache_update():
-    cache = InMemoryMarketCache()
+    cache = DummyCache()
     service = MarketDataService(cache)
 
     quote1 = Quote(

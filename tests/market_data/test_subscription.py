@@ -2,11 +2,9 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from services.market_data import (
-    MarketPublisher,
-    Quote,
-    SubscriptionManager,
-)
+from services.market_data.publisher import MarketPublisher
+from services.market_data.quote import Quote
+from services.market_data.subscription_manager import SubscriptionManager
 
 
 class DummySubscriber:
