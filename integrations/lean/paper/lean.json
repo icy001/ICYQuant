@@ -1,8 +1,4 @@
 {
   "algorithm-language": "Python",
-  "description": "ICYQuant P0-01 paper bridge: consumes strategy_contract.json written by apps/adapters/lean.",
-  "local-id": 7719001,
-  "cloud-id": 0,
-  "organization-id": "",
-  "data-queue-handler": []
+  "description": "ICYQuant P0-02 paper bridge: consumes strategy_contract.json written by apps/adapters/lean."
 }

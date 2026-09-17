@@ -170,9 +170,13 @@ class LeanAdapter:
         * ``--parameter`` exists only on ``lean backtest`` — passing it on
           ``lean live deploy`` is rejected.  The bridge no longer emits it;
           the algorithm reads the contract from the project directory.
-        * ``--data-provider-live`` is required for a non-interactive deploy;
-          ``Custom data only`` keeps the command self-contained (no
-          external feed or API key) and matches P0-01's contract-driven flow.
+        * ``--data-provider-live`` is required for a non-interactive deploy.
+          ``Custom data only`` is the adapter's current default: it keeps the
+          command self-contained (no external feed or API key), which is what
+          offline command-surface validation needs.  Whether the algorithm
+          actually receives ``OnData`` callbacks under this or any other
+          provider is a LEAN runtime behaviour, to be settled by a real
+          deployment and its logs — P0-02 does not assert it here.
         """
         command = [
             self.lean_binary,
@@ -199,6 +203,10 @@ class LeanAdapter:
     ) -> subprocess.CompletedProcess[str]:
         """Run the paper deployment to completion.
 
+        The contract is written into the project directory first; LEAN reads
+        it from disk.  ``lean live deploy`` has no ``--parameter`` flag, so
+        the contract is a project artifact rather than a CLI argument.
+
         A live deployment is long-running, so this call blocks until
         LEAN exits.  The P0-01 suite never calls it — it builds the
         command and hands it to the operator instead.
@@ -206,12 +214,9 @@ class LeanAdapter:
         if contract.mode != "paper":
             raise ValueError("LeanAdapter.deploy_paper requires mode='paper'")
 
-        contract_path = self.write_contract(contract)
+        self.write_contract(contract)
 
-        command = self.build_live_command(
-            contract_path=contract_path,
-            output_dir=output_dir,
-        )
+        command = self.build_live_command(output_dir=output_dir)
 
         return subprocess.run(
             command,

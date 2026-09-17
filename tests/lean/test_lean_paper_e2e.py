@@ -6,8 +6,10 @@ from supplied evidence, and it refuses to pass when there is none.
 """
 from __future__ import annotations
 
+import ast
 import json
 import shutil
+import subprocess
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
@@ -32,12 +34,15 @@ from apps.adapters.lean.position_mapper import map_lean_position
 from apps.runtime.lean_paper_e2e import (
     LAYER_A_GATES,
     LAYER_B_GATES,
+    P02_GATE_NAMES,
     STATUS_FAIL,
     STATUS_PASS,
     STATUS_PENDING,
     LeanPaperE2E,
+    generate_p0_02_report,
     generate_reports,
     parse_lean_debug_log,
+    run_p0_02,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -79,6 +84,21 @@ def events_file(tmp_path: Path) -> Path:
     path = tmp_path / "lean-live.log"
     path.write_text(SAMPLE_LOG, encoding="utf-8")
     return path
+
+
+@pytest.fixture()
+def repo_copy(tmp_path: Path, lean_project: Path) -> Path:
+    """A throwaway repo root mirroring the committed LEAN project.
+
+    P0-02's suite writes the contract through ``deploy_paper``, so it runs
+    against a copy: the read-only assertions elsewhere still read the real
+    committed files.
+    """
+    root = tmp_path / "repo"
+    (root / "integrations" / "lean").mkdir(parents=True)
+    shutil.copytree(lean_project, root / "integrations" / "lean" / "paper")
+
+    return root
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -559,6 +579,169 @@ def test_report_markdown_marks_pending_gates(runner: LeanPaperE2E) -> None:
     assert "PENDING" in markdown
     assert "PENDING, not PASS" in markdown
     assert report["next_action"]
+
+
+# ══════════════════════════════════════════════════════════════════
+# P0-02 — command / contract acceptance
+# ══════════════════════════════════════════════════════════════════
+def test_deploy_paper_does_not_typeerror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P02-G01 — deploy_paper() builds the argv itself, no dead kwargs."""
+    adapter = LeanAdapter(tmp_path / "project")
+    calls: list[list[str]] = []
+
+    def fake_run(command, *args, **kwargs):
+        calls.append(list(command))
+        return subprocess.CompletedProcess(
+            args=command, returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr("apps.adapters.lean.adapter.subprocess.run", fake_run)
+
+    adapter.deploy_paper(_sample_contract())
+
+    assert len(calls) == 1
+    command = calls[0]
+
+    assert command[:3] == ["lean", "live", "deploy"]
+    assert "Paper Trading" in command
+    assert "--data-provider-live" in command
+    assert "--parameter" not in command
+
+
+def test_build_live_command_has_no_parameter_flag(tmp_path: Path) -> None:
+    """P02-G02 — ``lean live deploy`` has no ``--parameter`` flag."""
+    adapter = LeanAdapter(tmp_path / "project")
+
+    command = adapter.build_live_command()
+
+    assert "--parameter" not in command
+
+
+def test_build_live_command_data_provider_default(tmp_path: Path) -> None:
+    """P02-G03 — the live data provider is explicit and well formed.
+
+    This gate says nothing about ``OnData``: whether ticks arrive is a LEAN
+    runtime behaviour, asserted only against a real deployment.
+    """
+    adapter = LeanAdapter(tmp_path / "project")
+
+    command = adapter.build_live_command()
+
+    assert "--data-provider-live" in command
+
+    index = command.index("--data-provider-live")
+
+    assert index + 1 < len(command)
+    assert command[index + 1] == "Custom data only"
+
+
+def test_contract_filename_protocol_constant() -> None:
+    """P02-G04 — adapter, runtime and algorithm agree on one filename."""
+    from apps.adapters.lean import CONTRACT_FILENAME as ADAPTER_CONTRACT_NAME
+
+    source = (LEAN_PROJECT / "main.py").read_text("utf-8")
+    algorithm_names = [
+        node.value.value
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant)
+        and any(
+            isinstance(target, ast.Name) and target.id == "CONTRACT_FILENAME"
+            for target in node.targets
+        )
+    ]
+
+    assert CONTRACT_FILENAME == "strategy_contract.json"
+    assert ADAPTER_CONTRACT_NAME == CONTRACT_FILENAME
+    assert algorithm_names == [CONTRACT_FILENAME]
+
+
+def test_lean_json_has_no_fake_contract_field() -> None:
+    """P02-G05 — the contract is a project artifact, not a CLI parameter."""
+    payload = json.loads((LEAN_PROJECT / "lean.json").read_text("utf-8"))
+
+    assert "parameters" not in payload
+    assert "data-queue-handler" not in payload
+    assert payload["algorithm-language"] == "Python"
+
+
+def test_lean_json_no_user_specific_identity() -> None:
+    """P02-G06 — no operator's local QuantConnect identity is committed."""
+    payload = json.loads((LEAN_PROJECT / "lean.json").read_text("utf-8"))
+
+    for key in ("local-id", "cloud-id", "organization-id"):
+        assert key not in payload
+
+
+def test_main_loads_contract_via_disk_path() -> None:
+    """P02-G07 — the algorithm resolves the contract from the project dir."""
+    source = (LEAN_PROJECT / "main.py").read_text("utf-8")
+    tree = ast.parse(source)
+
+    assert CONTRACT_FILENAME in source
+
+    load_contract = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_load_contract"
+    ]
+
+    assert load_contract
+
+
+def test_p0_02_suite_grades_seven_of_eight(repo_copy: Path) -> None:
+    """P02-G08 is the only PENDING: no offline gate fabricates a fill."""
+    results = run_p0_02(repo_copy)
+    statuses = {result.gate: result.status for result in results}
+
+    assert set(statuses) == set(P02_GATE_NAMES)
+    assert statuses["P02-G08"] == STATUS_PENDING
+    assert {
+        gate for gate, status in statuses.items() if status == STATUS_PASS
+    } == {gate for gate in P02_GATE_NAMES if gate != "P02-G08"}
+
+
+def test_p0_02_report_is_separate_from_p0_01(repo_copy: Path,
+                                             tmp_path: Path) -> None:
+    report = generate_p0_02_report(
+        repo_copy, run_p0_02(repo_copy), tmp_path / "artifacts"
+    )
+
+    assert report["commit"] == "P0-02"
+    assert report["gate"] == "PARTIAL"
+    assert (report["passed"], report["failed"], report["pending"]) == (7, 0, 1)
+    assert report["gates"][-1]["gate"] == "P02-G08"
+
+    artifacts = tmp_path / "artifacts"
+
+    assert (artifacts / "p02_report.json").exists()
+
+    markdown = (artifacts / "p02_report.md").read_text("utf-8")
+
+    assert "P0-02" in markdown
+    assert "7 PASS" in markdown
+    assert not (artifacts / "e2e_report.json").exists()
+    assert not (artifacts / "e2e_report.md").exists()
+
+
+def test_cli_runs_the_p0_02_suite(repo_copy: Path, tmp_path: Path,
+                                  capsys: pytest.CaptureFixture) -> None:
+    """`--p0-02` is a real entry point, not just a helper function."""
+    from apps.runtime.lean_paper_e2e import main as lean_main
+
+    exit_code = lean_main([
+        "--p0-02",
+        "--repo-root", str(repo_copy),
+        "--artifacts", str(tmp_path / "artifacts"),
+    ])
+    out = capsys.readouterr().out
+
+    assert exit_code == 2  # PENDING is incomplete, not a failure
+    assert "P0-02 LEAN PAPER — GATE: PARTIAL" in out
+    assert "P02-G08" in out
+    assert (tmp_path / "artifacts" / "p02_report.json").exists()
 
 
 def _sample_contract() -> StrategyContract:

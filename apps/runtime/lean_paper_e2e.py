@@ -6,12 +6,17 @@ Usage:
     python -m apps.runtime lean-paper --events ~/lean-live.log   # grade Layer B
     python -m apps.runtime lean-paper --gate G03
 
+P0-02 is a separate suite with its own gate namespace and its own report:
+    python -m apps.runtime lean-paper --p0-02
+
 Artifacts:
     artifacts/lean_paper_e2e/e2e_report.json   8-gate verdicts
     artifacts/lean_paper_e2e/e2e_report.md     human summary
     artifacts/lean_paper_e2e/strategy_contract.json   the payload LEAN reads
     artifacts/lean_paper_e2e/lean_live_command.txt    the deploy argv
     artifacts/lean_paper_e2e/reconciliation.json      G08 detail
+    artifacts/lean_paper_e2e/p02_report.json   P0-02 command/contract verdicts
+    artifacts/lean_paper_e2e/p02_report.md     P0-02 human summary
 
 The suite runs in two layers, and says which one it is in:
 
@@ -35,6 +40,17 @@ in two ways —
 
 Without either, Layer B stays PENDING and the exit code is 2, so CI can
 tell "not yet run" apart from "ran and failed".
+
+P0-02 (``--p0-02``) grades the *command surface and the contract boundary*
+and never starts LEAN:
+
+  P02-G01 deploy_paper 不再 TypeError      P02-G05 lean.json 无 fake contract field
+  P02-G02 live command 无 --parameter      P02-G06 lean.json 无 user-specific local-id
+  P02-G03 live command data-provider 合法  P02-G07 main.py 从磁盘读取 contract
+  P02-G04 contract filename protocol       P02-G08 Order → Fill → Ledger   (PENDING)
+
+P02-G08 stays PENDING until a real LEAN paper deployment produces an order
+and fill stream; no offline gate fabricates one.
 """
 from __future__ import annotations
 
@@ -1011,6 +1027,463 @@ class LeanPaperE2E:
 
 
 # ══════════════════════════════════════════════════════════════════
+# P0-02 — command / contract acceptance
+#
+# P0-02 answers a different question from P0-01.  P0-01 asks "does the
+# contract survive the round trip to LEAN?"; P0-02 asks "is the command we
+# hand LEAN actually legal, and is the contract exchanged through a real
+# artifact rather than a CLI flag that does not exist?".  It never starts
+# LEAN, so it grades on a laptop with no CLI and no organisation.
+# ══════════════════════════════════════════════════════════════════
+P02_GATE_NAMES = {
+    "P02-G01": "deploy_paper 不再 TypeError",
+    "P02-G02": "live command 无 --parameter",
+    "P02-G03": "live command data-provider 合法",
+    "P02-G04": "contract filename protocol",
+    "P02-G05": "lean.json 无 fake contract field",
+    "P02-G06": "lean.json 无 user-specific local-id",
+    "P02-G07": "main.py 从磁盘读取 contract",
+    "P02-G08": "Order → Fill → Ledger",
+}
+
+#: Top-level keys a LEAN project's ``lean.json`` may legitimately carry.
+#: Anything outside this set is an ICYQuant invention that would look like
+#: official configuration without being honoured by the LEAN CLI.
+LEAN_PROJECT_KNOWN_KEYS = frozenset(
+    {
+        "algorithm-language",
+        "description",
+        "parameters",
+        "local-id",
+        "cloud-id",
+        "organization-id",
+        "environment",
+        "environments",
+        "data-queue-handler",
+    }
+)
+
+#: Fields that pin one operator's local QuantConnect identity.
+LEAN_PROJECT_IDENTITY_KEYS = ("local-id", "cloud-id", "organization-id")
+
+
+def run_p0_02(repo_root: Path) -> list[GateResult]:
+    """Run the P0-02 offline acceptance gates (P02-G01 .. P02-G08).
+
+    Reads the committed adapter, ``lean.json`` and algorithm source; writes
+    nothing except the contract file that ``deploy_paper`` itself persists.
+    P02-G08 is always PENDING here.
+    """
+    project_dir = repo_root / LEAN_PROJECT_DIR
+    adapter = LeanAdapter(project_dir)
+
+    def project_config() -> dict:
+        return json.loads(
+            (project_dir / LEAN_PROJECT_FILE).read_text(encoding="utf-8")
+        )
+
+    def g01() -> tuple[str, str, dict]:
+        """deploy_paper() must not blow up on a keyword it does not accept."""
+        contract = build_contract()
+        captured: list[list[str]] = []
+        original_run = subprocess.run
+
+        def fake_run(command, *args, **kwargs):
+            captured.append(list(command))
+            return subprocess.CompletedProcess(
+                args=command, returncode=0, stdout="", stderr=""
+            )
+
+        try:
+            subprocess.run = fake_run  # type: ignore[assignment]
+            adapter.deploy_paper(contract)
+        except TypeError as exc:
+            return STATUS_FAIL, f"deploy_paper raised TypeError: {exc}", {}
+        finally:
+            subprocess.run = original_run  # type: ignore[assignment]
+
+        if not captured:
+            return STATUS_FAIL, "deploy_paper never reached subprocess.run", {}
+
+        command = captured[0]
+
+        if command[:3] != [adapter.lean_binary, "live", "deploy"]:
+            return (
+                STATUS_FAIL,
+                f"unexpected argv head: {command[:3]!r}",
+                {"command": command},
+            )
+
+        if "--parameter" in command:
+            return (
+                STATUS_FAIL,
+                "deploy_paper still emits the legacy --parameter flag",
+                {"command": command},
+            )
+
+        return (
+            STATUS_PASS,
+            "deploy_paper built and dispatched a legal live deploy argv",
+            {"command": command},
+        )
+
+    def g02() -> tuple[str, str, dict]:
+        command = adapter.build_live_command()
+
+        if "--parameter" in command:
+            return (
+                STATUS_FAIL,
+                "legacy --parameter flag is still present",
+                {"command": command},
+            )
+
+        return (
+            STATUS_PASS,
+            "live command contains no --parameter flag",
+            {"command": command},
+        )
+
+    def g03() -> tuple[str, str, dict]:
+        command = adapter.build_live_command()
+
+        if "--data-provider-live" not in command:
+            return STATUS_FAIL, "--data-provider-live missing", {"command": command}
+
+        index = command.index("--data-provider-live")
+
+        if index + 1 >= len(command):
+            return (
+                STATUS_FAIL,
+                "--data-provider-live has no value",
+                {"command": command},
+            )
+
+        value = command[index + 1]
+        allowed = {"Custom data only"}
+
+        if value not in allowed:
+            return (
+                STATUS_FAIL,
+                f"unsupported live data provider: {value!r}",
+                {"command": command},
+            )
+
+        return (
+            STATUS_PASS,
+            f"live data provider={value!r}",
+            {"data_provider": value},
+        )
+
+    def g04() -> tuple[str, str, dict]:
+        """The adapter, the runtime and the algorithm must agree on one name."""
+        from apps.adapters.lean import CONTRACT_FILENAME as ADAPTER_CONTRACT_NAME
+
+        source_path = project_dir / ALGORITHM_FILE
+
+        if not source_path.exists():
+            return STATUS_FAIL, f"{ALGORITHM_FILE} missing", {}
+
+        try:
+            tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:
+            return STATUS_FAIL, f"{ALGORITHM_FILE} syntax error: {exc}", {}
+
+        algorithm_names = [
+            node.value.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Constant)
+            and any(
+                isinstance(target, ast.Name) and target.id == "CONTRACT_FILENAME"
+                for target in node.targets
+            )
+        ]
+
+        names = {
+            "runtime": CONTRACT_FILENAME,
+            "adapter": ADAPTER_CONTRACT_NAME,
+            "algorithm": algorithm_names[0] if algorithm_names else None,
+        }
+        mismatched = {k: v for k, v in names.items() if v != CONTRACT_FILENAME}
+
+        if mismatched:
+            return (
+                STATUS_FAIL,
+                f"contract filename protocol mismatch: {mismatched}",
+                {"names": names},
+            )
+
+        return (
+            STATUS_PASS,
+            f"adapter / runtime / algorithm all name {CONTRACT_FILENAME!r}",
+            {"names": names},
+        )
+
+    def g05() -> tuple[str, str, dict]:
+        try:
+            project = project_config()
+        except FileNotFoundError:
+            return STATUS_FAIL, f"{LEAN_PROJECT_FILE} missing", {}
+        except json.JSONDecodeError as exc:
+            return STATUS_FAIL, f"{LEAN_PROJECT_FILE} is not valid JSON: {exc}", {}
+
+        if "parameters" in project:
+            return (
+                STATUS_FAIL,
+                "lean.json carries a 'parameters' block; the contract is a "
+                "project artifact, not a live-deploy CLI parameter",
+                {"keys": sorted(project)},
+            )
+
+        if "data-queue-handler" in project:
+            return (
+                STATUS_FAIL,
+                "'data-queue-handler' belongs under environments, not at the "
+                "project top level",
+                {"keys": sorted(project)},
+            )
+
+        unknown = sorted(set(project) - LEAN_PROJECT_KNOWN_KEYS)
+
+        if unknown:
+            return (
+                STATUS_FAIL,
+                f"lean.json carries non-LEAN top-level keys: {unknown}",
+                {"keys": sorted(project)},
+            )
+
+        if project.get("algorithm-language") != "Python":
+            return (
+                STATUS_FAIL,
+                "algorithm-language must be 'Python'",
+                {"project": project},
+            )
+
+        return (
+            STATUS_PASS,
+            "lean.json holds only LEAN project-level fields; no fake contract "
+            "parameter",
+            {"keys": sorted(project)},
+        )
+
+    def g06() -> tuple[str, str, dict]:
+        try:
+            project = project_config()
+        except FileNotFoundError:
+            return STATUS_FAIL, f"{LEAN_PROJECT_FILE} missing", {}
+        except json.JSONDecodeError as exc:
+            return STATUS_FAIL, f"{LEAN_PROJECT_FILE} is not valid JSON: {exc}", {}
+
+        found = [key for key in LEAN_PROJECT_IDENTITY_KEYS if key in project]
+
+        if found:
+            return (
+                STATUS_FAIL,
+                f"user-specific LEAN identity pinned in the repo: {found}",
+                {"keys": sorted(project)},
+            )
+
+        return (
+            STATUS_PASS,
+            "no local-id / cloud-id / organization-id committed",
+            {"keys": sorted(project)},
+        )
+
+    def g07() -> tuple[str, str, dict]:
+        source_path = project_dir / ALGORITHM_FILE
+
+        if not source_path.exists():
+            return STATUS_FAIL, f"{ALGORITHM_FILE} missing", {}
+
+        source = source_path.read_text(encoding="utf-8")
+
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as exc:
+            return STATUS_FAIL, f"{ALGORITHM_FILE} syntax error: {exc}", {}
+
+        loads = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "_load_contract"
+        ]
+
+        if not loads:
+            return STATUS_FAIL, "_load_contract() not found", {}
+
+        if not any(
+            isinstance(node, ast.Constant) and node.value == CONTRACT_FILENAME
+            for node in ast.walk(tree)
+        ):
+            return (
+                STATUS_FAIL,
+                f"{ALGORITHM_FILE} never names {CONTRACT_FILENAME!r}",
+                {},
+            )
+
+        return (
+            STATUS_PASS,
+            "_load_contract() resolves the contract from the project directory",
+            {"contract_filename": CONTRACT_FILENAME},
+        )
+
+    def g08() -> tuple[str, str, dict]:
+        return (
+            STATUS_PENDING,
+            "real LEAN paper Order → Fill → Ledger evidence required; P0-02 "
+            "does not fabricate an offline fill",
+            {},
+        )
+
+    gates: list[tuple[str, Callable[[], tuple[str, str, dict]]]] = [
+        ("P02-G01", g01),
+        ("P02-G02", g02),
+        ("P02-G03", g03),
+        ("P02-G04", g04),
+        ("P02-G05", g05),
+        ("P02-G06", g06),
+        ("P02-G07", g07),
+        ("P02-G08", g08),
+    ]
+
+    results: list[GateResult] = []
+
+    for gate_id, probe in gates:
+        started = time.perf_counter()
+
+        try:
+            status, detail, data = probe()
+        except Exception as exc:  # pragma: no cover - defensive
+            status = STATUS_FAIL
+            detail = f"raised {type(exc).__name__}: {exc}"
+            data = {}
+
+        results.append(
+            GateResult(
+                gate=gate_id,
+                name=P02_GATE_NAMES[gate_id],
+                status=status,
+                detail=detail,
+                duration_ms=round((time.perf_counter() - started) * 1000, 3),
+                data=data,
+            )
+        )
+
+    return results
+
+
+def generate_p0_02_report(repo_root: Path,
+                          results: list[GateResult],
+                          artifacts: Optional[Path] = None) -> dict:
+    passed = sum(1 for r in results if r.status == STATUS_PASS)
+    failed = sum(1 for r in results if r.status == STATUS_FAIL)
+    pending = sum(1 for r in results if r.status == STATUS_PENDING)
+    total = len(results)
+
+    if failed:
+        verdict = "FAIL"
+    elif pending:
+        verdict = "PARTIAL"
+    else:
+        verdict = "PASS"
+
+    artifact_dir = artifacts or (repo_root / ARTIFACT_DIR)
+
+    report = {
+        "commit": "P0-02",
+        "suite": "lean-paper",
+        "gate": verdict,
+        "passed": passed,
+        "failed": failed,
+        "pending": pending,
+        "total": total,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "project_dir": str(repo_root / LEAN_PROJECT_DIR),
+        "gates": [
+            {
+                "gate": r.gate,
+                "name": r.name,
+                "status": r.status,
+                "passed": r.passed,
+                "detail": r.detail,
+                "duration_ms": r.duration_ms,
+                "data": r.data,
+            }
+            for r in results
+        ],
+    }
+
+    if verdict != "PASS":
+        report["next_action"] = (
+            "P02-G08 (real Order → Fill → Ledger) needs a real LEAN paper "
+            "deployment: pip install lean, `lean init`, then "
+            "`python -m apps.runtime lean-paper --deploy`, or grade an "
+            "existing run with `--events <lean log or events.json>`."
+        )
+
+    _dump(artifact_dir / "p02_report.json", report)
+    (artifact_dir / "p02_report.md").write_text(
+        _render_p0_02_markdown(report), encoding="utf-8"
+    )
+    return report
+
+
+def _render_p0_02_markdown(report: dict) -> str:
+    lines = [
+        "# P0-02 — LEAN Paper Command / Contract Acceptance",
+        "",
+        f"- **Gate: {report['gate']}** "
+        f"({report['passed']} PASS / {report['failed']} FAIL / "
+        f"{report['pending']} PENDING of {report['total']})",
+        f"- Generated: `{report['generated_at']}`",
+        f"- Project: `{report['project_dir']}`",
+        "",
+        "| Gate | Name | Status | Detail |",
+        "|---|---|---|---|",
+    ]
+
+    for gate in report["gates"]:
+        detail = str(gate["detail"]).replace("|", "\\|")
+        lines.append(
+            f"| {gate['gate']} | {gate['name']} | {gate['status']} | {detail} |"
+        )
+
+    if report.get("next_action"):
+        lines += ["", "## Next action", "", report["next_action"]]
+
+    lines += [
+        "",
+        "> P02-G08 stays PENDING until a real deployment produces Order/Fill.",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def _print_p0_02_summary(report: dict, as_json: bool = False) -> None:
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        return
+
+    print(
+        f"P0-02 LEAN PAPER — GATE: {report['gate']} "
+        f"({report['passed']} PASS / {report['failed']} FAIL / "
+        f"{report['pending']} PENDING of {report['total']})"
+    )
+
+    for gate in report["gates"]:
+        print(
+            f"  [{gate['status']:<7}] {gate['gate']} {gate['name']} "
+            f"({gate['duration_ms']} ms)"
+        )
+
+        if gate["status"] != STATUS_PASS:
+            print(f"            {gate['detail']}")
+
+    print(f"  artifacts → {ARTIFACT_DIR.as_posix()}/p02_report.md")
+
+
+# ══════════════════════════════════════════════════════════════════
 # Reports
 # ══════════════════════════════════════════════════════════════════
 def generate_reports(runner: LeanPaperE2E,
@@ -1146,8 +1619,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     """CLI entry point (``python -m apps.runtime lean-paper``)."""
     parser = argparse.ArgumentParser(
         prog="lean-paper-e2e",
-        description="P0-01 — ICYQuant → LEAN paper track E2E validation "
-                    "(8 gates; Layer A offline, Layer B needs LEAN CLI).",
+        description="ICYQuant → LEAN paper track acceptance. "
+                    "P0-01 E2E (8 gates; Layer A offline, Layer B needs "
+                    "LEAN CLI) or --p0-02 command/contract gates "
+                    "(P02-G01..P02-G08).",
     )
     parser.add_argument(
         "--artifacts", default=None,
@@ -1172,6 +1647,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--deploy-timeout", type=int, default=900,
         help="seconds to wait for a --deploy run (default: 900)",
     )
+    parser.add_argument(
+        "--p0-02", action="store_true",
+        help="run the P0-02 command/contract acceptance gates "
+             "(P02-G01..P02-G08) instead of the P0-01 suite",
+    )
     parser.add_argument("--json", action="store_true", help="raw JSON output")
     args = parser.parse_args(argv)
 
@@ -1182,6 +1662,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         Path(args.artifacts).resolve() if args.artifacts
         else repo_root / ARTIFACT_DIR
     )
+
+    if args.p0_02:
+        p02_results = run_p0_02(repo_root)
+        p02_report = generate_p0_02_report(repo_root, p02_results, artifacts)
+        _print_p0_02_summary(p02_report, as_json=args.json)
+
+        if p02_report["failed"]:
+            return 1
+
+        if p02_report["pending"]:
+            return 2
+
+        return 0
+
     events_path = Path(args.events).expanduser().resolve() if args.events else None
 
     if events_path is not None and not events_path.exists():

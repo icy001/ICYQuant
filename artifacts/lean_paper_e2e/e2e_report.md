@@ -1,7 +1,7 @@
 # P0-01 — ICYQuant → LEAN Paper E2E
 
 - **Gate: PARTIAL** (4 PASS / 0 FAIL / 4 PENDING of 8)
-- Generated: `2026-09-17T06:29:48.636748+00:00`
+- Generated: `2026-09-17T07:37:53.786517+00:00`
 - Project: `/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper`
 - Environment: LEAN CLI `OK`, Docker `OK`
 - Deploy command: `lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --data-provider-live Custom data only --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results`

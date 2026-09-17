@@ -10,6 +10,7 @@ Usage:
     python -m apps.runtime e2e --suite market-data   # Commit 017: A-share market data track E2E (20 gates)
     python -m apps.runtime market-data-check         # same suite, short alias
     python -m apps.runtime lean-paper                # P0-01: ICYQuant -> LEAN paper E2E (8 gates)
+    python -m apps.runtime lean-paper --p0-02        # P0-02: LEAN paper command/contract acceptance (8 gates)
 """
 from __future__ import annotations
 
@@ -102,11 +103,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_lean = sub.add_parser(
         "lean-paper",
-        help="P0-01: ICYQuant -> LEAN paper E2E (8 gates; Layer A offline)",
+        help="ICYQuant -> LEAN paper acceptance: P0-01 E2E or --p0-02 gates",
         epilog=(
             "Layer B (G05-G08) needs the LEAN CLI and a paid QuantConnect "
             "organisation. Until a real deployment's events are supplied via "
-            "--events, those gates report PENDING - never PASS."
+            "--events, those gates report PENDING - never PASS. "
+            "--p0-02 runs a separate suite (P02-G01..P02-G08) that grades the "
+            "live deploy command and the contract boundary offline; its P02-G08 "
+            "stays PENDING until a real deployment produces an Order/Fill."
         ),
     )
     p_lean.add_argument("--artifacts", default=None,
@@ -120,6 +124,14 @@ def build_parser() -> argparse.ArgumentParser:
                         help="actually run `lean live deploy` (needs LEAN CLI + organisation)")
     p_lean.add_argument("--deploy-timeout", type=int, default=900,
                         help="seconds to wait for a --deploy run (default: 900)")
+    p_lean.add_argument(
+        "--p0-02",
+        action="store_true",
+        help=(
+            "run the P0-02 command/contract acceptance gates "
+            "(P02-G01..P02-G08) instead of the P0-01 suite"
+        ),
+    )
     p_lean.add_argument("--json", action="store_true", help="output raw JSON")
 
     return parser
@@ -158,7 +170,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_lean_paper(args) -> int:
-    """P0-01 acceptance suite — Layer A offline, Layer B needs LEAN CLI."""
+    """P0-01 acceptance suite — Layer A offline, Layer B needs LEAN CLI.
+
+    ``--p0-02`` switches to the P0-02 command/contract acceptance gates
+    instead of running the P0-01 suite; the two suites never share a
+    report or a gate namespace.
+    """
     from apps.runtime.lean_paper_e2e import main as lean_main
 
     argv: list[str] = []
@@ -175,6 +192,8 @@ def _run_lean_paper(args) -> int:
         argv.append("--deploy")
     if getattr(args, "deploy_timeout", None) != 900 and getattr(args, "deploy_timeout", None):
         argv += ["--deploy-timeout", str(args.deploy_timeout)]
+    if getattr(args, "p0_02", False):
+        argv.append("--p0-02")
     if getattr(args, "json", False):
         argv.append("--json")
     return lean_main(argv)

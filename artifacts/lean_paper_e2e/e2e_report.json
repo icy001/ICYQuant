@@ -6,7 +6,7 @@
   "failed": 0,
   "pending": 4,
   "total": 8,
-  "generated_at": "2026-09-17T06:29:48.636748+00:00",
+  "generated_at": "2026-09-17T07:37:53.786517+00:00",
   "layer_a": {
     "G01": "PASS",
     "G02": "PASS",
@@ -41,7 +41,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "StrategyContract built, frozen, and serialisable",
-      "duration_ms": 0.022,
+      "duration_ms": 0.026,
       "data": {
         "intents": 1,
         "symbols": [
@@ -55,7 +55,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "2 valid inputs accepted, 21/21 invalid rejected",
-      "duration_ms": 0.069,
+      "duration_ms": 0.082,
       "data": {
         "invalid_cases": 21,
         "rejected": 21
@@ -67,7 +67,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "contract written to strategy_contract.json (559 bytes) and re-read identical",
-      "duration_ms": 59.928,
+      "duration_ms": 163.419,
       "data": {
         "path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
         "orders": 1
@@ -79,7 +79,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "LEAN CLI usable (lean 1.0.229); docker=OK",
-      "duration_ms": 229.34,
+      "duration_ms": 267.749,
       "data": {
         "status": "OK",
         "version": "lean 1.0.229",
@@ -92,7 +92,7 @@
       "status": "PENDING",
       "passed": false,
       "detail": "LEAN CLI present; re-run with --deploy to start the paper deployment (long-running)",
-      "duration_ms": 1.186,
+      "duration_ms": 1.135,
       "data": {
         "algorithm_bytes": 4941,
         "algorithm_language": "Python",
@@ -123,7 +123,7 @@
       "status": "PENDING",
       "passed": false,
       "detail": "no LEAN events supplied — G08 needs a real fill to post and reconcile (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation)",
-      "duration_ms": 0.003,
+      "duration_ms": 0.002,
       "data": {}
     }
   ],
