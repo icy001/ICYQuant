@@ -1,0 +1,128 @@
+{
+  "commit": "P0-01",
+  "suite": "lean-paper",
+  "gate": "PARTIAL",
+  "passed": 4,
+  "failed": 0,
+  "pending": 4,
+  "total": 8,
+  "generated_at": "2026-09-17T05:54:15.281245+00:00",
+  "layer_a": {
+    "G01": "PASS",
+    "G02": "PASS",
+    "G03": "PASS",
+    "G04": "PASS"
+  },
+  "layer_b": {
+    "G05": "PENDING",
+    "G06": "PENDING",
+    "G07": "PENDING",
+    "G08": "PENDING"
+  },
+  "environment": {
+    "status": "UNAVAILABLE",
+    "lean_binary": "lean",
+    "detail": "'lean' not found on PATH",
+    "docker": {
+      "status": "OK",
+      "server_version": "29.2.1"
+    },
+    "project_dir": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper"
+  },
+  "project_dir": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
+  "contract_path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
+  "lean_command": "lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --parameter strategy_contract strategy_contract.json --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results",
+  "gates": [
+    {
+      "gate": "G01",
+      "name": "StrategyContract 创建",
+      "status": "PASS",
+      "passed": true,
+      "detail": "StrategyContract built, frozen, and serialisable",
+      "duration_ms": 0.026,
+      "data": {
+        "intents": 1,
+        "symbols": [
+          "SPY"
+        ]
+      }
+    },
+    {
+      "gate": "G02",
+      "name": "Contract validation",
+      "status": "PASS",
+      "passed": true,
+      "detail": "2 valid inputs accepted, 21/21 invalid rejected",
+      "duration_ms": 0.079,
+      "data": {
+        "invalid_cases": 21,
+        "rejected": 21
+      }
+    },
+    {
+      "gate": "G03",
+      "name": "ICYQuant → JSON",
+      "status": "PASS",
+      "passed": true,
+      "detail": "contract written to strategy_contract.json (559 bytes) and re-read identical",
+      "duration_ms": 125.41,
+      "data": {
+        "path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
+        "orders": 1
+      }
+    },
+    {
+      "gate": "G04",
+      "name": "LEAN Adapter health",
+      "status": "PASS",
+      "passed": true,
+      "detail": "LEAN CLI absent (expected on a fresh Mac) — the adapter still reports the environment correctly; Layer B stays PENDING; docker=OK",
+      "duration_ms": 73.202,
+      "data": {
+        "status": "UNAVAILABLE",
+        "version": null,
+        "docker": "OK"
+      }
+    },
+    {
+      "gate": "G05",
+      "name": "LEAN Algorithm 启动",
+      "status": "PENDING",
+      "passed": false,
+      "detail": "algorithm assets validate offline (class + hooks + lean.json + contract); starting LEAN needs an installed CLI and a paid QuantConnect organisation",
+      "duration_ms": 1.74,
+      "data": {
+        "algorithm_bytes": 4941,
+        "algorithm_language": "Python"
+      }
+    },
+    {
+      "gate": "G06",
+      "name": "Paper Brokerage 接收订单",
+      "status": "PENDING",
+      "passed": false,
+      "detail": "no LEAN events supplied — pass --events <log|json> from a real paper deployment to grade this gate",
+      "duration_ms": 0.007,
+      "data": {}
+    },
+    {
+      "gate": "G07",
+      "name": "OrderEvent / Fill 返回",
+      "status": "PENDING",
+      "passed": false,
+      "detail": "no LEAN events supplied — G07 needs a real fill to grade",
+      "duration_ms": 0.003,
+      "data": {}
+    },
+    {
+      "gate": "G08",
+      "name": "ICYQuant Ledger/Reconcile",
+      "status": "PENDING",
+      "passed": false,
+      "detail": "no LEAN events supplied — G08 needs a real fill to post and reconcile",
+      "duration_ms": 0.002,
+      "data": {}
+    }
+  ],
+  "next_action": "Layer B (G05–G08) is gradable once LEAN CLI is available: pip install lean, run `lean init`, then `python -m apps.runtime lean-paper --deploy`, or grade an existing run with `--events <lean log or events.json>`."
+}

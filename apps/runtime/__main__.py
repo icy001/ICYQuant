@@ -9,6 +9,7 @@ Usage:
     python -m apps.runtime factor [--json]           # Phase 8: Alpha021 factor -> paper trading (research layer)
     python -m apps.runtime e2e --suite market-data   # Commit 017: A-share market data track E2E (20 gates)
     python -m apps.runtime market-data-check         # same suite, short alias
+    python -m apps.runtime lean-paper                # P0-01: ICYQuant -> LEAN paper E2E (8 gates)
 """
 from __future__ import annotations
 
@@ -99,6 +100,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_e2e_args(p_mdc)
 
+    p_lean = sub.add_parser(
+        "lean-paper",
+        help="P0-01: ICYQuant -> LEAN paper E2E (8 gates; Layer A offline)",
+        epilog=(
+            "Layer B (G05-G08) needs the LEAN CLI and a paid QuantConnect "
+            "organisation. Until a real deployment's events are supplied via "
+            "--events, those gates report PENDING - never PASS."
+        ),
+    )
+    p_lean.add_argument("--artifacts", default=None,
+                        help="artifact directory (default: artifacts/lean_paper_e2e)")
+    p_lean.add_argument("--repo-root", default=None, help="repository root override")
+    p_lean.add_argument("--gate", action="append", default=None, metavar="Gnn",
+                        help="run only the named gate(s), e.g. --gate G03")
+    p_lean.add_argument("--events", default=None, metavar="PATH",
+                        help="grade Layer B from a real run: LEAN debug log or events JSON")
+    p_lean.add_argument("--deploy", action="store_true",
+                        help="actually run `lean live deploy` (needs LEAN CLI + organisation)")
+    p_lean.add_argument("--deploy-timeout", type=int, default=900,
+                        help="seconds to wait for a --deploy run (default: 900)")
+    p_lean.add_argument("--json", action="store_true", help="output raw JSON")
+
     return parser
 
 
@@ -128,8 +151,33 @@ def main(argv: list[str] | None = None) -> int:
         return _run_factor(args)
     if args.command in ("e2e", "market-data-check"):
         return _run_market_data_e2e(args)
+    if args.command == "lean-paper":
+        return _run_lean_paper(args)
     parser.print_help()
     return 2
+
+
+def _run_lean_paper(args) -> int:
+    """P0-01 acceptance suite — Layer A offline, Layer B needs LEAN CLI."""
+    from apps.runtime.lean_paper_e2e import main as lean_main
+
+    argv: list[str] = []
+    for value in (
+        ("--artifacts", getattr(args, "artifacts", None)),
+        ("--repo-root", getattr(args, "repo_root", None)),
+        ("--events", getattr(args, "events", None)),
+    ):
+        if value[1]:
+            argv += [value[0], value[1]]
+    for gate in getattr(args, "gate", None) or []:
+        argv += ["--gate", gate]
+    if getattr(args, "deploy", False):
+        argv.append("--deploy")
+    if getattr(args, "deploy_timeout", None) != 900 and getattr(args, "deploy_timeout", None):
+        argv += ["--deploy-timeout", str(args.deploy_timeout)]
+    if getattr(args, "json", False):
+        argv.append("--json")
+    return lean_main(argv)
 
 
 def _run_market_data_e2e(args) -> int:

@@ -41,3 +41,17 @@ data/config/
 
 # Alert disposition ledger (Phase 1 persistence) - runtime state, not source.
 data/alerts/
+
+# LEAN paper bridge (P0-01): strategy_contract.json is rewritten on every
+# `python -m apps.runtime lean-paper` run, so it is runtime state, not source.
+# The contract *schema* lives in apps/adapters/lean/contract.py and the
+# human-readable sample is embedded in the tracked gate report under
+# artifacts/lean_paper_e2e/ - both stay in version control.
+integrations/lean/paper/strategy_contract.json
+artifacts/lean_paper_e2e/strategy_contract.json
+
+# LEAN live deployment output (`lean live deploy --output`): securities,
+# portfolio and price-data dumps written by the LEAN engine on every paper
+# run. Regenerable and potentially large; the graded summary that matters is
+# the tracked e2e_report.* sitting next to it.
+artifacts/lean_paper_e2e/live-results/
