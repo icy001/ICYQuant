@@ -4,7 +4,7 @@ Usage:
     python -m apps.runtime health [--port 8010]      # Health check server (all 10 services)
     python -m apps.runtime scenarios [--json]        # Run Golden Scenarios 01-08
     python -m apps.runtime paper [--signals N]       # Phase 4: paper trading metrics
-    python -m apps.runtime shadow [--signals N]      # Phase 5: shadow trading consistency
+    python -m apps.runtime shadow [--signals N]      # Commit 016: shadow trading session (real market, simulated fills)
     python -m apps.runtime strategy [--json]         # Phase 7: Strategy 001 backtest (research layer)
     python -m apps.runtime factor [--json]           # Phase 8: Alpha021 factor -> paper trading (research layer)
 """
@@ -15,7 +15,13 @@ import json
 import sys
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The single source of truth for the runtime CLI surface.
+
+    Exposed (rather than buried in :func:`main`) so the acceptance
+    suite can prove, at the CLI level, that ``shadow --live`` and its
+    aliases are rejected before any code runs.
+    """
     parser = argparse.ArgumentParser(prog="icyquant-runtime", description="ICYQuant deployment & validation runtime")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -30,9 +36,27 @@ def main(argv: list[str] | None = None) -> int:
     p_paper.add_argument("--signals", type=int, default=50, help="number of signals to trade")
     p_paper.add_argument("--json", action="store_true", help="output raw JSON")
 
-    p_shadow = sub.add_parser("shadow", help="Phase 5: shadow trading consistency run")
-    p_shadow.add_argument("--signals", type=int, default=20, help="number of signals to mirror")
-    p_shadow.add_argument("--json", action="store_true", help="output raw JSON")
+    p_shadow = sub.add_parser(
+        "shadow",
+        help="Commit 016: shadow trading session (simulated execution, never a real order)",
+        epilog=(
+            "Shadow structurally cannot place real orders: it never "
+            "accepts --live / --real-order / --broker-order and no code "
+            "path reaches a broker order API."
+        ),
+    )
+    p_shadow.add_argument(
+        "action",
+        nargs="?",
+        default="run",
+        choices=["run", "status", "stop"],
+        help="run the session, or query/stop a running one",
+    )
+    p_shadow.add_argument("--symbols", default="159852,159559,161116", help="comma-separated symbols to shadow-trade")
+    p_shadow.add_argument("--capital", type=float, default=1_000_000, help="shadow initial capital in CNY")
+    p_shadow.add_argument("--signals", type=int, default=20, help="max shadow intents per session (0 = unlimited)")
+    p_shadow.add_argument("--interval", type=float, default=5.0, help="seconds between session cycles")
+    p_shadow.add_argument("--json", action="store_true", help="JSON status lines")
 
     p_gate = sub.add_parser("gate", help="Phase 6: production readiness gate")
     p_gate.add_argument("--json", action="store_true", help="output raw JSON")
@@ -46,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
                           help="export the full trade/equity log as CSV "
                                "(default dir: research/discovery/output/factor-paper-d1)")
 
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "health":
@@ -55,7 +84,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "paper":
         return _run_paper(args)
     if args.command == "shadow":
-        return _run_shadow(args)
+        from apps.runtime.shadow_cli import run_shadow_session, shadow_status, shadow_stop
+
+        if args.action == "status":
+            return shadow_status(args)
+        if args.action == "stop":
+            return shadow_stop(args)
+        return run_shadow_session(args)
     if args.command == "gate":
         return _run_gate(args)
     if args.command == "strategy":
@@ -108,45 +143,6 @@ def _run_paper(args) -> int:
         print(f"  slippage bps avg: {m['slippage_bps_avg']}  "
               f"equity: {report['equity']}  ledger events: {report['ledger_events']}")
     return 0
-
-
-def _run_shadow(args) -> int:
-    from apps.runtime.paper_trading import SimulatedMarketFeed
-    from apps.runtime.shadow_trading import ShadowSignal, ShadowTradingSession
-
-    feed = SimulatedMarketFeed(seed=7)
-    symbols = ["AAPL", "MSFT", "TSLA"]
-
-    def signal_source():
-        return [
-            ShadowSignal(symbol=symbols[i % len(symbols)], side="BUY" if i % 2 == 0 else "SELL",
-                         quantity=50 + (i % 4) * 10, price=feed.quote(symbols[i % len(symbols)]))
-            for i in range(args.signals)
-        ]
-
-    report = ShadowTradingSession(signal_source).run()
-    payload = {
-        "mode": "shadow",
-        "mirrored_signals": report.mirrored_signals,
-        "consistent": report.consistent,
-        "divergences": report.divergences,
-        "reference_state": report.reference_state,
-        "shadow_state": report.shadow_state,
-        "all_consistent": report.all_consistent,
-    }
-    if args.json:
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-    else:
-        print(f"PHASE 5 SHADOW TRADING - GATE: "
-              f"{'PASS' if report.all_consistent else 'FAIL'} "
-              f"({report.consistent}/{report.mirrored_signals} consistent)")
-        if report.divergences:
-            for d in report.divergences:
-                print(f"  DIVERGENCE {d['symbol']} {d['side']} x{d['quantity']}: "
-                      f"ref={d['reference']} shadow={d['shadow']}")
-        print(f"  reference: {report.reference_state}")
-        print(f"  shadow:    {report.shadow_state}")
-    return 0 if report.all_consistent else 1
 
 
 def _run_gate(args) -> int:

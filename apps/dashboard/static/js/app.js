@@ -2559,6 +2559,7 @@
     "#/trading/universe": { group: "trading", navKey: "trading/universe", label: "Universe", zh: "标的池", desc: "Trading instrument master" },
     "#/trading/market": { group: "trading", navKey: "trading/market", label: "Market Data", zh: "行情", desc: "Real-time quote pipeline" },
     "#/trading/paper": { group: "trading", navKey: "trading/paper", label: "Paper Trading", zh: "模拟", desc: "Paper trading workspace" },
+    "#/trading/shadow": { group: "trading", navKey: "trading/shadow", label: "Shadow Trading", zh: "影子", desc: "Shadow trading workspace (real market, simulated fills)" },
     "#/trading/orders": { group: "trading", navKey: "trading/orders", label: "Orders", zh: "订单", desc: "Order management" },
     "#/trading/positions": { group: "trading", navKey: "trading/positions", label: "Positions", zh: "持仓", desc: "Position management" },
     "#/trading/trades": { group: "trading", navKey: "trading/trades", label: "Trades", zh: "成交", desc: "Trade history" },
@@ -10487,6 +10488,14 @@
     );
   };
 
+  // ── Shadow Trading page (Commit 016) — async hydrate ─────────
+  // The page module (shadow.js) owns its DOM + visibility-aware poll
+  // against /api/shadow/*; the framework only mounts the shell.
+  PAGE_FRAMEWORK["trading/shadow"] = function () {
+    if (window.ShadowTradingPage) return window.ShadowTradingPage.render();
+    return pageNavPlaceholder(NAV["#/trading/shadow"]);
+  };
+
 
 
   // Build ROUTES array from NAV config
@@ -11502,6 +11511,10 @@
         // account-sync = snapshot-status page holding an account selector;
         // it runs its own 30s visibility-aware refresh (§15 / §16).
         if (location.hash.indexOf("#/operations/account-sync") === 0) return;
+        // shadow = own visibility-aware poll against /api/shadow/*
+        // (Commit 016); a 5s re-render here would rebuild the DOM
+        // under its tables.
+        if (location.hash.indexOf("#/trading/shadow") === 0) return;
         render();
       }
     }, state.refreshMs);

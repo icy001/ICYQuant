@@ -61,6 +61,7 @@ from apps.api.routers.market_data import (  # noqa: E402
     router as market_data_router,
 )
 from apps.api.routers.reconciliation import router as reconciliation_router  # noqa: E402
+from apps.api.routers.shadow import router as shadow_router  # noqa: E402
 from apps.api.health import router as health_router  # noqa: E402
 from apps.dashboard import dashboard_router  # noqa: E402
 from services.account.domain.exceptions import AccountError  # noqa: E402
@@ -82,6 +83,7 @@ app.include_router(health_router)
 app.include_router(reconciliation_router)
 app.include_router(market_data_router)
 app.include_router(accounts_router)
+app.include_router(shadow_router)
 app.include_router(dashboard_router)
 
 @app.get("/")
