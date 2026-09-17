@@ -1,4 +1,6 @@
 {
   "algorithm-language": "Python",
-  "description": "ICYQuant P0-02 paper bridge: consumes strategy_contract.json written by apps/adapters/lean."
+  "description": "ICYQuant P0-02 paper bridge: consumes strategy_contract.json written by apps/adapters/lean.",
+  "organization-id": "00000000-0000-0000-0000-000000000000",
+  "data-folder": "data"
 }
