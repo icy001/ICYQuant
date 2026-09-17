@@ -55,3 +55,15 @@ artifacts/lean_paper_e2e/strategy_contract.json
 # run. Regenerable and potentially large; the graded summary that matters is
 # the tracked e2e_report.* sitting next to it.
 artifacts/lean_paper_e2e/live-results/
+
+# LEAN CLI generated project state (P0-02.2). The Lean CLI materializes
+# machine-scoped state and copies its bundled reference databases into the
+# project folder the first time any command resolves the project config:
+#   config.json              - machine-scoped local-id, not shareable
+#   data/market-hours/       - reference DB copied from the CLI bundle
+#   data/symbol-properties/  - reference DB copied from the CLI bundle
+# data/equity/ (P0-03-A local market data) is deliberately left unignored
+# for now; whether those inputs belong in Git is a separate decision.
+integrations/lean/paper/config.json
+integrations/lean/paper/data/market-hours/
+integrations/lean/paper/data/symbol-properties/
