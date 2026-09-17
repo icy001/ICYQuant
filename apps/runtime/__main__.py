@@ -7,6 +7,8 @@ Usage:
     python -m apps.runtime shadow [--signals N]      # Commit 016: shadow trading session (real market, simulated fills)
     python -m apps.runtime strategy [--json]         # Phase 7: Strategy 001 backtest (research layer)
     python -m apps.runtime factor [--json]           # Phase 8: Alpha021 factor -> paper trading (research layer)
+    python -m apps.runtime e2e --suite market-data   # Commit 017: A-share market data track E2E (20 gates)
+    python -m apps.runtime market-data-check         # same suite, short alias
 """
 from __future__ import annotations
 
@@ -70,6 +72,33 @@ def build_parser() -> argparse.ArgumentParser:
                           help="export the full trade/equity log as CSV "
                                "(default dir: research/discovery/output/factor-paper-d1)")
 
+    def _add_e2e_args(target: argparse.ArgumentParser) -> None:
+        target.add_argument(
+            "--suite", default="market-data", choices=["market-data"],
+            help="validation suite (Commit 017 ships the market-data track)",
+        )
+        target.add_argument(
+            "--artifacts", default=None,
+            help="artifact directory (default: artifacts/market_data_e2e)",
+        )
+        target.add_argument(
+            "--gate", action="append", default=None, metavar="Gnn",
+            help="run only the named gate(s), e.g. --gate G15",
+        )
+        target.add_argument("--json", action="store_true", help="raw JSON output")
+
+    p_e2e = sub.add_parser(
+        "e2e",
+        help="Commit 017: A-share market data track end-to-end validation (20 gates)",
+    )
+    _add_e2e_args(p_e2e)
+
+    p_mdc = sub.add_parser(
+        "market-data-check",
+        help="alias for `e2e --suite market-data`",
+    )
+    _add_e2e_args(p_mdc)
+
     return parser
 
 
@@ -97,8 +126,25 @@ def main(argv: list[str] | None = None) -> int:
         return _run_strategy(args)
     if args.command == "factor":
         return _run_factor(args)
+    if args.command in ("e2e", "market-data-check"):
+        return _run_market_data_e2e(args)
     parser.print_help()
     return 2
+
+
+def _run_market_data_e2e(args) -> int:
+    """Commit 017 acceptance suite — deterministic, offline, no network."""
+    from apps.runtime.e2e_market_data import main as e2e_main
+
+    argv = ["--suite", args.suite]
+    if args.artifacts:
+        argv += ["--artifacts", args.artifacts]
+    if args.gate:
+        for gate in args.gate:
+            argv += ["--gate", gate]
+    if args.json:
+        argv.append("--json")
+    return e2e_main(argv)
 
 
 def _run_health(args) -> int:
