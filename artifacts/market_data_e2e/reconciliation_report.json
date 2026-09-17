@@ -1,0 +1,197 @@
+{
+  "commit": "017",
+  "reconciled": {
+    "account_id": "E2E014",
+    "snapshot_id": "E2E014-000001-8a6d136c",
+    "timestamp": "2026-09-17T10:41:47+08:00",
+    "status": "RECONCILED",
+    "outcome": "PASS",
+    "checked": 6,
+    "matched": 6,
+    "mismatch": 0,
+    "missing_broker": 0,
+    "missing_ledger": 0,
+    "invalid": 0,
+    "mismatch_count": 0,
+    "items": [
+      {
+        "symbol": "159559",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 20000.0,
+        "ledger_value": 20000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159559",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 0.0,
+        "ledger_value": 0.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159852",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 10000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159852",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 10000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "513050",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "513050",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      }
+    ]
+  },
+  "mismatch": {
+    "account_id": "E2E014",
+    "snapshot_id": "E2E014-000001-342fedf1",
+    "timestamp": "2026-09-17T10:41:47+08:00",
+    "status": "MISMATCH",
+    "outcome": "FAIL",
+    "checked": 6,
+    "matched": 4,
+    "mismatch": 2,
+    "missing_broker": 0,
+    "missing_ledger": 0,
+    "invalid": 0,
+    "mismatch_count": 2,
+    "items": [
+      {
+        "symbol": "159559",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 20000.0,
+        "ledger_value": 20000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159559",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 0.0,
+        "ledger_value": 0.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159852",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 8000.0,
+        "difference": 2000.0,
+        "status": "MISMATCH"
+      },
+      {
+        "symbol": "159852",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 8000.0,
+        "difference": 2000.0,
+        "status": "MISMATCH"
+      },
+      {
+        "symbol": "513050",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "513050",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      }
+    ]
+  },
+  "restored": {
+    "account_id": "E2E014",
+    "snapshot_id": "E2E014-000001-4957dc90",
+    "timestamp": "2026-09-17T10:41:47+08:00",
+    "status": "RECONCILED",
+    "outcome": "PASS",
+    "checked": 6,
+    "matched": 6,
+    "mismatch": 0,
+    "missing_broker": 0,
+    "missing_ledger": 0,
+    "invalid": 0,
+    "mismatch_count": 0,
+    "items": [
+      {
+        "symbol": "159559",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 20000.0,
+        "ledger_value": 20000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159559",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 0.0,
+        "ledger_value": 0.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159852",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 10000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "159852",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 10000.0,
+        "ledger_value": 10000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "513050",
+        "check": "POSITION_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      },
+      {
+        "symbol": "513050",
+        "check": "AVAILABLE_QUANTITY",
+        "broker_value": 5000.0,
+        "ledger_value": 5000.0,
+        "difference": 0.0,
+        "status": "RECONCILED"
+      }
+    ]
+  },
+  "blocked_while_mismatched": true,
+  "ledger_untouched": "8000.000000"
+}

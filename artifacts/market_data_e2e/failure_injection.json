@@ -1,0 +1,122 @@
+{
+  "commit": "017",
+  "scenarios": [
+    {
+      "scenario": "G5/INVALID_PRICE",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (INVALID_PRICE)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/FUTURE_TIMESTAMP",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (FUTURE_TIMESTAMP)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/TIMESTAMP_REGRESSION",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (TIMESTAMP_REGRESSION)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/DUPLICATE",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (DUPLICATE)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/INVALID_BID_ASK",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (CROSSED_BOOK)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/INVALID_VOLUME",
+      "expected": "quality-gate",
+      "observed": "quality gate rejected 159852: INVALID (INVALID_VOLUME)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/UNKNOWN_SYMBOL",
+      "expected": "validator",
+      "observed": "cannot infer exchange for code '999999' (expected 15/16/50/51 prefix)",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G5/STALE",
+      "expected": "accepted-then-not-tradable",
+      "observed": "STALE",
+      "order_blocked": null
+    },
+    {
+      "scenario": "G6/cache-unavailable",
+      "expected": "DEGRADED + trading blocked",
+      "observed": "DEGRADED",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G12/adapter-disconnect",
+      "expected": "sync ERROR + orders blocked",
+      "observed": "ERROR",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G14/position-mismatch",
+      "expected": "MISMATCH + new orders blocked",
+      "observed": "MISMATCH",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G15/EXCESS_NOTIONAL",
+      "expected": "shadow order blocked",
+      "observed": "SHADOW_EXCESS_NOTIONAL",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G15/INSUFFICIENT_CASH",
+      "expected": "shadow order blocked",
+      "observed": "SHADOW_INSUFFICIENT_CASH",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G15/SESSION_CLOSED",
+      "expected": "shadow order blocked",
+      "observed": "SHADOW_FEED_NOT_READY",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G15/SHORT_SELL",
+      "expected": "shadow order blocked",
+      "observed": "SHADOW_SHORT_SELL_BLOCKED",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G18-A/broker-link-down",
+      "expected": "FEED_NOT_READY",
+      "observed": "SHADOW_FEED_NOT_READY",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G18-B/cache-down (feed=DEGRADED)",
+      "expected": "FEED_NOT_READY",
+      "observed": "SHADOW_FEED_NOT_READY",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G18-C/account-sync-error",
+      "expected": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+      "observed": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+      "order_blocked": true
+    },
+    {
+      "scenario": "G18-D/reconciliation-MISMATCH",
+      "expected": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+      "observed": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+      "order_blocked": true
+    }
+  ],
+  "count": 19,
+  "order_level": 11,
+  "all_orders_blocked": true
+}

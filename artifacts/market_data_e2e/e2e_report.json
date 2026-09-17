@@ -1,0 +1,785 @@
+{
+  "commit": "017",
+  "suite": "market-data",
+  "gate": "PASS",
+  "passed": 20,
+  "total": 20,
+  "generated_at": "2026-09-17T02:41:51.675683+00:00",
+  "reproducibility": {
+    "verified_by": "G19",
+    "decision_digest": "62578348273351400cbc85658096ad9e81a9a54b4cf3a03da8dc2c44774a2cde",
+    "provider_digest": "89bf6f2fd0359065bfa6de5a1114828caff9a1d0c4d642f26cc05e1299649d71",
+    "stable": [
+      "every gate verdict and its detail",
+      "shadow decisions: orders, fills, positions, pnl, events (ids normalised)",
+      "the simulated vendor stream (seeded)"
+    ],
+    "not_reproducible_by_design": [
+      {
+        "what": "order / fill / intent ids",
+        "why": "uuid4 — uniqueness is the requirement, not repeatability",
+        "checked_by": "G19: declared namespace shape, and no id shared between runs",
+        "observed": [
+          "SHIN-8E7456BA58BB",
+          "SHIN-961ED21627BF"
+        ]
+      },
+      {
+        "what": "account-sync latency",
+        "why": "it measures the real broker round trip, i.e. wall time, which a replay cannot pin",
+        "checked_by": "G12: the sync is nevertheless fresh and reconciled"
+      }
+    ],
+    "cli_flags_refused": [
+      "--live",
+      "--real-order",
+      "--broker-order"
+    ]
+  },
+  "virtual_session": {
+    "date": "2026-09-08",
+    "time": "10:31",
+    "timezone": "CST",
+    "phase": "CONTINUOUS_AM"
+  },
+  "gates": [
+    {
+      "gate": "G1",
+      "name": "Architecture",
+      "passed": true,
+      "detail": "dependency direction clean; no Shadow→broker-order edge",
+      "duration_ms": 5223.2,
+      "data": {
+        "broker_package_contents": [
+          "__init__.py",
+          "account\\__init__.py",
+          "account\\base.py",
+          "account\\broker_account.py",
+          "account\\models.py",
+          "account\\normalizer.py"
+        ],
+        "forbidden_edges": [],
+        "components_present": [
+          "MarketDataService",
+          "PaperMarketFeed",
+          "ShadowTradingService"
+        ]
+      }
+    },
+    {
+      "gate": "G2",
+      "name": "Instrument Master",
+      "passed": true,
+      "detail": "11/11 instruments loaded, mapping correct",
+      "duration_ms": 0.1,
+      "data": {
+        "loaded": 11,
+        "symbols": [
+          "159559",
+          "159569",
+          "159852",
+          "159871",
+          "159890",
+          "161116",
+          "165520",
+          "501225",
+          "513050",
+          "513310",
+          "515880"
+        ],
+        "types": {
+          "159559": "ETF",
+          "159569": "ETF",
+          "159852": "ETF",
+          "159871": "ETF",
+          "159890": "ETF",
+          "161116": "QDII-LOF",
+          "165520": "LOF",
+          "501225": "QDII-LOF",
+          "513050": "QDII-ETF",
+          "513310": "QDII-ETF",
+          "515880": "ETF"
+        }
+      }
+    },
+    {
+      "gate": "G3",
+      "name": "Realtime Quote",
+      "passed": true,
+      "detail": "quote coverage 11/11; all fields valid",
+      "duration_ms": 4.4,
+      "data": {
+        "coverage": "11/11",
+        "quotes": {
+          "159559": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "0.820",
+            "ask": "0.821",
+            "last": "0.821",
+            "volume": 19700,
+            "turnover": "16173.70"
+          },
+          "165520": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.319",
+            "ask": "1.320",
+            "last": "1.320",
+            "volume": 19400,
+            "turnover": "25608.00"
+          },
+          "513310": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "2.345",
+            "ask": "2.346",
+            "last": "2.346",
+            "volume": 31000,
+            "turnover": "72726.00"
+          },
+          "159871": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.151",
+            "ask": "1.152",
+            "last": "1.152",
+            "volume": 48600,
+            "turnover": "55987.20"
+          },
+          "159852": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.050",
+            "ask": "1.051",
+            "last": "1.051",
+            "volume": 24100,
+            "turnover": "25329.10"
+          },
+          "513050": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.617",
+            "ask": "1.618",
+            "last": "1.618",
+            "volume": 24500,
+            "turnover": "39641.00"
+          },
+          "515880": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "0.688",
+            "ask": "0.689",
+            "last": "0.689",
+            "volume": 27500,
+            "turnover": "18947.50"
+          },
+          "501225": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.480",
+            "ask": "1.481",
+            "last": "1.481",
+            "volume": 31000,
+            "turnover": "45911.00"
+          },
+          "159890": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "0.947",
+            "ask": "0.948",
+            "last": "0.948",
+            "volume": 16100,
+            "turnover": "15262.80"
+          },
+          "159569": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.277",
+            "ask": "1.278",
+            "last": "1.278",
+            "volume": 16700,
+            "turnover": "21342.60"
+          },
+          "161116": {
+            "timestamp": "2026-09-08T10:31:00+08:00",
+            "bid": "1.048",
+            "ask": "1.049",
+            "last": "1.049",
+            "volume": 32700,
+            "turnover": "34302.30"
+          }
+        }
+      }
+    },
+    {
+      "gate": "G4",
+      "name": "Trading Session",
+      "passed": true,
+      "detail": "phases, weekend, holiday and makeup days all correct; lunch break is a phase, not a data gap",
+      "duration_ms": 0.1,
+      "data": {
+        "observed": {
+          "09:20 auction": "AUCTION",
+          "09:31 continuous AM": "CONTINUOUS_AM",
+          "12:00 lunch break": "LUNCH_BREAK",
+          "14:00 continuous PM": "CONTINUOUS_PM",
+          "15:30 post close": "POST_CLOSE",
+          "trading-day 2026-09-08 (ordinary Tuesday)": true,
+          "trading-day 2026-09-12 (Saturday, no makeup)": false,
+          "trading-day 2026-10-01 (National Day holiday)": false,
+          "trading-day 2026-02-28 (makeup trading day (Sat))": true,
+          "trading-day 2026-10-10 (makeup trading day (Sat))": true
+        }
+      }
+    },
+    {
+      "gate": "G5",
+      "name": "Quality Gate",
+      "passed": true,
+      "detail": "7/7 anomaly classes refused at the gate or the validator; 1 flagged STALE (in the stream, not tradable); clean quote still tradable",
+      "duration_ms": 1.3,
+      "data": {
+        "rejected": {
+          "INVALID_PRICE": "quality gate rejected 159852: INVALID (INVALID_PRICE)",
+          "FUTURE_TIMESTAMP": "quality gate rejected 159852: INVALID (FUTURE_TIMESTAMP)",
+          "TIMESTAMP_REGRESSION": "quality gate rejected 159852: INVALID (TIMESTAMP_REGRESSION)",
+          "DUPLICATE": "quality gate rejected 159852: INVALID (DUPLICATE)",
+          "INVALID_BID_ASK": "quality gate rejected 159852: INVALID (CROSSED_BOOK)",
+          "INVALID_VOLUME": "quality gate rejected 159852: INVALID (INVALID_VOLUME)",
+          "UNKNOWN_SYMBOL": "cannot infer exchange for code '999999' (expected 15/16/50/51 prefix)"
+        },
+        "flagged": {
+          "STALE": "STALE"
+        },
+        "refused_by": {
+          "INVALID_PRICE": "quality-gate",
+          "FUTURE_TIMESTAMP": "quality-gate",
+          "TIMESTAMP_REGRESSION": "quality-gate",
+          "DUPLICATE": "quality-gate",
+          "INVALID_BID_ASK": "quality-gate",
+          "INVALID_VOLUME": "quality-gate",
+          "UNKNOWN_SYMBOL": "validator"
+        },
+        "quarantine_count": 6,
+        "gate_stats": {
+          "evaluated": 11,
+          "rejected": 6,
+          "by_status": {
+            "FRESH": 4,
+            "STALE": 1,
+            "INVALID": 6
+          }
+        }
+      }
+    },
+    {
+      "gate": "G6",
+      "name": "Redis Cache",
+      "passed": true,
+      "detail": "quote/bar/session/quality cached; failure → DEGRADED + blocked; recovery → rehydrate → HEALTHY",
+      "duration_ms": 1.0,
+      "data": {
+        "healthy": {
+          "status": "HEALTHY",
+          "backend": "memory",
+          "enabled": true,
+          "consecutive_failures": 0,
+          "last_error": null,
+          "last_error_at": null,
+          "trading_allowed": true
+        },
+        "degraded": {
+          "status": "DEGRADED",
+          "backend": "flaky-memory",
+          "enabled": true,
+          "consecutive_failures": 3,
+          "last_error": "injected failure in ping",
+          "last_error_at": "2026-09-08T10:31:00+08:00",
+          "trading_allowed": false
+        },
+        "recovered": {
+          "status": "HEALTHY",
+          "backend": "flaky-memory",
+          "enabled": true,
+          "consecutive_failures": 0,
+          "last_error": "injected failure in ping",
+          "last_error_at": "2026-09-08T10:31:00+08:00",
+          "trading_allowed": true
+        }
+      }
+    },
+    {
+      "gate": "G7",
+      "name": "Historical Merge",
+      "passed": true,
+      "detail": "cold start seamless across UTC/CST; realtime owns the junction; closed conflict → revision; lunch ≠ gap; holes stay holes",
+      "duration_ms": 9.3,
+      "data": {
+        "cold_start": {
+          "first": "2026-09-08T09:30:00+08:00",
+          "last": "2026-09-08T10:36:00+08:00",
+          "sources": [
+            "HISTORICAL",
+            "REALTIME"
+          ],
+          "counts": {
+            "historical": 65,
+            "realtime": 2,
+            "total": 67,
+            "overlaps": 0
+          },
+          "junction": {
+            "historical_last": "2026-09-08T02:34:00+00:00",
+            "realtime_first": "2026-09-08T10:35:00+08:00",
+            "mode": "MERGED",
+            "seamless": true
+          }
+        },
+        "history_only": {
+          "bars": 10,
+          "mode": "COLD"
+        },
+        "conflict": {
+          "revisions": 1,
+          "winner": "REALTIME",
+          "realtime_close": "1.050"
+        },
+        "lunch": [
+          "2026-09-08T11:29:00+08:00",
+          "2026-09-08T13:00:00+08:00",
+          "2026-09-08T13:01:00+08:00"
+        ],
+        "hole": {
+          "bars": [
+            "2026-09-08T10:31:00+08:00",
+            "2026-09-08T10:32:00+08:00",
+            "2026-09-08T10:34:00+08:00",
+            "2026-09-08T10:35:00+08:00"
+          ],
+          "gaps": [
+            "159890_202609081033"
+          ]
+        }
+      }
+    },
+    {
+      "gate": "G8",
+      "name": "Paper Trading",
+      "passed": true,
+      "detail": "BUY@ask / SELL@bid simulated from real quotes; lot size enforced; no quote → no fill; PAPER disclaimer present",
+      "duration_ms": 1.4,
+      "data": {
+        "feed_state": "READY"
+      }
+    },
+    {
+      "gate": "G9",
+      "name": "Replay",
+      "passed": true,
+      "detail": "deterministic replay: identical event sequence at 1x/10x/100x and across repeated manual runs",
+      "duration_ms": 250.1,
+      "data": {
+        "digests": {
+          "1x": "55fad844b2fd34b8ac5ed6efdd22c96b5be5befe",
+          "10x": "55fad844b2fd34b8ac5ed6efdd22c96b5be5befe",
+          "100x": "55fad844b2fd34b8ac5ed6efdd22c96b5be5befe"
+        },
+        "events": 45
+      }
+    },
+    {
+      "gate": "G10",
+      "name": "Monitoring",
+      "passed": true,
+      "detail": "14/14 metrics declared by their exported names; sync path never raises; HEALTHY/DEGRADED/BLOCKED/OFFLINE vocabulary intact",
+      "duration_ms": 235.0,
+      "data": {
+        "declared": {
+          "QUOTES_RECEIVED": "icyquant_market_data_quotes_received_total",
+          "BARS_RECEIVED": "icyquant_market_data_bars_received_total",
+          "QUOTE_AGE": "icyquant_market_data_quote_age_seconds",
+          "LATENCY": "icyquant_market_data_latency_seconds",
+          "LATENCY_P95": "icyquant_market_data_latency_p95_seconds",
+          "STALE_TOTAL": "icyquant_market_data_stale_total",
+          "INVALID_TOTAL": "icyquant_market_data_invalid_total",
+          "DUPLICATE_TOTAL": "icyquant_market_data_duplicate_total",
+          "GAP_TOTAL": "icyquant_market_data_gap_total",
+          "QUARANTINE_TOTAL": "icyquant_market_data_quarantine_total",
+          "RECONNECT_TOTAL": "icyquant_market_data_reconnect_total",
+          "ERRORS_TOTAL": "icyquant_market_data_errors_total",
+          "CACHE_HIT_TOTAL": "icyquant_market_data_cache_hit_total",
+          "CACHE_MISS_TOTAL": "icyquant_market_data_cache_miss_total"
+        },
+        "health_states": [
+          "BLOCKED",
+          "DEGRADED",
+          "HEALTHY",
+          "OFFLINE"
+        ],
+        "quotes_accepted": 1,
+        "quote_age_seconds": 0.0,
+        "prometheus_client": true
+      }
+    },
+    {
+      "gate": "G11",
+      "name": "Broker Adapter",
+      "passed": true,
+      "detail": "connect → subscribe → stream; disconnect → reconnect → RESUBSCRIBE → quotes resumed",
+      "duration_ms": 1.4,
+      "data": {
+        "subscribe_calls": 2,
+        "quotes_before": [
+          "159559",
+          "165520",
+          "513310"
+        ],
+        "quotes_after": [
+          "159852",
+          "159871",
+          "513310"
+        ]
+      }
+    },
+    {
+      "gate": "G12",
+      "name": "Account Sync",
+      "passed": true,
+      "detail": "balance fields + latency captured; 3 snapshots retained in order; disconnect → ERROR → orders blocked",
+      "duration_ms": 5.4,
+      "data": {
+        "snapshots": 3,
+        "sequences": [
+          3,
+          2,
+          1
+        ],
+        "state_after_disconnect": "ERROR"
+      }
+    },
+    {
+      "gate": "G13",
+      "name": "Position Sync",
+      "passed": true,
+      "detail": "3 positions synced; quantity/available/frozen/cost present; T+1 20000/0/20000 preserved; valuation only from real prices",
+      "duration_ms": 1.4,
+      "data": {
+        "symbols": [
+          "159559",
+          "159852",
+          "513050"
+        ],
+        "t_plus_1": {
+          "symbol": "159559",
+          "quantity": "20000.000000",
+          "available_quantity": "0.000000",
+          "frozen_quantity": "20000.000000"
+        }
+      }
+    },
+    {
+      "gate": "G14",
+      "name": "Reconciliation",
+      "passed": true,
+      "detail": "10000/10000 → RECONCILED; 10000/8000 → MISMATCH + orders blocked; neither side auto-edited; restore → RECONCILED",
+      "duration_ms": 4.1,
+      "data": {
+        "matched_items": 6,
+        "mismatch_items": 2
+      }
+    },
+    {
+      "gate": "G15",
+      "name": "Shadow",
+      "passed": true,
+      "detail": "signal → intent → gate → simulated fill @ask → shadow position → PnL; broker read-only; 4 block codes reachable",
+      "duration_ms": 7.0,
+      "data": {
+        "order_id": "SHD-20260908-000001",
+        "fill_id": "SHDF-20260908-000002",
+        "pnl": {
+          "cash": "999789.60000",
+          "equity": "999999.60000",
+          "total_pnl": "-0.40000"
+        },
+        "decision_trail": [
+          "SESSION_STARTED",
+          "SIGNAL",
+          "ORDER_INTENT",
+          "RISK_DECISION",
+          "ORDER_ACCEPTED",
+          "FILL",
+          "POSITION_UPDATE",
+          "PNL_UPDATE"
+        ],
+        "blocked": {
+          "EXCESS_NOTIONAL": "SHADOW_EXCESS_NOTIONAL",
+          "SHORT_SELL": "SHADOW_SHORT_SELL_BLOCKED",
+          "INSUFFICIENT_CASH": "SHADOW_INSUFFICIENT_CASH",
+          "SESSION_CLOSED": "SHADOW_FEED_NOT_READY"
+        }
+      }
+    },
+    {
+      "gate": "G16",
+      "name": "Dashboard",
+      "passed": true,
+      "detail": "20 dashboard endpoints present; PAPER / SHADOW banners rendered",
+      "duration_ms": 3900.4,
+      "data": {
+        "routes_checked": 20,
+        "missing": {},
+        "api_route_total": 111
+      }
+    },
+    {
+      "gate": "G17",
+      "name": "Security",
+      "passed": true,
+      "detail": "0 broker order calls; SHD-/SHDF-/SHIN- namespaces; gate refuses LIVE/PAPER; CLI refuses --live",
+      "duration_ms": 170.1,
+      "data": {
+        "shadow_broker_imports": [],
+        "shadow_order_symbols": [],
+        "broker_adapter_order_surface": [],
+        "broker_order_modules": [],
+        "gate_mode": "SHADOW",
+        "cli_flags_rejected": [
+          "--live",
+          "--real-order",
+          "--broker-order"
+        ],
+        "order_id": "SHD-20260908-000001",
+        "fill_id": "SHDF-20260908-000002",
+        "intent_id": "SHIN-5B63E5644C8F",
+        "broker_objects_reachable": [],
+        "broker_order_api_calls": 0
+      }
+    },
+    {
+      "gate": "G18",
+      "name": "Failure Recovery",
+      "passed": true,
+      "detail": "4 injected faults (broker link / cache / account sync / reconciliation) each blocked new shadow orders and each recovered",
+      "duration_ms": 16.8,
+      "data": {
+        "A_broker_link": {
+          "before": "FILLED",
+          "during": "REJECTED",
+          "reason": "SHADOW_FEED_NOT_READY",
+          "after": "FILLED",
+          "reconnects": 0,
+          "quotes_after_recovery": 6
+        },
+        "B_cache": {
+          "degraded_state": "DEGRADED",
+          "during": "REJECTED",
+          "reason": "SHADOW_FEED_NOT_READY",
+          "recovered_state": "READY",
+          "after": "FILLED",
+          "backend_failures": 2
+        },
+        "C_account_sync": {
+          "during": "REJECTED",
+          "reason": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+          "after": "FILLED",
+          "state": "SYNCED"
+        },
+        "D_reconciliation": {
+          "mismatch_status": "MISMATCH",
+          "during": "REJECTED",
+          "reason": "SHADOW_ACCOUNT_SYNC_BLOCKED",
+          "after": "FILLED",
+          "healed_status": "RECONCILED"
+        }
+      }
+    },
+    {
+      "gate": "G19",
+      "name": "Determinism",
+      "passed": true,
+      "detail": "3 shadow sessions → 1 digest; 2 seeded provider walks → 1 digest; unique id namespaces; no wall clock in the decision path",
+      "duration_ms": 18.1,
+      "data": {
+        "shadow_sha256": "62578348273351400cbc85658096ad9e81a9a54b4cf3a03da8dc2c44774a2cde",
+        "shadow_runs": 3,
+        "shadow_unique_digests": 1,
+        "ids_per_run": 2,
+        "id_sample": [
+          "SHIN-8E7456BA58BB",
+          "SHIN-961ED21627BF"
+        ],
+        "provider_seed": 20260908,
+        "provider_sha256": "89bf6f2fd0359065bfa6de5a1114828caff9a1d0c4d642f26cc05e1299649d71",
+        "provider_frames": 33,
+        "equity": "999999.60000"
+      }
+    },
+    {
+      "gate": "G20",
+      "name": "Final E2E",
+      "passed": true,
+      "detail": "the full chain ran end to end — 10/10 stages, equity 1000000.00000",
+      "duration_ms": 11.5,
+      "data": {
+        "stages": 10,
+        "passed": 10,
+        "chain": [
+          {
+            "stage": "1 provider→adapter→quote",
+            "ok": true,
+            "detail": "11/11 instruments streamed (STREAMING/SUBSCRIBED)",
+            "evidence": {
+              "instruments": 11,
+              "state": "STREAMING",
+              "subscription": "SUBSCRIBED"
+            }
+          },
+          {
+            "stage": "2 quote→quality gate",
+            "ok": true,
+            "detail": "11/11 quotes passed the gate as FRESH",
+            "evidence": {
+              "ingested": 11,
+              "fresh": 11
+            }
+          },
+          {
+            "stage": "3 quality→cache",
+            "ok": true,
+            "detail": "11 writes, 11 warm reads",
+            "evidence": {
+              "writes": 11,
+              "hits": 11
+            }
+          },
+          {
+            "stage": "4 merged bars",
+            "ok": true,
+            "detail": "30 bars (29 historical + 1 realtime) from ['HISTORICAL', 'REALTIME']",
+            "evidence": {
+              "bars": 30,
+              "counts": {
+                "historical": 29,
+                "realtime": 1,
+                "total": 30,
+                "overlaps": 0
+              },
+              "origins": [
+                "HISTORICAL",
+                "REALTIME"
+              ],
+              "gaps": 0,
+              "junction": {
+                "historical_last": "2026-09-08T02:30:00+00:00",
+                "realtime_first": "2026-09-08T10:31:00+08:00",
+                "mode": "MERGED",
+                "seamless": true
+              }
+            }
+          },
+          {
+            "stage": "5 paper order decision",
+            "ok": true,
+            "detail": "allowed=True fill=1.0500 from ASK",
+            "evidence": {
+              "allowed": true,
+              "fill_price": "1.0500",
+              "price_source": "ASK"
+            }
+          },
+          {
+            "stage": "6 shadow execution",
+            "ok": true,
+            "detail": "SHD-20260908-000001 FILLED → SHDF-20260908-000002 @ 1.05000",
+            "evidence": {
+              "order_id": "SHD-20260908-000001",
+              "fill_id": "SHDF-20260908-000002",
+              "fill_price": "1.05000"
+            }
+          },
+          {
+            "stage": "6b fill price = paper price",
+            "ok": true,
+            "detail": "shadow 1.05000 vs paper 1.0500",
+            "evidence": {
+              "shadow": "1.05000",
+              "paper": "1.0500"
+            }
+          },
+          {
+            "stage": "7 position & PnL",
+            "ok": true,
+            "detail": "200 shares, equity 1000000.00000, total 0.00000",
+            "evidence": {
+              "quantity": 200,
+              "cash": "999790.00000",
+              "equity": "1000000.00000",
+              "total_pnl": "0.00000",
+              "unrealized": "0.00000"
+            }
+          },
+          {
+            "stage": "8 account sync & reconcile",
+            "ok": true,
+            "detail": "159559 20000.000000/0.000000 (T+1), reconcile=RECONCILED",
+            "evidence": {
+              "positions": 3,
+              "t1_available": "0.000000",
+              "reconcile": "RECONCILED"
+            }
+          },
+          {
+            "stage": "9 dashboard read-back",
+            "ok": true,
+            "detail": "API LIVE ask=1.05 == fill 1.0500",
+            "evidence": {
+              "status": "LIVE",
+              "api_ask": "1.05",
+              "fill_price": "1.0500"
+            }
+          }
+        ],
+        "shadow": {
+          "mode": "SHADOW",
+          "real_orders_enabled": false,
+          "running": true,
+          "started_at": "2026-09-08T10:31:00+08:00",
+          "feed": {
+            "state": "OFFLINE",
+            "source": "LIVE"
+          },
+          "account_reference": {
+            "account_id": "E2E020",
+            "status": "SYNCED",
+            "connection_state": "CONNECTED",
+            "broker_connected": true,
+            "provider": "simulated",
+            "source": "BROKER",
+            "last_successful_sync": "2026-09-17T10:41:51.671682+08:00",
+            "last_sync_age_seconds": 0.001998,
+            "sync_latency_ms": 671.682,
+            "position_count": 3,
+            "mismatch_count": 0,
+            "invalid_count": 0,
+            "reconciliation_status": "RECONCILED",
+            "reconciliation_outcome": "PASS",
+            "new_orders_blocked": false,
+            "snapshot_count": 1,
+            "available": true
+          },
+          "counts": {
+            "orders": 1,
+            "fills": 1,
+            "rejected": 0,
+            "events": 8
+          },
+          "config": {
+            "enabled": true,
+            "initial_capital": "1000000",
+            "slippage_bps": 0.0,
+            "execution_latency_ms": 0,
+            "commission_bps": 0.0,
+            "max_clip_quantity": 0,
+            "max_order_notional": "200000",
+            "ledger_path": null
+          }
+        },
+        "reconciliation": "RECONCILED",
+        "equity": "1000000.00000",
+        "total_pnl": "0.00000"
+      }
+    }
+  ]
+}
