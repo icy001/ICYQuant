@@ -6,7 +6,7 @@
   "failed": 0,
   "pending": 4,
   "total": 8,
-  "generated_at": "2026-09-17T05:54:15.281245+00:00",
+  "generated_at": "2026-09-17T06:29:48.636748+00:00",
   "layer_a": {
     "G01": "PASS",
     "G02": "PASS",
@@ -20,9 +20,11 @@
     "G08": "PENDING"
   },
   "environment": {
-    "status": "UNAVAILABLE",
-    "lean_binary": "lean",
-    "detail": "'lean' not found on PATH",
+    "status": "OK",
+    "lean_binary": "/Users/xuehairong/miniforge3/bin/lean",
+    "version": "lean 1.0.229",
+    "returncode": 0,
+    "stderr": "/Users/xuehairong/miniforge3/lib/python3.13/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!\n  warnings.warn(",
     "docker": {
       "status": "OK",
       "server_version": "29.2.1"
@@ -31,7 +33,7 @@
   },
   "project_dir": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
   "contract_path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
-  "lean_command": "lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --parameter strategy_contract strategy_contract.json --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results",
+  "lean_command": "lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --data-provider-live Custom data only --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results",
   "gates": [
     {
       "gate": "G01",
@@ -39,7 +41,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "StrategyContract built, frozen, and serialisable",
-      "duration_ms": 0.026,
+      "duration_ms": 0.022,
       "data": {
         "intents": 1,
         "symbols": [
@@ -53,7 +55,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "2 valid inputs accepted, 21/21 invalid rejected",
-      "duration_ms": 0.079,
+      "duration_ms": 0.069,
       "data": {
         "invalid_cases": 21,
         "rejected": 21
@@ -65,7 +67,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "contract written to strategy_contract.json (559 bytes) and re-read identical",
-      "duration_ms": 125.41,
+      "duration_ms": 59.928,
       "data": {
         "path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
         "orders": 1
@@ -76,11 +78,11 @@
       "name": "LEAN Adapter health",
       "status": "PASS",
       "passed": true,
-      "detail": "LEAN CLI absent (expected on a fresh Mac) — the adapter still reports the environment correctly; Layer B stays PENDING; docker=OK",
-      "duration_ms": 73.202,
+      "detail": "LEAN CLI usable (lean 1.0.229); docker=OK",
+      "duration_ms": 229.34,
       "data": {
-        "status": "UNAVAILABLE",
-        "version": null,
+        "status": "OK",
+        "version": "lean 1.0.229",
         "docker": "OK"
       }
     },
@@ -89,11 +91,12 @@
       "name": "LEAN Algorithm 启动",
       "status": "PENDING",
       "passed": false,
-      "detail": "algorithm assets validate offline (class + hooks + lean.json + contract); starting LEAN needs an installed CLI and a paid QuantConnect organisation",
-      "duration_ms": 1.74,
+      "detail": "LEAN CLI present; re-run with --deploy to start the paper deployment (long-running)",
+      "duration_ms": 1.186,
       "data": {
         "algorithm_bytes": 4941,
-        "algorithm_language": "Python"
+        "algorithm_language": "Python",
+        "command": "lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --data-provider-live Custom data only --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results"
       }
     },
     {
@@ -101,8 +104,8 @@
       "name": "Paper Brokerage 接收订单",
       "status": "PENDING",
       "passed": false,
-      "detail": "no LEAN events supplied — pass --events <log|json> from a real paper deployment to grade this gate",
-      "duration_ms": 0.007,
+      "detail": "no LEAN events supplied — pass --events <log|json> from a real paper deployment to grade this gate (the deployment itself needs the CLI logged into a QuantConnect organisation)",
+      "duration_ms": 0.003,
       "data": {}
     },
     {
@@ -110,8 +113,8 @@
       "name": "OrderEvent / Fill 返回",
       "status": "PENDING",
       "passed": false,
-      "detail": "no LEAN events supplied — G07 needs a real fill to grade",
-      "duration_ms": 0.003,
+      "detail": "no LEAN events supplied — G07 needs a real fill to grade (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation)",
+      "duration_ms": 0.002,
       "data": {}
     },
     {
@@ -119,8 +122,8 @@
       "name": "ICYQuant Ledger/Reconcile",
       "status": "PENDING",
       "passed": false,
-      "detail": "no LEAN events supplied — G08 needs a real fill to post and reconcile",
-      "duration_ms": 0.002,
+      "detail": "no LEAN events supplied — G08 needs a real fill to post and reconcile (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation)",
+      "duration_ms": 0.003,
       "data": {}
     }
   ],

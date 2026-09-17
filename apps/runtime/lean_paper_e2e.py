@@ -19,7 +19,7 @@ The suite runs in two layers, and says which one it is in:
     G01 StrategyContract 创建      G03 ICYQuant → JSON
     G02 Contract validation        G04 LEAN Adapter health
 
-  Layer B (needs the LEAN CLI — a paid QuantConnect organisation)
+  Layer B (needs the LEAN CLI logged into a QuantConnect organisation)
     G05 LEAN Algorithm 启动        G07 OrderEvent / Fill 返回
     G06 Paper Brokerage 接收订单   G08 ICYQuant Ledger/Reconcile
 
@@ -507,7 +507,6 @@ class LeanPaperE2E:
         _dump(self.artifacts / CONTRACT_FILENAME, payload)
 
         command = self.adapter.build_live_command(
-            contract_path=self.contract_path,
             output_dir=self.artifacts / "live-results",
         )
         self.command = command
@@ -661,13 +660,13 @@ class LeanPaperE2E:
             return GateResult(
                 "", "", STATUS_PENDING,
                 "algorithm assets validate offline "
-                "(class + hooks + lean.json + contract); starting LEAN needs an "
-                "installed CLI and a paid QuantConnect organisation",
+                "(class + hooks + lean.json + contract); running it still needs "
+                "the CLI logged into a QuantConnect organisation (G05 cannot "
+                "grade a deploy the operator has not authorised)",
                 data=assets,
             )
 
         command = self.command or self.adapter.build_live_command(
-            contract_path=self.contract_path,
             output_dir=self.artifacts / "live-results",
         )
 
@@ -740,7 +739,8 @@ class LeanPaperE2E:
             return GateResult(
                 "", "", STATUS_PENDING,
                 "no LEAN events supplied — pass --events <log|json> from a real "
-                "paper deployment to grade this gate",
+                "paper deployment to grade this gate (the deployment itself "
+                "needs the CLI logged into a QuantConnect organisation)",
             )
 
         orders = self.order_events()
@@ -784,7 +784,9 @@ class LeanPaperE2E:
         if not self.events:
             return GateResult(
                 "", "", STATUS_PENDING,
-                "no LEAN events supplied — G07 needs a real fill to grade",
+                "no LEAN events supplied — G07 needs a real fill to grade "
+                "(requires a CLI deployment, which itself needs a logged-in "
+                "QuantConnect organisation)",
             )
 
         orders = self.order_events()
@@ -836,7 +838,8 @@ class LeanPaperE2E:
             return GateResult(
                 "", "", STATUS_PENDING,
                 "no LEAN events supplied — G08 needs a real fill to post and "
-                "reconcile",
+                "reconcile (requires a CLI deployment, which itself needs a "
+                "logged-in QuantConnect organisation)",
             )
 
         fills = self.fills()

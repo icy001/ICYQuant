@@ -154,9 +154,9 @@ class LeanAdapter:
     def build_live_command(
         self,
         *,
-        contract_path: Optional[Path] = None,
         output_dir: Optional[str | Path] = None,
         brokerage: str = "Paper Trading",
+        data_provider: str = "Custom data only",
     ) -> list[str]:
         """The ``lean live deploy`` argv for a paper deployment.
 
@@ -164,6 +164,15 @@ class LeanAdapter:
         money — but the local live-deployment workflow itself is gated
         behind a QuantConnect organisation, which is why P0-01 keeps
         this command *constructible* without being *required*.
+
+        Notes on the surface (verified against ``lean live deploy --help``):
+
+        * ``--parameter`` exists only on ``lean backtest`` — passing it on
+          ``lean live deploy`` is rejected.  The bridge no longer emits it;
+          the algorithm reads the contract from the project directory.
+        * ``--data-provider-live`` is required for a non-interactive deploy;
+          ``Custom data only`` keeps the command self-contained (no
+          external feed or API key) and matches P0-01's contract-driven flow.
         """
         command = [
             self.lean_binary,
@@ -172,16 +181,9 @@ class LeanAdapter:
             str(self.project_dir),
             "--brokerage",
             brokerage,
+            "--data-provider-live",
+            data_provider,
         ]
-
-        if contract_path is not None:
-            command.extend(
-                [
-                    "--parameter",
-                    "strategy_contract",
-                    Path(contract_path).name,
-                ]
-            )
 
         if output_dir is not None:
             command.extend(["--output", str(output_dir)])

@@ -358,7 +358,6 @@ def test_live_command_uses_paper_trading(tmp_path: Path) -> None:
     adapter = LeanAdapter(tmp_path / "project")
 
     command = adapter.build_live_command(
-        contract_path=tmp_path / "project" / CONTRACT_FILENAME,
         output_dir=tmp_path / "results",
     )
 
@@ -426,9 +425,11 @@ def test_g03_writes_both_the_project_file_and_the_artifact(
 def test_algorithm_assets_are_checked_without_lean(runner: LeanPaperE2E) -> None:
     result = runner.run(only=["G05"])[0]
 
-    # Without the CLI the gate must not claim the algorithm started.
+    # Whether the CLI is installed or not, a deploy that has not been
+    # started must keep G05 PENDING — the gate is gradable only via
+    # ``--deploy`` (which the operator triggers, not the suite).
     assert result.status == STATUS_PENDING
-    assert "offline" in result.detail
+    assert "deploy" in result.detail.lower()
 
 
 def test_missing_algorithm_asset_fails_offline(
