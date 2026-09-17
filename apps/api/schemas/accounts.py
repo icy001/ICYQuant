@@ -30,8 +30,17 @@ SyncHealthName = Literal["HEALTHY", "DEGRADED", "BLOCKED", "OFFLINE"]
 # ── errors ────────────────────────────────────────────────────────
 
 
-class ErrorResponse(BaseModel):
-    """Error envelope shared by every ``/api/accounts`` route (§15)."""
+class AccountsErrorResponse(BaseModel):
+    """Error envelope shared by every ``/api/accounts`` route (§15).
+
+    Named with the ``Accounts`` prefix on purpose.  FastAPI keys OpenAPI
+    components by class name, and two ``ErrorResponse`` classes in
+    different modules collide: both get re-keyed to their full module
+    path, so *neither* is published as ``ErrorResponse`` — which silently
+    broke ``/api/market-data``'s §13 envelope in the spec.  Distinct
+    class names keep the market-data envelope plain and give this one a
+    name that says where it belongs.
+    """
 
     error: str = Field(description="Machine-readable error code")
     detail: str = Field(description="Human-readable explanation")
@@ -291,7 +300,7 @@ __all__ = [
     "ReconciliationStatusName",
     "ReconciliationOutcomeName",
     "SyncHealthName",
-    "ErrorResponse",
+    "AccountsErrorResponse",
     "AccountSchema",
     "AccountListResponse",
     "BalanceSchema",

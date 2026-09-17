@@ -44,9 +44,9 @@ from apps.api.schemas.accounts import (
     AccountHealthResponse,
     AccountListResponse,
     AccountSchema,
+    AccountsErrorResponse,
     BalanceSchema,
     ConnectionActionResponse,
-    ErrorResponse,
     PositionListResponse,
     PositionSchema,
     ReconciliationItemSchema,
@@ -76,12 +76,30 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 _MAX_SNAPSHOT_LIMIT = 500
 
 _ERROR_RESPONSES: dict = {
-    400: {"model": ErrorResponse, "description": "Bad request / unknown provider"},
-    404: {"model": ErrorResponse, "description": "Unknown account or no snapshot"},
-    409: {"model": ErrorResponse, "description": "Account / broker state conflict"},
-    422: {"model": ErrorResponse, "description": "Broker payload invalid"},
-    502: {"model": ErrorResponse, "description": "Broker account request failed"},
-    503: {"model": ErrorResponse, "description": "Broker channel unavailable"},
+    400: {
+        "model": AccountsErrorResponse,
+        "description": "Bad request / unknown provider",
+    },
+    404: {
+        "model": AccountsErrorResponse,
+        "description": "Unknown account or no snapshot",
+    },
+    409: {
+        "model": AccountsErrorResponse,
+        "description": "Account / broker state conflict",
+    },
+    422: {
+        "model": AccountsErrorResponse,
+        "description": "Broker payload invalid",
+    },
+    502: {
+        "model": AccountsErrorResponse,
+        "description": "Broker account request failed",
+    },
+    503: {
+        "model": AccountsErrorResponse,
+        "description": "Broker channel unavailable",
+    },
 }
 
 
