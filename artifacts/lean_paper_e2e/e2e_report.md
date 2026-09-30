@@ -1,7 +1,7 @@
 # P0-01 — ICYQuant → LEAN Paper E2E
 
-- **Gate: PARTIAL** (4 PASS / 0 FAIL / 4 PENDING of 8)
-- Generated: `2026-09-17T07:37:53.786517+00:00`
+- **Gate: PARTIAL** (7 PASS / 0 FAIL / 1 PENDING of 8)
+- Generated: `2026-09-30T06:32:38.359424+00:00`
 - Project: `/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper`
 - Environment: LEAN CLI `OK`, Docker `OK`
 - Deploy command: `lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --data-provider-live Custom data only --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results`
@@ -13,9 +13,9 @@
 | G03 | ICYQuant → JSON | PASS | contract written to strategy_contract.json (559 bytes) and re-read identical |
 | G04 | LEAN Adapter health | PASS | LEAN CLI usable (lean 1.0.229); docker=OK |
 | G05 | LEAN Algorithm 启动 | PENDING | LEAN CLI present; re-run with --deploy to start the paper deployment (long-running) |
-| G06 | Paper Brokerage 接收订单 | PENDING | no LEAN events supplied — pass --events <log\|json> from a real paper deployment to grade this gate (the deployment itself needs the CLI logged into a QuantConnect organisation) |
-| G07 | OrderEvent / Fill 返回 | PENDING | no LEAN events supplied — G07 needs a real fill to grade (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation) |
-| G08 | ICYQuant Ledger/Reconcile | PENDING | no LEAN events supplied — G08 needs a real fill to post and reconcile (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation) |
+| G06 | Paper Brokerage 接收订单 | PASS | paper brokerage accepted 2 order event(s) from lean-native-json input |
+| G07 | OrderEvent / Fill 返回 | PASS | 1 fill event(s) mapped back to ICYQuant |
+| G08 | ICYQuant Ledger/Reconcile | PASS | 1 fill(s) posted to the ledger and 1 intent(s) reconciled |
 
 ## Next action
 

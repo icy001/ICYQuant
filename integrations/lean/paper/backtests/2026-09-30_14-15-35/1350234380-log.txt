@@ -1,0 +1,9 @@
+2013-10-07 00:00:00 Launching analysis for 1350234380 with LEAN Engine v2.5.0.0
+2013-10-07 00:00:00 ICYQUANT_CONTRACT_FILE path=/LeanCLI/strategy_contract.json
+2013-10-07 00:00:00 ICYQUANT_CONTRACT contract_version=1.0 strategy_id=ICYQUANT_P0_01 mode=paper symbols=SPY intents=1
+2013-10-07 00:00:00 Accurate daily end-times now enabled by default. See more at https://qnt.co/3YHaWHL. To disable it and use legacy daily bars set self.settings.daily_precise_end_time = False.
+2013-10-07 09:31:00 ICYQUANT_ORDER_EVENT order_id=1 signal_id=p0_buy_spy symbol=SPY status=1 quantity=100.0 fill_qty=0.0 fill_price=0.0
+2013-10-07 09:31:00 ICYQUANT_ORDER_EVENT order_id=1 signal_id=p0_buy_spy symbol=SPY status=3 quantity=100.0 fill_qty=100.0 fill_price=144.78172417
+2013-10-07 09:31:00 ICYQUANT_ORDER signal_id=p0_buy_spy order_id=1 symbol=SPY side=BUY quantity=100
+2026-09-29 16:00:00 ICYQUANT_END strategy_id=ICYQUANT_P0_01 orders=1 cash=985520.827583 invested=True
+2026-09-29 16:00:00 Algorithm Id:(1350234380) completed in 9.86 seconds at 257k data points per second. Processing total of 2,535,871 data points.

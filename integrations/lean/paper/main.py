@@ -21,7 +21,7 @@ from pathlib import Path
 CONTRACT_FILENAME = "strategy_contract.json"
 
 #: LEAN requires an explicit start date even for a live deployment.
-DEFAULT_START = (2026, 1, 1)
+DEFAULT_START = (2013, 10, 7)
 FALLBACK_CASH = 1_000_000.0
 
 
@@ -41,6 +41,9 @@ class ICYQuantPaperAlgorithm(QCAlgorithm):
             self.symbols[ticker] = security.Symbol
 
         self.intents = list(self.contract.get("orders", []))
+        # K01: signal_ids staged before MarketOrder() so the synchronous
+        # OnOrderEvent callback can claim them on first sight of the id.
+        self._pending_signals = []
         self.signal_by_order = {}
         self.executed = False
 
@@ -108,8 +111,16 @@ class ICYQuantPaperAlgorithm(QCAlgorithm):
             if str(intent["side"]).upper() == "SELL":
                 quantity = -quantity
 
+            # K01: stage the signal_id BEFORE submitting.  LEAN fires
+            # OnOrderEvent synchronously inside MarketOrder(), before the
+            # ticket (and its OrderId) is returned to us.
+            self._pending_signals.append(intent["signal_id"])
             ticket = self.MarketOrder(symbol, quantity)
-            self.signal_by_order[str(ticket.OrderId)] = intent["signal_id"]
+            order_id = str(ticket.OrderId)
+            if order_id not in self.signal_by_order:
+                # No callback claimed it; do it here so the mapping is
+                # always complete regardless of callback timing.
+                self.signal_by_order[order_id] = self._pending_signals.pop(0)
 
             self.Debug(
                 "ICYQUANT_ORDER "
@@ -123,12 +134,19 @@ class ICYQuantPaperAlgorithm(QCAlgorithm):
         self.executed = True
 
     def OnOrderEvent(self, order_event):
+        order_id = str(order_event.OrderId)
+
+        if order_id not in self.signal_by_order and self._pending_signals:
+            # K01: MarketOrder() triggers this callback synchronously before
+            # it returns; claim the staged signal_id for the new order.
+            self.signal_by_order[order_id] = self._pending_signals.pop(0)
+
         symbol = getattr(order_event, "Symbol", None)
 
         self.Debug(
             "ICYQUANT_ORDER_EVENT "
             f"order_id={order_event.OrderId} "
-            f"signal_id={self.signal_by_order.get(str(order_event.OrderId), '')} "
+            f"signal_id={self.signal_by_order.get(order_id, '')} "
             f"symbol={getattr(symbol, 'Value', '')} "
             f"status={order_event.Status} "
             f"quantity={order_event.Quantity} "

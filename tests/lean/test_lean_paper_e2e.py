@@ -668,11 +668,24 @@ def test_lean_json_has_no_fake_contract_field() -> None:
 
 
 def test_lean_json_no_user_specific_identity() -> None:
-    """P02-G06 — no operator's local QuantConnect identity is committed."""
+    """P02-G06 — no operator's *real* QuantConnect identity is committed.
+
+    LEAN CLI 1.0.229 requires ``organization-id`` in the project
+    ``lean.json`` to run at all (verified 2026-09-30: removing it makes
+    every ``lean backtest`` fail with "old Lean CLI root folder"), so the
+    all-zero GUID is the CLI's null/no-organisation state and names no
+    operator.  Any non-zero value is a real identity and must not be
+    committed.
+    """
     payload = json.loads((LEAN_PROJECT / "lean.json").read_text("utf-8"))
 
+    null_values = {"", "00000000-0000-0000-0000-000000000000"}
+
     for key in ("local-id", "cloud-id", "organization-id"):
-        assert key not in payload
+        value = payload.get(key)
+        assert value is None or str(value).strip() in null_values, (
+            f"real user identity committed: {key}={value!r}"
+        )
 
 
 def test_main_loads_contract_via_disk_path() -> None:

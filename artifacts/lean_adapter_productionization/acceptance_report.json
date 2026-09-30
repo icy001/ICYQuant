@@ -1,0 +1,107 @@
+{
+  "commit": "LEAN-ADAPTER-PRODUCTIONIZATION",
+  "title": "LEAN Adapter Productionization — Acceptance Report",
+  "gate_verdict": "PASS",
+  "status": "CLOSED",
+  "generated_at": "2026-09-30T15:00:00+08:00",
+  "predecessor": {
+    "p0_03_a": "PASS / CLOSED (2026-09-30, artifacts/lean_p0_03_a_acceptance/)",
+    "productionization_track": "K01 → K02 → K03 → Productionization Gate"
+  },
+  "verdicts": {
+    "K01_signal_binding": "PASS / CLOSED",
+    "K02_native_event_adapter": "PASS / CLOSED",
+    "K03_ledger": "PASS",
+    "K03_reconciliation": "PASS",
+    "productionization_gate": "PASS"
+  },
+  "scope": {
+    "in_scope": "Local execution → native event → ICYQuant → EXECUTION → Ledger → Reconciliation",
+    "out_of_scope": {
+      "item": "Live Paper Trading",
+      "status": "PENDING",
+      "reason": "QuantConnect Org / live data credentials 未配置 (lean config user-id / api-token 均 <not set>)。本地 Productionization 通过不构成 live paper trading 证明。",
+      "next_phase": "P0-03-B / Live Paper Trading"
+    }
+  },
+  "evidence": {
+    "k01_signal_binding": {
+      "verdict": "PASS",
+      "issue": "MarketOrder() 同步触发 OnOrderEvent 时 signal_by_order[order_id] 尚未写入，ICYQUANT_ORDER_EVENT 的 signal_id 为空",
+      "fix": "预暂存 signal_id + 回调首次见到 order_id 时认领 (integrations/lean/paper/main.py)",
+      "proof": "backtests/2026-09-30_14-15-35/1350234380-log.txt: Submitted(status=1) 与 Filled(status=3) 事件均携带 signal_id=p0_buy_spy",
+      "baseline_preserved": "fill_price=144.78172417, cash=985520.827583 与 P0-03-A 基线逐位一致"
+    },
+    "k02_native_event_adapter": {
+      "verdict": "PASS",
+      "component": "apps/adapters/lean/native_events.py (唯一 native→canonical 转换层)",
+      "boundary": "load_events() JSON 分支检测 native 格式 (source=lean-native-json)；map_order_event / event_mapper 零改动",
+      "signal_id_evidence_priority": [
+        "(i) order_id→signal_id 从同目录 *-log.txt 的 ICYQUANT_ORDER_EVENT 证据行",
+        "(ii) symbol→signal_id 从 strategy_contract.json (仅无歧义时)",
+        "(iii) 无法确定则留空，不猜测，由后续 Gate 暴露"
+      ],
+      "tests": "19/19 PASS (tests/lean/test_lean_native_events.py)"
+    },
+    "k03_signed_quantity": {
+      "verdict": "PASS",
+      "buy_100": "filled_quantity = +100",
+      "sell_100": "filled_quantity = -100 (K02 映射缺口补全：native fillQuantity 恒正，方向在 direction 字段)",
+      "partially_filled": "fillQuantity=50.5 原样保留，无整数截断；status 别名 partiallyFilled → PARTIALLY_FILLED"
+    },
+    "k03_commission_chain": {
+      "verdict": "PASS",
+      "chain": "native orderFeeAmount=1.0 → adapter commission=1.0 → G08 commission lookup → LedgerTrade.commission=1.0 → PostingEngine COMMISSION journal (4 entries, balanced)",
+      "note": "map_order_event 冻结不透传 commission；G08 从 adapter 产出的原始 canonical events 按 order_id 恢复"
+    },
+    "g07_execution": "PASS — 1 fill mapped to EXECUTION envelope (map_lean_event → ORDER_EVENT ∈ EXECUTION_EVENT_TYPES)",
+    "g08_ledger": "PASS — journal balanced=true, amount=14478.172417000, commission=1.0",
+    "g09_reconciliation": {
+      "verdict": "PASS",
+      "artifact": "artifacts/lean_paper_e2e/reconciliation.json",
+      "expected": {"p0_buy_spy": "100"},
+      "matched": [{"signal_id": "p0_buy_spy", "signed_quantity": "100"}],
+      "unexpected_fills": {},
+      "problems": [],
+      "reconciled": true
+    },
+    "real_artifact_chain": {
+      "input": "integrations/lean/paper/backtests/2026-09-30_14-15-35/1350234380-order-events.json (真实 K01 backtest 产物，未重跑)",
+      "cli_result": "7 PASS / 0 FAIL / 1 PENDING of 8 (python -m apps.runtime lean-paper --events ...)",
+      "event_source": "lean-native-json"
+    },
+    "test_suites": {
+      "k02": "19/19 PASS",
+      "k03": "10/10 PASS (tests/lean/test_lean_k03_regression.py)",
+      "frozen_suite": "86 passed / 4 failed",
+      "known_failures": {
+        "count": 4,
+        "classification": "既有问题，K03 范围外 (git stash 对照证明：移除 K02/K03 改动后 4 个失败原样存在)",
+        "root_cause": "P0-03-A 会话往 lean.json 写入 organization-id 占位值 00000000-0000-0000-0000-000000000000，触发 P02-G06 (lean.json 无 user-specific local-id)",
+        "affected_tests": [
+          "test_lean_json_no_user_specific_identity",
+          "test_p0_02_suite_grades_seven_of_eight",
+          "test_p0_02_report_is_separate_from_p0_01",
+          "test_cli_runs_the_p0_02_suite"
+        ]
+      },
+      "g05_live_deploy": "PENDING — 设计内：live deploy 需要 QC 组织登录，不作为本地 Productionization failure"
+    }
+  },
+  "canonical_event_contract": {
+    "documented_in": "apps/adapters/lean/native_events.py (模块 docstring，K03 固化)",
+    "required_fields": ["type", "order_id", "status", "quantity (signed)", "filled_quantity (signed, cumulative)"],
+    "optional_fields": ["symbol", "fill_price", "commission", "message", "timestamp"],
+    "invariants": [
+      "status ∈ {NEW, SUBMITTED, PARTIALLY_FILLED, FILLED, CANCELLED, REJECTED, UNKNOWN}，map_order_event 可原样 round-trip",
+      "SELL 的 quantity 与 filled_quantity 均为负",
+      "无 fill 的事件 fill_price=None, filled_quantity=0",
+      "signal_id 无法确定时留空，绝不猜测"
+    ]
+  },
+  "final_conclusion": {
+    "lean_adapter_productionization": "PASS / CLOSED",
+    "chain": "Local execution → native event → ICYQuant → EXECUTION → Ledger → Reconciliation (balanced=true, reconciled=true)",
+    "live_paper_trading": "PENDING (QuantConnect Org / live data credentials 未配置)"
+  }
+}

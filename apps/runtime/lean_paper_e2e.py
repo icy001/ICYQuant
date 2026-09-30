@@ -70,6 +70,12 @@ from apps.adapters.lean import LeanAdapter, StrategyContract, StrategyIntent
 from apps.adapters.lean.contract import CONTRACT_VERSION
 from apps.adapters.lean.event_mapper import map_lean_event
 from apps.adapters.lean.mapper import contract_to_lean_payload
+from apps.adapters.lean.native_events import (
+    adapt_native_order_events,
+    extract_signal_ids_from_contract,
+    extract_signal_ids_from_log,
+    is_native_lean_order_events,
+)
 from apps.adapters.lean.order_mapper import (
     FILL_STATUSES,
     map_order_event,
@@ -182,7 +188,14 @@ def parse_lean_debug_log(text: str) -> list[dict[str, Any]]:
 
 
 def load_events(path: Path) -> tuple[list[dict[str, Any]], str]:
-    """Load events from a JSON export or a raw LEAN log."""
+    """Load events from a JSON export or a raw LEAN log.
+
+    K02: a JSON payload shaped like LEAN's native ``*-order-events.json``
+    export is adapted to the canonical event contract right here at the
+    boundary.  signal_ids are recovered from sibling ``*-log.txt``
+    evidence first, from ``strategy_contract.json`` only as a fallback,
+    and stay empty when neither resolves — never guessed at.
+    """
     text = path.read_text(encoding="utf-8")
 
     try:
@@ -196,7 +209,63 @@ def load_events(path: Path) -> tuple[list[dict[str, Any]], str]:
     if not isinstance(payload, list):
         raise ValueError(f"unsupported events payload in {path}")
 
-    return [event for event in payload if isinstance(event, dict)], "json"
+    events = [event for event in payload if isinstance(event, dict)]
+
+    if is_native_lean_order_events(events):
+        order_lookup, symbol_lookup = _native_signal_lookups(path)
+
+        return (
+            adapt_native_order_events(
+                events,
+                signal_lookup=order_lookup,
+                symbol_signal_lookup=symbol_lookup,
+            ),
+            "lean-native-json",
+        )
+
+    return events, "json"
+
+
+def _native_signal_lookups(path: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """Evidence first, contract fallback second.
+
+    (i) ``order_id -> signal_id`` from every sibling ``*-log.txt`` of the
+    run that produced the order-events.json (K01 guarantees the
+    ``ICYQUANT_ORDER_EVENT`` lines carry the signal_id).
+    (ii) ``symbol -> signal_id`` from the strategy contract, only where a
+    symbol is unambiguous.
+    """
+    order_lookup: dict[str, str] = {}
+
+    for log_path in sorted(path.parent.glob("*-log.txt")):
+        try:
+            order_lookup.update(
+                extract_signal_ids_from_log(
+                    log_path.read_text(encoding="utf-8")
+                )
+            )
+        except OSError:
+            continue
+
+    symbol_lookup: dict[str, str] = {}
+
+    for candidate in (
+        path.parent / CONTRACT_FILENAME,
+        path.parent.parent / CONTRACT_FILENAME,
+    ):
+        if not candidate.exists():
+            continue
+
+        try:
+            symbol_lookup = extract_signal_ids_from_contract(
+                json.loads(candidate.read_text(encoding="utf-8"))
+            )
+        except (OSError, json.JSONDecodeError):
+            symbol_lookup = {}
+
+        break
+
+    return order_lookup, symbol_lookup
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -877,8 +946,23 @@ class LeanPaperE2E:
         engine = PostingEngine()
         journals: list[dict] = []
 
+        # K03: ``map_order_event`` deliberately narrows the event dict and
+        # drops ``commission`` (its contract is frozen), so recover the
+        # adapter-recovered orderFeeAmount from the raw canonical events.
+        commissions = {
+            str(event.get("order_id")): event.get("commission") or 0
+            for event in self.events
+            if isinstance(event, dict)
+        }
+
         for fill in fills:
-            trade = order_event_to_ledger_trade(fill)
+            # K03: forward the commission the native adapter recovered
+            # (orderFeeAmount), so the PostingEngine writes the
+            # COMMISSION journal entry the trade actually incurred.
+            trade = order_event_to_ledger_trade(
+                fill,
+                commission=commissions.get(str(fill.get("order_id")), 0),
+            )
 
             try:
                 journal = engine.post_trade(trade)
@@ -893,6 +977,7 @@ class LeanPaperE2E:
                     "quantity": str(trade.quantity),
                     "price": str(trade.price),
                     "amount": str(trade.quantity * trade.price),
+                    "commission": str(trade.commission),
                     "balanced": journal.is_balanced(),
                 }
             )
@@ -1049,6 +1134,14 @@ P02_GATE_NAMES = {
 #: Top-level keys a LEAN project's ``lean.json`` may legitimately carry.
 #: Anything outside this set is an ICYQuant invention that would look like
 #: official configuration without being honoured by the LEAN CLI.
+#:
+#: The engine-handler block below is not speculation: LEAN Engine v2.5.0.0
+#: refuses to start without these handler type names in the config (its
+#: MEF loader raises "Unable to locate any exports matching the requested
+#: typeName" when they are absent — verified in the P0-03-A session, which
+#: enumerated the real implementation classes from the engine DLLs via
+#: reflection).  ``data-folder``/``id`` are standard CLI keys;
+#: ``file-database-last-update`` is a timestamp the CLI itself writes.
 LEAN_PROJECT_KNOWN_KEYS = frozenset(
     {
         "algorithm-language",
@@ -1060,11 +1153,37 @@ LEAN_PROJECT_KNOWN_KEYS = frozenset(
         "environment",
         "environments",
         "data-queue-handler",
+        # Engine handler / provider keys required by LEAN v2.5.0.0
+        # (P0-03-A verified; see artifacts/lean_p0_03_a_acceptance/).
+        "data-folder",
+        "data-provider",
+        "data-channel-provider",
+        "history-provider",
+        "object-store",
+        "api-handler",
+        "messaging-handler",
+        "job-queue-handler",
+        "setup-handler",
+        "command-handler",
+        "results-destination-handler",
+        "map-file-provider",
+        "factor-file-provider",
+        "brokerage",
+        "transaction-handler",
+        # CLI-managed runtime state.
+        "id",
+        "file-database-last-update",
     }
 )
 
 #: Fields that pin one operator's local QuantConnect identity.
 LEAN_PROJECT_IDENTITY_KEYS = ("local-id", "cloud-id", "organization-id")
+
+#: The CLI's null identity: LEAN CLI 1.0.229 requires organization-id in
+#: the project lean.json to run (else "old Lean CLI root folder"), and the
+#: all-zero GUID is what "not logged into any organisation" looks like.
+#: It names no operator, so the identity gate tolerates exactly this.
+NULL_IDENTITY_VALUES = frozenset({"", "00000000-0000-0000-0000-000000000000"})
 
 
 def run_p0_02(repo_root: Path) -> list[GateResult]:
@@ -1274,7 +1393,18 @@ def run_p0_02(repo_root: Path) -> list[GateResult]:
         except json.JSONDecodeError as exc:
             return STATUS_FAIL, f"{LEAN_PROJECT_FILE} is not valid JSON: {exc}", {}
 
-        found = [key for key in LEAN_PROJECT_IDENTITY_KEYS if key in project]
+        # A key only pins an operator when it carries a *real* identity.
+        # LEAN CLI 1.0.229 refuses to run at all without organization-id in
+        # the project lean.json ("This is an old Lean CLI root folder" —
+        # verified 2026-09-30 by removing it and watching every backtest
+        # fail), so the all-zero GUID stays as the CLI's null/no-org
+        # state: it names nobody.  Any non-zero value still FAILs.
+        found = [
+            key
+            for key in LEAN_PROJECT_IDENTITY_KEYS
+            if key in project
+            and str(project[key]).strip() not in NULL_IDENTITY_VALUES
+        ]
 
         if found:
             return (
@@ -1285,7 +1415,8 @@ def run_p0_02(repo_root: Path) -> list[GateResult]:
 
         return (
             STATUS_PASS,
-            "no local-id / cloud-id / organization-id committed",
+            "no user-specific local-id / cloud-id / organization-id "
+            "(all-zero placeholders are the CLI's null state, not an identity)",
             {"keys": sorted(project)},
         )
 

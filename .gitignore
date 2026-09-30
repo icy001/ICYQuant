@@ -67,3 +67,9 @@ artifacts/lean_paper_e2e/live-results/
 integrations/lean/paper/config.json
 integrations/lean/paper/data/market-hours/
 integrations/lean/paper/data/symbol-properties/
+# LEAN backtest run output (log/code snapshots/result JSON written by
+# every `lean backtest`): runtime state, not source.  The K01 evidence
+# files (1350234380-log.txt + 1350234380-order-events.json of the
+# 2026-09-30_14-15-35 run) are force-added: the K02/K03 test suites and
+# the Productionization acceptance report grade against that real run.
+integrations/lean/paper/backtests/

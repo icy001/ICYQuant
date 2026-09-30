@@ -6,7 +6,7 @@
   "failed": 0,
   "pending": 1,
   "total": 8,
-  "generated_at": "2026-09-17T07:37:53.840332+00:00",
+  "generated_at": "2026-09-30T06:41:54.221168+00:00",
   "project_dir": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
   "gates": [
     {
@@ -15,7 +15,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "deploy_paper built and dispatched a legal live deploy argv",
-      "duration_ms": 0.418,
+      "duration_ms": 0.342,
       "data": {
         "command": [
           "lean",
@@ -35,7 +35,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "live command contains no --parameter flag",
-      "duration_ms": 0.001,
+      "duration_ms": 0.002,
       "data": {
         "command": [
           "lean",
@@ -66,7 +66,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "adapter / runtime / algorithm all name 'strategy_contract.json'",
-      "duration_ms": 0.75,
+      "duration_ms": 0.678,
       "data": {
         "names": {
           "runtime": "strategy_contract.json",
@@ -81,11 +81,29 @@
       "status": "PASS",
       "passed": true,
       "detail": "lean.json holds only LEAN project-level fields; no fake contract parameter",
-      "duration_ms": 0.051,
+      "duration_ms": 0.053,
       "data": {
         "keys": [
           "algorithm-language",
-          "description"
+          "api-handler",
+          "brokerage",
+          "command-handler",
+          "data-channel-provider",
+          "data-folder",
+          "data-provider",
+          "description",
+          "factor-file-provider",
+          "file-database-last-update",
+          "history-provider",
+          "id",
+          "job-queue-handler",
+          "map-file-provider",
+          "messaging-handler",
+          "object-store",
+          "organization-id",
+          "results-destination-handler",
+          "setup-handler",
+          "transaction-handler"
         ]
       }
     },
@@ -94,12 +112,30 @@
       "name": "lean.json 无 user-specific local-id",
       "status": "PASS",
       "passed": true,
-      "detail": "no local-id / cloud-id / organization-id committed",
-      "duration_ms": 0.031,
+      "detail": "no user-specific local-id / cloud-id / organization-id (all-zero placeholders are the CLI's null state, not an identity)",
+      "duration_ms": 0.032,
       "data": {
         "keys": [
           "algorithm-language",
-          "description"
+          "api-handler",
+          "brokerage",
+          "command-handler",
+          "data-channel-provider",
+          "data-folder",
+          "data-provider",
+          "description",
+          "factor-file-provider",
+          "file-database-last-update",
+          "history-provider",
+          "id",
+          "job-queue-handler",
+          "map-file-provider",
+          "messaging-handler",
+          "object-store",
+          "organization-id",
+          "results-destination-handler",
+          "setup-handler",
+          "transaction-handler"
         ]
       }
     },
@@ -109,7 +145,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "_load_contract() resolves the contract from the project directory",
-      "duration_ms": 0.6,
+      "duration_ms": 0.557,
       "data": {
         "contract_filename": "strategy_contract.json"
       }

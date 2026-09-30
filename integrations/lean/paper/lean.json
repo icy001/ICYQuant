@@ -1,6 +1,22 @@
 {
-  "algorithm-language": "Python",
-  "description": "ICYQuant P0-02 paper bridge: consumes strategy_contract.json written by apps/adapters/lean.",
-  "organization-id": "00000000-0000-0000-0000-000000000000",
-  "data-folder": "data"
+    "algorithm-language": "Python",
+    "description": "ICYQuant P0-02 paper bridge: consumes strategy_contract.json written by apps/adapters/lean.",
+    "id": "Local",
+    "data-folder": "data",
+    "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
+    "job-queue-handler": "QuantConnect.Queues.JobQueue",
+    "api-handler": "QuantConnect.Api.Api",
+    "messaging-handler": "QuantConnect.Messaging.EventMessagingHandler",
+    "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
+    "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
+    "object-store": "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
+    "data-channel-provider": "QuantConnect.Lean.Engine.DataFeeds.DataChannelProvider",
+    "history-provider": "QuantConnect.Lean.Engine.HistoricalData.SubscriptionDataReaderHistoryProvider",
+    "setup-handler": "QuantConnect.Lean.Engine.Setup.BacktestingSetupHandler",
+    "command-handler": "QuantConnect.Commands.FileCommandHandler",
+    "results-destination-handler": "QuantConnect.Lean.Engine.Results.BacktestingResultHandler",
+    "brokerage": "QuantConnect.Brokerages.Paper.PaperBrokerage",
+    "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler",
+    "file-database-last-update": "09/30/2026 10:51:14",
+    "organization-id": "00000000-0000-0000-0000-000000000000"
 }

@@ -2,11 +2,11 @@
   "commit": "P0-01",
   "suite": "lean-paper",
   "gate": "PARTIAL",
-  "passed": 4,
+  "passed": 7,
   "failed": 0,
-  "pending": 4,
+  "pending": 1,
   "total": 8,
-  "generated_at": "2026-09-17T07:37:53.786517+00:00",
+  "generated_at": "2026-09-30T06:32:38.359424+00:00",
   "layer_a": {
     "G01": "PASS",
     "G02": "PASS",
@@ -15,9 +15,9 @@
   },
   "layer_b": {
     "G05": "PENDING",
-    "G06": "PENDING",
-    "G07": "PENDING",
-    "G08": "PENDING"
+    "G06": "PASS",
+    "G07": "PASS",
+    "G08": "PASS"
   },
   "environment": {
     "status": "OK",
@@ -41,7 +41,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "StrategyContract built, frozen, and serialisable",
-      "duration_ms": 0.026,
+      "duration_ms": 0.021,
       "data": {
         "intents": 1,
         "symbols": [
@@ -55,7 +55,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "2 valid inputs accepted, 21/21 invalid rejected",
-      "duration_ms": 0.082,
+      "duration_ms": 0.069,
       "data": {
         "invalid_cases": 21,
         "rejected": 21
@@ -67,7 +67,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "contract written to strategy_contract.json (559 bytes) and re-read identical",
-      "duration_ms": 163.419,
+      "duration_ms": 121.682,
       "data": {
         "path": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper/strategy_contract.json",
         "orders": 1
@@ -79,7 +79,7 @@
       "status": "PASS",
       "passed": true,
       "detail": "LEAN CLI usable (lean 1.0.229); docker=OK",
-      "duration_ms": 267.749,
+      "duration_ms": 329.156,
       "data": {
         "status": "OK",
         "version": "lean 1.0.229",
@@ -92,9 +92,9 @@
       "status": "PENDING",
       "passed": false,
       "detail": "LEAN CLI present; re-run with --deploy to start the paper deployment (long-running)",
-      "duration_ms": 1.135,
+      "duration_ms": 1.251,
       "data": {
-        "algorithm_bytes": 4941,
+        "algorithm_bytes": 5949,
         "algorithm_language": "Python",
         "command": "lean live deploy /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper --brokerage Paper Trading --data-provider-live Custom data only --output /Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/lean_paper_e2e/live-results"
       }
@@ -102,29 +102,44 @@
     {
       "gate": "G06",
       "name": "Paper Brokerage 接收订单",
-      "status": "PENDING",
-      "passed": false,
-      "detail": "no LEAN events supplied — pass --events <log|json> from a real paper deployment to grade this gate (the deployment itself needs the CLI logged into a QuantConnect organisation)",
-      "duration_ms": 0.003,
-      "data": {}
+      "status": "PASS",
+      "passed": true,
+      "detail": "paper brokerage accepted 2 order event(s) from lean-native-json input",
+      "duration_ms": 0.324,
+      "data": {
+        "accepted": 2,
+        "statuses": [
+          "FILLED",
+          "SUBMITTED"
+        ],
+        "source": "lean-native-json"
+      }
     },
     {
       "gate": "G07",
       "name": "OrderEvent / Fill 返回",
-      "status": "PENDING",
-      "passed": false,
-      "detail": "no LEAN events supplied — G07 needs a real fill to grade (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation)",
-      "duration_ms": 0.002,
-      "data": {}
+      "status": "PASS",
+      "passed": true,
+      "detail": "1 fill event(s) mapped back to ICYQuant",
+      "duration_ms": 0.022,
+      "data": {
+        "fills": 1,
+        "orders": 1,
+        "source": "lean-native-json"
+      }
     },
     {
       "gate": "G08",
       "name": "ICYQuant Ledger/Reconcile",
-      "status": "PENDING",
-      "passed": false,
-      "detail": "no LEAN events supplied — G08 needs a real fill to post and reconcile (requires a CLI deployment, which itself needs a logged-in QuantConnect organisation)",
-      "duration_ms": 0.002,
-      "data": {}
+      "status": "PASS",
+      "passed": true,
+      "detail": "1 fill(s) posted to the ledger and 1 intent(s) reconciled",
+      "duration_ms": 577.023,
+      "data": {
+        "journals": 1,
+        "matched": 1,
+        "balanced": true
+      }
     }
   ],
   "next_action": "Layer B (G05–G08) is gradable once LEAN CLI is available: pip install lean, run `lean init`, then `python -m apps.runtime lean-paper --deploy`, or grade an existing run with `--events <lean log or events.json>`."
