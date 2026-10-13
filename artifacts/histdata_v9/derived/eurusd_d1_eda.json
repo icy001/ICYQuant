@@ -1,0 +1,279 @@
+{
+  "source": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet",
+  "m1_rows": 8999733,
+  "d1_rows": 8126,
+  "spike_bars_quarantined": 1,
+  "date_min": "2000-05-30",
+  "date_max": "2026-10-02",
+  "volume_all_zero": true,
+  "bars_per_day": {
+    "min": 1,
+    "median": 1273.0,
+    "max": 1440
+  },
+  "weekday_distribution": {
+    "Mon": 1370,
+    "Tue": 1368,
+    "Wed": 1369,
+    "Thu": 1329,
+    "Fri": 1322,
+    "Sat": 11,
+    "Sun": 1357
+  },
+  "first_bar_time_top5": {
+    "00:00": 5944,
+    "17:00": 1042,
+    "00:01": 364,
+    "00:02": 155,
+    "00:03": 86
+  },
+  "max_calendar_gap_days": 11,
+  "max_gap_at": "2001-01-21",
+  "per_year": [
+    {
+      "year": 2000,
+      "days": 182,
+      "bars": 143167,
+      "min_low": 0.8229,
+      "max_high": 0.9704,
+      "first_date": "2000-05-30",
+      "last_date": "2000-12-29"
+    },
+    {
+      "year": 2001,
+      "days": 275,
+      "bars": 230765,
+      "min_low": 0.8353,
+      "max_high": 0.9599,
+      "first_date": "2001-01-02",
+      "last_date": "2001-12-31"
+    },
+    {
+      "year": 2002,
+      "days": 251,
+      "bars": 213000,
+      "min_low": 0.8577,
+      "max_high": 1.0504,
+      "first_date": "2002-01-02",
+      "last_date": "2002-12-31"
+    },
+    {
+      "year": 2003,
+      "days": 308,
+      "bars": 316351,
+      "min_low": 1.0338,
+      "max_high": 1.2648,
+      "first_date": "2003-01-01",
+      "last_date": "2003-12-31"
+    },
+    {
+      "year": 2004,
+      "days": 318,
+      "bars": 328426,
+      "min_low": 1.1763,
+      "max_high": 1.3667,
+      "first_date": "2004-01-01",
+      "last_date": "2004-12-31"
+    },
+    {
+      "year": 2005,
+      "days": 315,
+      "bars": 315635,
+      "min_low": 1.1641,
+      "max_high": 1.3576,
+      "first_date": "2005-01-03",
+      "last_date": "2005-12-29"
+    },
+    {
+      "year": 2006,
+      "days": 310,
+      "bars": 307176,
+      "min_low": 1.1815,
+      "max_high": 1.337,
+      "first_date": "2006-01-02",
+      "last_date": "2006-12-29"
+    },
+    {
+      "year": 2007,
+      "days": 312,
+      "bars": 299782,
+      "min_low": 1.2868,
+      "max_high": 1.497,
+      "first_date": "2007-01-01",
+      "last_date": "2007-12-31"
+    },
+    {
+      "year": 2008,
+      "days": 313,
+      "bars": 347355,
+      "min_low": 1.2331,
+      "max_high": 1.6041,
+      "first_date": "2008-01-01",
+      "last_date": "2008-12-31"
+    },
+    {
+      "year": 2009,
+      "days": 312,
+      "bars": 355880,
+      "min_low": 1.2458,
+      "max_high": 1.5144,
+      "first_date": "2009-01-01",
+      "last_date": "2009-12-31"
+    },
+    {
+      "year": 2010,
+      "days": 312,
+      "bars": 352320,
+      "min_low": 1.1875,
+      "max_high": 1.4579,
+      "first_date": "2010-01-03",
+      "last_date": "2010-12-31"
+    },
+    {
+      "year": 2011,
+      "days": 311,
+      "bars": 358369,
+      "min_low": 1.28577,
+      "max_high": 1.4939,
+      "first_date": "2011-01-02",
+      "last_date": "2011-12-30"
+    },
+    {
+      "year": 2012,
+      "days": 312,
+      "bars": 372161,
+      "min_low": 1.20414,
+      "max_high": 1.34856,
+      "first_date": "2012-01-02",
+      "last_date": "2012-12-31"
+    },
+    {
+      "year": 2013,
+      "days": 312,
+      "bars": 370611,
+      "min_low": 1.2745,
+      "max_high": 1.38922,
+      "first_date": "2013-01-01",
+      "last_date": "2013-12-31"
+    },
+    {
+      "year": 2014,
+      "days": 312,
+      "bars": 366477,
+      "min_low": 1.20959,
+      "max_high": 1.39927,
+      "first_date": "2014-01-01",
+      "last_date": "2014-12-31"
+    },
+    {
+      "year": 2015,
+      "days": 312,
+      "bars": 372210,
+      "min_low": 1.04623,
+      "max_high": 1.21072,
+      "first_date": "2015-01-01",
+      "last_date": "2015-12-31"
+    },
+    {
+      "year": 2016,
+      "days": 312,
+      "bars": 372679,
+      "min_low": 1.03522,
+      "max_high": 1.1616,
+      "first_date": "2016-01-03",
+      "last_date": "2016-12-30"
+    },
+    {
+      "year": 2017,
+      "days": 310,
+      "bars": 371635,
+      "min_low": 1.03406,
+      "max_high": 1.2092,
+      "first_date": "2017-01-02",
+      "last_date": "2017-12-29"
+    },
+    {
+      "year": 2018,
+      "days": 313,
+      "bars": 372607,
+      "min_low": 1.12154,
+      "max_high": 1.2555,
+      "first_date": "2018-01-01",
+      "last_date": "2018-12-31"
+    },
+    {
+      "year": 2019,
+      "days": 313,
+      "bars": 372470,
+      "min_low": 1.0879,
+      "max_high": 1.15697,
+      "first_date": "2019-01-01",
+      "last_date": "2019-12-31"
+    },
+    {
+      "year": 2020,
+      "days": 314,
+      "bars": 372275,
+      "min_low": 1.06357,
+      "max_high": 1.23101,
+      "first_date": "2020-01-01",
+      "last_date": "2020-12-31"
+    },
+    {
+      "year": 2021,
+      "days": 312,
+      "bars": 369442,
+      "min_low": 1.11859,
+      "max_high": 1.23494,
+      "first_date": "2021-01-03",
+      "last_date": "2021-12-31"
+    },
+    {
+      "year": 2022,
+      "days": 312,
+      "bars": 372805,
+      "min_low": 0.95357,
+      "max_high": 1.14948,
+      "first_date": "2022-01-02",
+      "last_date": "2022-12-30"
+    },
+    {
+      "year": 2023,
+      "days": 311,
+      "bars": 322578,
+      "min_low": 1.04483,
+      "max_high": 1.12756,
+      "first_date": "2023-01-01",
+      "last_date": "2023-12-29"
+    },
+    {
+      "year": 2024,
+      "days": 314,
+      "bars": 372379,
+      "min_low": 1.03325,
+      "max_high": 1.1214,
+      "first_date": "2024-01-01",
+      "last_date": "2024-12-31"
+    },
+    {
+      "year": 2025,
+      "days": 313,
+      "bars": 372024,
+      "min_low": 1.01772,
+      "max_high": 1.19186,
+      "first_date": "2025-01-01",
+      "last_date": "2025-12-31"
+    },
+    {
+      "year": 2026,
+      "days": 235,
+      "bars": 279154,
+      "min_low": 1.12149,
+      "max_high": 1.20822,
+      "first_date": "2026-01-01",
+      "last_date": "2026-10-02"
+    }
+  ],
+  "price_min": 0.8229,
+  "price_max": 1.6041
+}
