@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "histdata_v9_bar_v1",
+  "title": "HistData v9 Bar and ErrorRecord",
+  "definitions": {
+    "Bar": {
+      "type": "object",
+      "required": [
+        "ts",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$",
+          "description": "Naive UTC ISO 8601 (no tz suffix)."
+        },
+        "open": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "high": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "low": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "close": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "volume": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "source_line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "ErrorRecord": {
+      "type": "object",
+      "required": [
+        "file",
+        "line",
+        "code",
+        "raw_excerpt"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "BAD_FIELD_COUNT",
+            "BAD_TIMESTAMP",
+            "BAD_OHLC",
+            "BAD_VOLUME",
+            "NEGATIVE_PRICE",
+            "DUPLICATE_TS",
+            "OUT_OF_RANGE_PRICE",
+            "ENCODING_ERROR"
+          ]
+        },
+        "raw_excerpt": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": "histdata_v9_final_report_v1",
+  "generated_at": "2026-10-13T05:27:38.990353+00:00",
+  "overall": "PASS",
+  "components": {
+    "interfaces": true,
+    "snapshot": true,
+    "acceptance": true,
+    "coverage": true
+  },
+  "details": {
+    "interfaces": {
+      "ok": true,
+      "issues": [],
+      "checked_paths": 16,
+      "checked_hashes": 3
+    },
+    "snapshot": {
+      "ok": true,
+      "csv_diffs": {},
+      "git_head_snap": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
+      "git_head_now": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
+      "head_drift": false
+    },
+    "acceptance": {
+      "ok": true,
+      "denominator_claimed": 14,
+      "denominator_actual": 14,
+      "missing": [],
+      "pass_count": 14,
+      "fail_count": 0,
+      "overall_claimed": "PASS"
+    },
+    "coverage": {
+      "expected": [
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "K01",
+        "K02",
+        "K03",
+        "K04"
+      ],
+      "covered": [
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "K01",
+        "K02",
+        "K03",
+        "K04"
+      ],
+      "missing": [],
+      "denominator": 14,
+      "complete": true
+    }
+  }
+}
