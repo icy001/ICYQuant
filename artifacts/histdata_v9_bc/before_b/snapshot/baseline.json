@@ -1,0 +1,17 @@
+{
+  "schema_version": "histdata_v9_baseline_v1",
+  "captured_at": "2026-10-13T05:26:37.389218+00:00",
+  "git": {
+    "commit": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
+    "branch": "develop",
+    "dirty": true
+  },
+  "baselines": {
+    "research/discovery/output/factor-paper-d1/summary.csv": "TRACKED",
+    "research/discovery/output/factor-v1/csv/alpha_ranking.csv": "TRACKED",
+    "research/discovery/output/factor-v1/csv/convergence.csv": "TRACKED"
+  },
+  "input_dir": "data/real/histdata",
+  "input_dir_exists": true,
+  "repo_root": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant"
+}

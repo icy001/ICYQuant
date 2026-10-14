@@ -1,0 +1,63 @@
+{
+  "schema_version": "histdata_v9_ledger_v1",
+  "captured_at": "2026-10-13T09:00:15.404479+00:00",
+  "git": {
+    "commit": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
+    "branch": "develop",
+    "dirty": true
+  },
+  "entries": [
+    {
+      "seq": 0,
+      "script": "00_baseline_snapshot",
+      "action": "snapshot",
+      "target": "git_head + env + baseline_csv_hashes",
+      "precondition": "repo has .git",
+      "produces": [
+        "snapshot/baseline.json",
+        "snapshot/csv_hashes.json",
+        "snapshot/env.json"
+      ]
+    },
+    {
+      "seq": 1,
+      "script": "01_generate_artifacts",
+      "action": "generate_contracts",
+      "target": "manifest + schema + ledger + quality_contract + validation_gates",
+      "precondition": "snapshot/baseline.json exists",
+      "produces": [
+        "manifest.yaml",
+        "schema.json",
+        "ledger.json",
+        "quality_contract.yaml",
+        "validation_gates.yaml"
+      ]
+    },
+    {
+      "seq": 2,
+      "script": "02_execute",
+      "action": "parse_validate_accept",
+      "target": "raw histdata -> bars.parquet + errors.jsonl + acceptance",
+      "precondition": "contracts exist; raw dir present (warn-only if absent)",
+      "produces": [
+        "parsed/eurusd_2000-2026_bars.parquet",
+        "parsed/eurusd_2000-2026_errors.jsonl",
+        "parsed/parse_stats.json",
+        "acceptance/run_acceptance.json",
+        "acceptance/coverage_audit.json"
+      ]
+    },
+    {
+      "seq": 3,
+      "script": "03_verify",
+      "action": "cross_check_finalize",
+      "target": "all artifacts + interfaces + re-run acceptance",
+      "precondition": "Scripts 00,01,02 completed",
+      "produces": [
+        "verify/final_report.json",
+        "verify/interface_check.json",
+        "verify/coverage_audit.json"
+      ]
+    }
+  ]
+}

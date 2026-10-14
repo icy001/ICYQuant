@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "issues": [
+    {
+      "kind": "missing_output",
+      "category": "parsed",
+      "path": "artifacts/histdata_v9_bc/step2/after_a2/parsed/xauusd_2024_bars.parquet"
+    }
+  ],
+  "checked_paths": 16,
+  "checked_hashes": 3,
+  "parsed_refs": {
+    "declared": [
+      "parsed/parse_stats.json",
+      "parsed/xauusd_2024_bars.parquet",
+      "parsed/xauusd_2024_errors.jsonl"
+    ],
+    "references": [
+      "parsed/parse_stats.json",
+      "parsed/xauusd_2024_bars.parquet",
+      "parsed/xauusd_2024_errors.jsonl"
+    ],
+    "duplicates": []
+  }
+}

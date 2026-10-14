@@ -1,0 +1,115 @@
+{
+  "schema_version": "histdata_v9_acceptance_v1",
+  "run_at": "2026-10-13T08:58:03.733386+00:00",
+  "denominator": 14,
+  "pass_count": 12,
+  "fail_count": 2,
+  "overall": "FAIL",
+  "items": [
+    {
+      "id": "G01",
+      "pass": false,
+      "evidence": {
+        "files_readable": 0,
+        "total_lines": 0
+      }
+    },
+    {
+      "id": "G02",
+      "pass": true,
+      "evidence": {
+        "rows": 0,
+        "errors": 0,
+        "lines": 0
+      }
+    },
+    {
+      "id": "G03",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G04",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G05",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G06",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G07",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G08",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G09",
+      "pass": true,
+      "evidence": {
+        "empty": true
+      }
+    },
+    {
+      "id": "G10",
+      "pass": true,
+      "evidence": {
+        "empty_or_skipped": true
+      }
+    },
+    {
+      "id": "K01",
+      "pass": false,
+      "evidence": {
+        "events_per_file": 0
+      }
+    },
+    {
+      "id": "K02",
+      "pass": true,
+      "evidence": {
+        "error_rate": 0.0,
+        "completeness": 1.0,
+        "max_error_rate": 0.01,
+        "min_completeness": 0.99
+      }
+    },
+    {
+      "id": "K03",
+      "pass": true,
+      "evidence": {
+        "mismatches": [],
+        "checked": 3
+      }
+    },
+    {
+      "id": "K04",
+      "pass": true,
+      "evidence": {
+        "deferred_to": "03_verify"
+      }
+    }
+  ]
+}
