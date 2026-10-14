@@ -1,8 +1,8 @@
 {
   "schema_version": "histdata_v9_ledger_v1",
-  "captured_at": "2026-10-13T05:26:37.456944+00:00",
+  "captured_at": "2026-10-14T02:27:28.299412+00:00",
   "git": {
-    "commit": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
+    "commit": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
     "branch": "develop",
     "dirty": true
   },
@@ -40,8 +40,8 @@
       "target": "raw histdata -> bars.parquet + errors.jsonl + acceptance",
       "precondition": "contracts exist; raw dir present (warn-only if absent)",
       "produces": [
-        "parsed/xauusd_2024_bars.parquet",
-        "parsed/xauusd_2024_errors.jsonl",
+        "parsed/eurusd_2000-2026_bars.parquet",
+        "parsed/eurusd_2000-2026_errors.jsonl",
         "parsed/parse_stats.json",
         "acceptance/run_acceptance.json",
         "acceptance/coverage_audit.json"

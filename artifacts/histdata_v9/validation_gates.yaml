@@ -31,8 +31,8 @@ gates:
   - schema.json
   - quality_contract.yaml exist
   post:
-  - parsed/xauusd_2024_bars.parquet non-empty (if raw available)
-  - parsed/xauusd_2024_errors.jsonl exists
+  - parsed/eurusd_2000-2026_bars.parquet non-empty (if raw available)
+  - parsed/eurusd_2000-2026_errors.jsonl exists
   - parsed/parse_stats.json has per-file stats
   - acceptance/run_acceptance.json has 14 results
   failure_codes: {}

@@ -1,4 +1,5 @@
 schema_version: histdata_v9_quality_contract_v1
+version: '9.1'
 acceptance_items:
 - id: G01
   kind: data
