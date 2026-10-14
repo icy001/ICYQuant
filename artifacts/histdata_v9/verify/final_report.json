@@ -1,6 +1,6 @@
 {
   "schema_version": "histdata_v9_final_report_v1",
-  "generated_at": "2026-10-13T05:27:38.990353+00:00",
+  "generated_at": "2026-10-14T02:28:37.451507+00:00",
   "overall": "PASS",
   "components": {
     "interfaces": true,
@@ -13,13 +13,26 @@
       "ok": true,
       "issues": [],
       "checked_paths": 16,
-      "checked_hashes": 3
+      "checked_hashes": 3,
+      "parsed_refs": {
+        "declared": [
+          "parsed/eurusd_2000-2026_bars.parquet",
+          "parsed/eurusd_2000-2026_errors.jsonl",
+          "parsed/parse_stats.json"
+        ],
+        "references": [
+          "parsed/eurusd_2000-2026_bars.parquet",
+          "parsed/eurusd_2000-2026_errors.jsonl",
+          "parsed/parse_stats.json"
+        ],
+        "duplicates": []
+      }
     },
     "snapshot": {
       "ok": true,
       "csv_diffs": {},
-      "git_head_snap": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
-      "git_head_now": "9a208ce3b709b4f5d0b912b1af8f732bc788d96f",
+      "git_head_snap": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
+      "git_head_now": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
       "head_drift": false
     },
     "acceptance": {

@@ -5,6 +5,15 @@ Cross-script interface check, snapshot consistency re-check, acceptance
 re-evaluation, final PASS/FAIL report. Read-only with respect to source data
 (may write only to artifacts/histdata_v9/verify/).
 
+The interface check carries a second, INDEPENDENT claim: every `parsed/...`
+reference in ledger.json and validation_gates.yaml must resolve to a parsed
+output that manifest.yaml declares. Script 1 checks that relation too, but
+Script 1 is the producer of those documents -- a document edited after the fact,
+or written by some other process, satisfies Script 1 just as well. This script
+re-derives the authority set from manifest.yaml and does NOT import Script 1's
+crossref_report(): one implementation shared by producer and verifier would
+share its blind spots and let the same defect pass both.
+
 Inputs:
   --output-dir DIR     artifacts dir (default: artifacts/histdata_v9)
   --repo-root DIR      Git repo root (default: discover by walking up from out_dir)
@@ -24,11 +33,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 try:
     import yaml  # type: ignore
@@ -80,8 +90,169 @@ def discover_repo_root(start: Path) -> str:
     return str(start)
 
 
+# ---------------------------------------------------------------------------
+# Independent parsed-reference audit.
+#
+# The documents address parsed outputs relative to the artifacts dir
+# ("parsed/<pair>_<year>_bars.parquet") while manifest.yaml declares them
+# relative to the repository root ("artifacts/histdata_v9/parsed/..."). Both
+# forms are accepted, but only after lexical normalization that refuses to leave
+# the artifacts dir: a token such as "parsed/../../secrets.json" must not be
+# waved through by a string-prefix test, and a token that merely looks like a
+# parsed path ("backup/parsed/x.parquet") must not resolve either.
+# ---------------------------------------------------------------------------
+
+PARSED_PATH_TOKEN_RE = re.compile(r"[A-Za-z0-9_./\\-]+")
+PARSED_DIR_SEGMENT = "parsed"
+
+
+def iter_strings(obj: Any, pointer: str = "") -> Iterator[tuple[str, str]]:
+    """Yield (json_pointer, text) for every string in a loaded document.
+
+    The audit walks the whole document instead of a list of known fields: a
+    reference tucked into a field nobody thought to scan is still a reference.
+    """
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            yield from iter_strings(value, f"{pointer}/{key}")
+    elif isinstance(obj, list):
+        for index, value in enumerate(obj):
+            yield from iter_strings(value, f"{pointer}/{index}")
+    elif isinstance(obj, str):
+        yield pointer, obj
+
+
+def parsed_reference_tokens(text: str) -> list[str]:
+    """The parsed references in one string, in order of appearance.
+
+    A candidate is a path-like token with `parsed` as a DIRECTORY segment, i.e.
+    something is named below it. The bare word `parsed` -- as in the gate text
+    "manifest.yaml has outputs.{snapshot,contract,parsed,acceptance,verify}" --
+    names no file and is therefore not a reference.
+
+    Both separators count when deciding what looks like a reference, so a
+    backslash path is seen and then refused by resolve_parsed_reference() as
+    non-canonical instead of slipping past unnoticed.
+    """
+    return [token for token in PARSED_PATH_TOKEN_RE.findall(text)
+            if PARSED_DIR_SEGMENT in token.replace("\\", "/").split("/")[:-1]]
+
+
+def declared_parsed_refs(manifest: dict, out_dir: str) -> set[str]:
+    """The parsed references manifest.yaml authorises, as artifacts-dir-relative
+    keys -- the form the ledger and the gates use.
+
+    A manifest path inside the artifacts dir is keyed by what follows that dir; a
+    path outside it is keyed by its tail from the `parsed` segment, so an
+    absolute --output-dir and a relative one still describe the same files.
+    """
+    root = out_dir.strip("/")
+    prefix = f"{root}/" if root else ""
+    declared: set[str] = set()
+    for raw in (manifest.get("outputs") or {}).get(PARSED_DIR_SEGMENT) or []:
+        token = str(raw).strip()
+        if prefix and token.startswith(prefix):
+            declared.add(token[len(prefix):])
+            continue
+        segments = token.split("/")
+        if PARSED_DIR_SEGMENT in segments[:-1]:
+            declared.add("/".join(segments[segments.index(PARSED_DIR_SEGMENT):]))
+    return declared
+
+
+def resolve_parsed_reference(raw: str, out_dir: str) -> tuple[str | None, str | None]:
+    """Resolve one parsed reference into its artifacts-dir-relative key.
+
+    Returns (key, None) when the reference is canonical, and (None, reason) when
+    it is not. The reason codes are stable and end up verbatim in
+    verify/interface_check.json.
+    """
+    token = raw.strip()
+    if not token:
+        return None, "parsed_ref_empty"
+    if "\\" in token:
+        # Only forward slashes are canonical; no platform-dependent reading.
+        return None, "parsed_ref_not_canonical"
+    if token.startswith("/") or (len(token) > 1 and token[1] == ":"):
+        return None, "parsed_ref_absolute"
+
+    root = out_dir.strip("/")
+    root_parts = [part for part in root.split("/") if part not in ("", ".")]
+    prefix = f"{root}/" if root else ""
+    if prefix and token.startswith(prefix):
+        relative = token[len(prefix):]
+    elif token.startswith(f"{PARSED_DIR_SEGMENT}/"):
+        relative = token
+    else:
+        return None, "parsed_ref_outside_parsed_dir"
+
+    segments = relative.split("/")
+    if segments[0] != PARSED_DIR_SEGMENT:
+        # A path with the parsed dir somewhere in the middle is not a parsed
+        # reference: it points at something else and only looks similar.
+        return None, "parsed_ref_outside_parsed_dir"
+    if any(segment == "" for segment in segments):
+        return None, "parsed_ref_not_canonical"
+    if any(segment in (".", "..") for segment in segments):
+        # `.`/`..` never appear in a canonical reference, and a detour is judged
+        # by walking the path, not by comparing prefixes: a reference that
+        # climbs out of the artifacts dir is an escape, one that stays inside is
+        # still not canonical. Neither is accepted.
+        depth = len(root_parts)
+        for segment in segments:
+            depth += -1 if segment == ".." else (0 if segment == "." else 1)
+            if depth < len(root_parts):
+                return None, "parsed_ref_escapes_root"
+        return None, "parsed_ref_not_canonical"
+    return relative, None
+
+
+def audit_parsed_references(manifest: dict, documents: dict, out_dir: str) -> dict:
+    """Every parsed reference in `documents` must resolve to a manifest output.
+
+    Pure function over loaded documents, so the tests can feed it the documents
+    Script 1 really emits as well as deliberately tampered ones. `documents` maps
+    a display name (the file name as the operator sees it) to the loaded object.
+    """
+    declared = declared_parsed_refs(manifest, out_dir)
+    issues: list[dict] = []
+    counts: dict[tuple[str, str], int] = {}
+    for name, document in documents.items():
+        cited = 0
+        for pointer, text in iter_strings(document):
+            for raw in parsed_reference_tokens(text):
+                cited += 1
+                counts[(name, raw)] = counts.get((name, raw), 0) + 1
+                key, reason = resolve_parsed_reference(raw, out_dir)
+                if reason is not None:
+                    issues.append({"kind": reason, "file": name,
+                                   "pointer": pointer, "reference": raw,
+                                   "missing_target": None})
+                elif key not in declared:
+                    # Well formed, but it names a file this run never declared:
+                    # another run's output, or a stale name.
+                    issues.append({"kind": "parsed_ref_missing_target",
+                                   "file": name, "pointer": pointer,
+                                   "reference": raw, "missing_target": key})
+        if not cited:
+            # Deleting the reference must not be a way to pass the check.
+            issues.append({"kind": "parsed_refs_absent", "file": name,
+                           "pointer": "", "reference": None,
+                           "missing_target": None})
+    duplicates = sorted(f"{name}:{ref}" for (name, ref), count in counts.items()
+                        if count > 1)
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "declared": sorted(declared),
+        "references": sorted({ref for _, ref in counts}),
+        "duplicates": duplicates,
+    }
+
+
 def check_interfaces(out_dir: Path) -> dict:
-    """Verify inter-script paths resolve and hash formats are valid."""
+    """Verify inter-script paths resolve, hash formats are valid, and every
+    parsed reference in the ledger and the gates is one the manifest declares."""
     manifest = load_any(out_dir / "manifest.yaml")
     if manifest is None:
         return {"ok": False, "reason": "manifest_missing", "issues": []}
@@ -126,11 +297,27 @@ def check_interfaces(out_dir: Path) -> dict:
                        "expected": 14,
                        "actual": len(quality.get("acceptance_items", []))})
 
+    # Independent parsed-reference audit. Documents that did not load are left to
+    # the manifest check above, which already reports every declared output that
+    # is missing from disk.
+    gates = load_any(out_dir / "validation_gates.yaml") or load_any(
+        out_dir / "validation_gates.json")
+    documents = {name: doc for name, doc in
+                 (("ledger.json", ledger), ("validation_gates.yaml", gates))
+                 if doc is not None}
+    refs = audit_parsed_references(manifest, documents, str(out_dir))
+    issues.extend(refs["issues"])
+
     return {
         "ok": not issues,
         "issues": issues,
         "checked_paths": sum(len(v) for v in manifest.get("outputs", {}).values()),
         "checked_hashes": len(csv_hashes),
+        "parsed_refs": {
+            "declared": refs["declared"],
+            "references": refs["references"],
+            "duplicates": refs["duplicates"],
+        },
     }
 
 
@@ -195,10 +382,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # 1) Interface check
     iface = check_interfaces(out_dir)
+    refs = iface.get("parsed_refs", {})
     emit({"event": "interface_check_done", "ok": iface["ok"],
           "issues": iface.get("issues", []),
           "checked_paths": iface.get("checked_paths", 0),
-          "checked_hashes": iface.get("checked_hashes", 0)})
+          "checked_hashes": iface.get("checked_hashes", 0),
+          "parsed_refs_declared": len(refs.get("declared", [])),
+          "parsed_refs_cited": refs.get("references", []),
+          "parsed_ref_duplicates": refs.get("duplicates", [])})
     (out_dir / "verify" / "interface_check.json").write_text(
         json.dumps(iface, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
     )
