@@ -9,7 +9,7 @@
 | 评审主持 | 仓主（项目授权主体） |
 | 评审范围 | Stage D Phase 0 **设计文档**（不覆盖 Stage 01/02 实施，不覆盖 Stage D 实施） |
 | 本记录版本 | v1 |
-| 本记录 commit | 待提交（独立 commit，与设计修订解耦） |
+| 本记录 commit | v1: `34b1bc4e`；G-4 勘误: 见本文件 git 历史（独立 commit，与设计修订解耦） |
 
 **本记录的性质：** 本文件是**评审过程记录**，不是设计文档的替代物，也不是 Phase 0 通过判定书。本记录登记评审结论、已裁定事项、推迟事项与已知缺口，逐项标注其证据来源或"无法独立确认"状态。**本记录不对任何 §11 退出条件做 PASS/FAIL 判定**——逐条验收属独立的后续动作（见第 8 节）。
 
@@ -45,7 +45,7 @@
 | `3083be9e`（Stage 01 acceptance 14/14 PASS，2026-10-13）审批依据 | 仅 commit message 声明"14/14 PASS"；无同期设计批准记录 | 证据不足（见第 7 节） |
 | `1fa4a34d`（"add"，2026-10-14 17:17）commit 时是否经独立授权 | commit message 仅"add"；无授权声明 | 无法独立确认（G6-1 §8 建议 1） |
 | B+C 流水线（`8a1872df` / `16595900`）在设计文档中的定位 | v2–v8 doc 中 `B+C` / `B and C` / `step 1` / `step 2` / `baseline` 均 0 命中 | 证据不足（属 G6-2 推迟范围） |
-| 仓库内流程约束的成文规范 | `CONTRIBUTING*` / `GOVERNANCE*` / `PROCESS*` / `WORKFLOW*` 均 0 命中；`governance_execution_flow.md`（289B）不含评审流程定义 | 无成文规范 |
+| Stage D 特有治理的成文规范 | 通用开发流程有规范（`docs/05-development/CONTRIBUTING.md` 1137B、`GIT_WORKFLOW.md` 1367B、`DEVELOPMENT_GUIDE.md` 1935B、`CODE_STYLE.md`、`TESTING.md`）；但"设计评审 ≠ 实施授权"分离、角色持有人登记、证据分级、历史事实裁定无成文规范 | Stage D 特有治理无成文规范（缺口 G-4） |
 
 ### 2.3 未覆盖项（本轮评审不做判定，留待后续）
 
@@ -153,7 +153,7 @@ v8 §11 为 Phase 0 评审通过标准，含九条退出检查条件。
 | G-1 | `3083be9e`（2026-10-13"14/14 PASS"）当时的审批依据 | 证据不足（无同期设计批准记录） | 保留为"无法独立确认"；不写成已通过 |
 | G-2 | `1fa4a34d`、`9a208ce3` 的授权来源与适用范围 | 无法独立确认（G6-1 §8） | 保留为"无法独立确认"；第 3 节建议 1/建议 3 已登记归类 |
 | G-3 | B+C 流水线在 v2–v8 doc 中无引用 | 有证据（0 命中） | 登记于第 4.3 节；属 G6-2 推迟范围 |
-| G-4 | 仓库内无流程约束成文规范（无 `CONTRIBUTING` / `GOVERNANCE` / `PROCESS`） | 有证据（0 命中）；`governance_execution_flow.md` 289B 不含评审流程 | 登记为流程缺口；是否补齐成文规范另行决定 |
+| G-4 | 通用开发流程有成文规范（`CONTRIBUTING.md` / `GIT_WORKFLOW.md` / `DEVELOPMENT_GUIDE.md` / `CODE_STYLE.md` / `TESTING.md`），但 Stage D 特有治理（设计评审 ≠ 实施授权分离、角色持有人登记、证据分级、历史事实裁定）无成文规范；根 `CONTRIBUTING.md` 为 0 字节空文件；`governance_execution_flow.md`（289B）仅为示意框图 | 有证据（2026-10-15 独立路径列举核实）；**曾于本记录初稿误记"0 命中"**，源于一次 `find` 命令被 shell 报错（`zsh: unknown file attribute`）中断，已更正 | 补齐 Stage D 特有治理规范（仓主 2026-10-15 授权"是"）；见第 8 节 |
 | G-5 | v8 doc §11 参考依据中"运行产物路径与生成命令版本""精确行号"推迟到下一轮修订 | 有证据（v8 修订说明自述） | 保留为设计文档未闭环项 |
 | G-6 | v8 doc §11.4 仍为 PARTIAL（审批角色已命名，角色持有人尚未实际登记） | 有证据（v8 修订说明自述） | 保留为未闭环项；对应 P0-11 |
 
@@ -163,9 +163,9 @@ v8 §11 为 Phase 0 评审通过标准，含九条退出检查条件。
 
 | 阶段 | 动作 | 前置 | 状态 |
 |---|---|---|---|
-| 短期 | G6-2 证据报告落盘 | G6-1 完整闭环（本记录创建） | 待启动（路径/方式另行授权） |
-| 中期 | 启动 P0-11 / P0-12 / P0-13 / P0-15（P0 其余项前置） | 本记录创建 | 待启动 |
-| 中期 | 补齐流程约束成文规范（缺口的 G-4 处置） | 仓主决定 | 待决定 |
+| 短期 | G6-2 证据报告落盘 | G6-1 完整闭环（本记录创建） | **已完成**（`2bf8f9a9`）；路径 `docs/reviews/g6-2_evidence_report.md` |
+| 中期 | 启动 P0-11 / P0-12 / P0-13 / P0-15（P0 其余项前置） | 本记录创建 | 已启动（仓主 2026-10-15）；P0-11/P0-12 须由项目授权主体作出任命，P0-13 依赖 GA、P0-15 依赖 CA 持有人登记 |
+| 中期 | 补齐 Stage D 特有治理规范（缺口 G-4 处置） | 仓主决定 | **已授权（仓主 2026-10-15）**；框架草案待仓主审核 |
 | 长期 | §11 九条退出条件逐条回填（Phase 0 退出条件验收） | P0 系列完成 | 待启动 |
 | 长期 | §6.6 映射逐项核对（P0-13）、§7.4 归属确认（P0-13） | GA 任命（P0-12） | 待启动 |
 | 长期 | PC-5 具体数值冻结 | P0-11 / P0-15 | 待启动 |
@@ -185,7 +185,9 @@ v8 §11 为 Phase 0 评审通过标准，含九条退出检查条件。
 | 被评审实现的提交 | `9a208ce3`、`3083be9e`、`9634aaf4`、`15eec64b`、`8a1872df`、`16595900`、`1fa4a34d` | 均早于 v2 doc，除 `1fa4a34d` 晚于 v2 doc |
 | B+C 交付记录 | `artifacts/histdata_v9_bc/step2/04_delivery_record.log` | 文件头 `2026-10-14T10:47:12Z`；交付时 HEAD = `16595900` |
 | 权威基线（14 IDs） | `artifacts/histdata_v9/quality_contract.yaml` | denominator: 14，pass_rule: all 14 items pass；自 `3083be9e` 以来 14 项结构未变 |
-| 治理/流程文档 | `docs/design/governance_execution_flow.md`（289B）、`docs/05-development/DEVELOPMENT_GUIDE.md`（1935B） | 均不含评审流程定义（缺口 G-4） |
+| 通用开发流程文档 | `docs/05-development/CONTRIBUTING.md`（1137B）、`GIT_WORKFLOW.md`（1367B）、`DEVELOPMENT_GUIDE.md`（1935B）、`CODE_STYLE.md`（1312B）、`TESTING.md`（1516B） | 存在；定义通用开发与 Review 流程；**不含** Stage D 特有治理（缺口 G-4） |
+| 根 `CONTRIBUTING.md` | 0 字节空文件 | 存在但为空 |
+| 治理示意文档 | `docs/design/governance_execution_flow.md`（289B） | 仅示意框图（Agent Runtime→…→Governance Dashboard），不含评审流程定义 |
 
 ---
 
