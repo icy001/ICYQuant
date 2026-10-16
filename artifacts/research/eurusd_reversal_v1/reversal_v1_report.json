@@ -1,0 +1,344 @@
+{
+  "spec": {
+    "bars": "5-minute OHLC from HistData M1, Beijing clock",
+    "timezone_proof": "Sunday open and Friday close both land on stored 17:00, identical Jan-Feb vs Jun-Aug -> fixed EST (UTC-5); Beijing = ts + 13h",
+    "day": "FX trading day starting 06:00 Beijing",
+    "O": "first available 5m open of the FX day",
+    "trigger": "|price - O| >= 1.00% during Beijing 09:00-10:00",
+    "entry": "reversal against the move, at the triggering bar's close",
+    "target": "revert to O",
+    "stops": {
+      "A": "fixed 20.0 pips",
+      "B": "running day extreme known at entry (past-only)"
+    },
+    "time_stop": "24 bars",
+    "cost": "1.5 pips ASSUMED (bid-only source, no spread)"
+  },
+  "data_quality": {
+    "m1_rows": 8999734,
+    "m5_bars": 1906107,
+    "m5_range": [
+      "2000-05-31 06:25:00",
+      "2026-10-03 05:55:00"
+    ],
+    "total_days": 6867,
+    "kept": 6703,
+    "window_not_populated": 164
+  },
+  "results": {
+    "A_fixed20": {
+      "full": {
+        "label": "A_fixed20",
+        "n": 19,
+        "win_rate": 0.4211,
+        "expectancy_R": 0.3108,
+        "gross_PF": 1.721,
+        "net_PF": 1.537,
+        "expectancy_pips": 6.216,
+        "net_pips_total": 118.1,
+        "net_usd_1lot": 1181.0,
+        "max_dd_R": -5.24,
+        "max_dd_usd_1lot": -1048.0,
+        "exit_reasons": {
+          "stop": 10,
+          "time": 9
+        },
+        "avg_risk_pips": 20.0
+      },
+      "is": {
+        "label": "A_fixed20_IS_lt2016",
+        "n": 13,
+        "win_rate": 0.4615,
+        "expectancy_R": 0.3462,
+        "gross_PF": 1.782,
+        "net_PF": 1.598,
+        "expectancy_pips": 6.923,
+        "net_pips_total": 90.0,
+        "net_usd_1lot": 900.0,
+        "max_dd_R": -4.25,
+        "max_dd_usd_1lot": -850.0,
+        "exit_reasons": {
+          "stop": 7,
+          "time": 6
+        },
+        "avg_risk_pips": 20.0
+      },
+      "oos": {
+        "label": "A_fixed20_OOS_ge2016",
+        "n": 6,
+        "win_rate": 0.3333,
+        "expectancy_R": 0.2342,
+        "gross_PF": 1.586,
+        "net_PF": 1.405,
+        "expectancy_pips": 4.683,
+        "net_pips_total": 28.1,
+        "net_usd_1lot": 281.0,
+        "max_dd_R": -1.31,
+        "max_dd_usd_1lot": -263.0,
+        "exit_reasons": {
+          "stop": 3,
+          "time": 3
+        },
+        "avg_risk_pips": 20.0
+      },
+      "guard": {
+        "signals": 19,
+        "boundary_stop_too_tight": 0,
+        "closed_at_day_end": 0
+      }
+    },
+    "B_boundary": {
+      "full": {
+        "label": "B_boundary",
+        "n": 20,
+        "win_rate": 0.35,
+        "expectancy_R": 0.3314,
+        "gross_PF": 2.468,
+        "net_PF": 2.059,
+        "expectancy_pips": 7.595,
+        "net_pips_total": 151.9,
+        "net_usd_1lot": 1519.0,
+        "max_dd_R": -9.93,
+        "max_dd_usd_1lot": -974.0,
+        "exit_reasons": {
+          "stop": 11,
+          "time": 9
+        },
+        "avg_risk_pips": 24.21
+      },
+      "is": {
+        "label": "B_boundary_IS_lt2016",
+        "n": 15,
+        "win_rate": 0.3333,
+        "expectancy_R": 0.2629,
+        "gross_PF": 1.72,
+        "net_PF": 1.452,
+        "expectancy_pips": 3.733,
+        "net_pips_total": 56.0,
+        "net_usd_1lot": 560.0,
+        "max_dd_R": -7.38,
+        "max_dd_usd_1lot": -860.0,
+        "exit_reasons": {
+          "stop": 9,
+          "time": 6
+        },
+        "avg_risk_pips": 23.39
+      },
+      "oos": {
+        "label": "B_boundary_OOS_ge2016",
+        "n": 5,
+        "win_rate": 0.4,
+        "expectancy_R": 0.5368,
+        "gross_PF": 7.94,
+        "net_PF": 5.943,
+        "expectancy_pips": 19.18,
+        "net_pips_total": 95.9,
+        "net_usd_1lot": 959.0,
+        "max_dd_R": -1.39,
+        "max_dd_usd_1lot": -113.0,
+        "exit_reasons": {
+          "time": 3,
+          "stop": 2
+        },
+        "avg_risk_pips": 26.66
+      },
+      "guard": {
+        "signals": 20,
+        "boundary_stop_too_tight": 5,
+        "closed_at_day_end": 0
+      }
+    }
+  },
+  "cost_sensitivity": [
+    {
+      "stop_mode": "A_fixed20",
+      "cost_pips": 0.5,
+      "n": 19,
+      "net_PF": 1.657,
+      "expectancy_R": 0.3608,
+      "net_pips_total": 137.1
+    },
+    {
+      "stop_mode": "A_fixed20",
+      "cost_pips": 1.0,
+      "n": 19,
+      "net_PF": 1.595,
+      "expectancy_R": 0.3358,
+      "net_pips_total": 127.6
+    },
+    {
+      "stop_mode": "A_fixed20",
+      "cost_pips": 1.5,
+      "n": 19,
+      "net_PF": 1.537,
+      "expectancy_R": 0.3108,
+      "net_pips_total": 118.1
+    },
+    {
+      "stop_mode": "A_fixed20",
+      "cost_pips": 2.0,
+      "n": 19,
+      "net_PF": 1.482,
+      "expectancy_R": 0.2858,
+      "net_pips_total": 108.6
+    },
+    {
+      "stop_mode": "A_fixed20",
+      "cost_pips": 3.0,
+      "n": 19,
+      "net_PF": 1.379,
+      "expectancy_R": 0.2358,
+      "net_pips_total": 89.6
+    },
+    {
+      "stop_mode": "B_boundary",
+      "cost_pips": 0.5,
+      "n": 20,
+      "net_PF": 2.318,
+      "expectancy_R": 0.4331,
+      "net_pips_total": 171.9
+    },
+    {
+      "stop_mode": "B_boundary",
+      "cost_pips": 1.0,
+      "n": 20,
+      "net_PF": 2.183,
+      "expectancy_R": 0.3822,
+      "net_pips_total": 161.9
+    },
+    {
+      "stop_mode": "B_boundary",
+      "cost_pips": 1.5,
+      "n": 20,
+      "net_PF": 2.059,
+      "expectancy_R": 0.3314,
+      "net_pips_total": 151.9
+    },
+    {
+      "stop_mode": "B_boundary",
+      "cost_pips": 2.0,
+      "n": 20,
+      "net_PF": 1.947,
+      "expectancy_R": 0.2806,
+      "net_pips_total": 141.9
+    },
+    {
+      "stop_mode": "B_boundary",
+      "cost_pips": 3.0,
+      "n": 20,
+      "net_PF": 1.748,
+      "expectancy_R": 0.1789,
+      "net_pips_total": 121.9
+    }
+  ],
+  "trigger_threshold_sweep": [
+    {
+      "pct": 0.002,
+      "stop_mode": "A_fixed20",
+      "n": 1679,
+      "net_PF": 0.869,
+      "expectancy_R": -0.0511,
+      "max_dd_R": -89.87,
+      "net_pips_total": -1714.7
+    },
+    {
+      "pct": 0.002,
+      "stop_mode": "B_boundary",
+      "n": 2390,
+      "net_PF": 0.811,
+      "expectancy_R": -0.2095,
+      "max_dd_R": -510.52,
+      "net_pips_total": -2582.2
+    },
+    {
+      "pct": 0.003,
+      "stop_mode": "A_fixed20",
+      "n": 757,
+      "net_PF": 1.001,
+      "expectancy_R": 0.0002,
+      "max_dd_R": -28.6,
+      "net_pips_total": 3.3
+    },
+    {
+      "pct": 0.003,
+      "stop_mode": "B_boundary",
+      "n": 1022,
+      "net_PF": 0.962,
+      "expectancy_R": -0.0862,
+      "max_dd_R": -112.37,
+      "net_pips_total": -243.4
+    },
+    {
+      "pct": 0.004,
+      "stop_mode": "A_fixed20",
+      "n": 366,
+      "net_PF": 1.023,
+      "expectancy_R": 0.0112,
+      "max_dd_R": -22.3,
+      "net_pips_total": 82.2
+    },
+    {
+      "pct": 0.004,
+      "stop_mode": "B_boundary",
+      "n": 479,
+      "net_PF": 1.044,
+      "expectancy_R": -0.1007,
+      "max_dd_R": -68.38,
+      "net_pips_total": 145.4
+    },
+    {
+      "pct": 0.005,
+      "stop_mode": "A_fixed20",
+      "n": 204,
+      "net_PF": 1.072,
+      "expectancy_R": 0.0387,
+      "max_dd_R": -19.17,
+      "net_pips_total": 157.8
+    },
+    {
+      "pct": 0.005,
+      "stop_mode": "B_boundary",
+      "n": 255,
+      "net_PF": 1.158,
+      "expectancy_R": -0.0322,
+      "max_dd_R": -31.92,
+      "net_pips_total": 293.2
+    },
+    {
+      "pct": 0.0075,
+      "stop_mode": "A_fixed20",
+      "n": 56,
+      "net_PF": 1.304,
+      "expectancy_R": 0.162,
+      "max_dd_R": -5.83,
+      "net_pips_total": 181.4
+    },
+    {
+      "pct": 0.0075,
+      "stop_mode": "B_boundary",
+      "n": 61,
+      "net_PF": 1.531,
+      "expectancy_R": 0.3439,
+      "max_dd_R": -8.44,
+      "net_pips_total": 264.5
+    },
+    {
+      "pct": 0.01,
+      "stop_mode": "A_fixed20",
+      "n": 19,
+      "net_PF": 1.537,
+      "expectancy_R": 0.3108,
+      "max_dd_R": -5.24,
+      "net_pips_total": 118.1
+    },
+    {
+      "pct": 0.01,
+      "stop_mode": "B_boundary",
+      "n": 20,
+      "net_PF": 2.059,
+      "expectancy_R": 0.3314,
+      "max_dd_R": -9.93,
+      "net_pips_total": 151.9
+    }
+  ]
+}

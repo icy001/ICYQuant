@@ -1,0 +1,763 @@
+{
+  "spec": {
+    "bars": "5-minute OHLC from HistData M1, Beijing clock",
+    "timezone_proof": "Sunday open and Friday close both land on stored 17:00, identical Jan-Feb vs Jun-Aug -> fixed EST (UTC-5); Beijing = ts + 13h",
+    "day": "FX trading day starting 06:00 Beijing",
+    "O": "first available 5m open of the FX day",
+    "trigger": "|price - O| >= 1.00% inside the configured Beijing window",
+    "entry": "reversal against the move, at the triggering bar's close",
+    "target": {
+      "tp30": "fixed 30 pips from entry (CANDIDATE; not promoted to original-rule status)",
+      "tp_to_open": "revert to O (day's open, ~110 pips at 1.10)"
+    },
+    "stops": {
+      "A": "fixed 20.0 pips",
+      "B": "running day extreme known at entry (past-only)"
+    },
+    "time_stop": "24 bars",
+    "cost": "1.5 pips ASSUMED (bid-only source, no spread)"
+  },
+  "data_quality": {
+    "m1_rows": 8999734,
+    "m5_bars": 1906107,
+    "m5_range": [
+      "2000-05-31 06:25:00",
+      "2026-10-03 05:55:00"
+    ],
+    "win_09_10": {
+      "total_days": 6867,
+      "kept": 6703,
+      "window_not_populated": 164,
+      "win_start_hr": 9,
+      "win_end_hr": 10,
+      "min_window_bars": 10
+    },
+    "win_15_18": {
+      "total_days": 6867,
+      "kept": 6709,
+      "window_not_populated": 158,
+      "win_start_hr": 15,
+      "win_end_hr": 18,
+      "min_window_bars": 20
+    }
+  },
+  "results": {
+    "tp30_win_09_10_A_fixed20": {
+      "full": {
+        "label": "tp30_win_09_10_A_fixed20",
+        "n": 20,
+        "win_rate": 0.4,
+        "expectancy_R": -0.0332,
+        "gross_PF": 1.075,
+        "net_PF": 0.945,
+        "expectancy_pips": -0.665,
+        "net_pips_total": -13.3,
+        "net_usd_1lot": -133.0,
+        "max_dd_R": -5.64,
+        "max_dd_usd_1lot": -1128.0,
+        "exit_reasons": {
+          "stop": 11,
+          "target": 8,
+          "time": 1
+        },
+        "avg_risk_pips": 20.0
+      },
+      "is": {
+        "label": "tp30_win_09_10_A_fixed20_IS_lt2016",
+        "n": 14,
+        "win_rate": 0.4286,
+        "expectancy_R": -0.0036,
+        "gross_PF": 1.125,
+        "net_PF": 0.994,
+        "expectancy_pips": -0.071,
+        "net_pips_total": -1.0,
+        "net_usd_1lot": -10.0,
+        "max_dd_R": -4.67,
+        "max_dd_usd_1lot": -935.0,
+        "exit_reasons": {
+          "stop": 8,
+          "target": 6
+        },
+        "avg_risk_pips": 20.0
+      },
+      "oos": {
+        "label": "tp30_win_09_10_A_fixed20_OOS_ge2016",
+        "n": 6,
+        "win_rate": 0.3333,
+        "expectancy_R": -0.1025,
+        "gross_PF": 0.948,
+        "net_PF": 0.823,
+        "expectancy_pips": -2.05,
+        "net_pips_total": -12.3,
+        "net_usd_1lot": -123.0,
+        "max_dd_R": -1.31,
+        "max_dd_usd_1lot": -263.0,
+        "exit_reasons": {
+          "stop": 3,
+          "target": 2,
+          "time": 1
+        },
+        "avg_risk_pips": 20.0
+      },
+      "guard": {
+        "signals": 20,
+        "boundary_stop_too_tight": 0,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": 30.0,
+        "win_start_hr": 9,
+        "win_end_hr": 10,
+        "stop_mode": "fixed",
+        "fixed_pips": 20.0
+      }
+    },
+    "tp30_win_09_10_B_boundary": {
+      "full": {
+        "label": "tp30_win_09_10_B_boundary",
+        "n": 22,
+        "win_rate": 0.4091,
+        "expectancy_R": -0.1125,
+        "gross_PF": 1.812,
+        "net_PF": 1.471,
+        "expectancy_pips": 3.073,
+        "net_pips_total": 67.6,
+        "net_usd_1lot": 676.0,
+        "max_dd_R": -9.67,
+        "max_dd_usd_1lot": -904.0,
+        "exit_reasons": {
+          "stop": 11,
+          "target": 7,
+          "time": 4
+        },
+        "avg_risk_pips": 26.97
+      },
+      "is": {
+        "label": "tp30_win_09_10_B_boundary_IS_lt2016",
+        "n": 16,
+        "win_rate": 0.375,
+        "expectancy_R": -0.1445,
+        "gross_PF": 1.234,
+        "net_PF": 1.012,
+        "expectancy_pips": 0.094,
+        "net_pips_total": 1.5,
+        "net_usd_1lot": 15.0,
+        "max_dd_R": -7.12,
+        "max_dd_usd_1lot": -790.0,
+        "exit_reasons": {
+          "stop": 9,
+          "target": 4,
+          "time": 3
+        },
+        "avg_risk_pips": 23.93
+      },
+      "oos": {
+        "label": "tp30_win_09_10_B_boundary_OOS_ge2016",
+        "n": 6,
+        "win_rate": 0.5,
+        "expectancy_R": -0.0274,
+        "gross_PF": 6.04,
+        "net_PF": 4.407,
+        "expectancy_pips": 11.017,
+        "net_pips_total": 66.1,
+        "net_usd_1lot": 661.0,
+        "max_dd_R": -1.39,
+        "max_dd_usd_1lot": -113.0,
+        "exit_reasons": {
+          "target": 3,
+          "stop": 2,
+          "time": 1
+        },
+        "avg_risk_pips": 35.08
+      },
+      "guard": {
+        "signals": 22,
+        "boundary_stop_too_tight": 5,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": 30.0,
+        "win_start_hr": 9,
+        "win_end_hr": 10,
+        "stop_mode": "boundary"
+      }
+    },
+    "tp30_win_15_18_A_fixed20": {
+      "full": {
+        "label": "tp30_win_15_18_A_fixed20",
+        "n": 343,
+        "win_rate": 0.4431,
+        "expectancy_R": -0.0187,
+        "gross_PF": 1.103,
+        "net_PF": 0.968,
+        "expectancy_pips": -0.375,
+        "net_pips_total": -128.6,
+        "net_usd_1lot": -1286.0,
+        "max_dd_R": -30.37,
+        "max_dd_usd_1lot": -6075.0,
+        "exit_reasons": {
+          "stop": 184,
+          "target": 128,
+          "time": 31
+        },
+        "avg_risk_pips": 20.0
+      },
+      "is": {
+        "label": "tp30_win_15_18_A_fixed20_IS_lt2016",
+        "n": 287,
+        "win_rate": 0.446,
+        "expectancy_R": -0.017,
+        "gross_PF": 1.107,
+        "net_PF": 0.971,
+        "expectancy_pips": -0.341,
+        "net_pips_total": -97.8,
+        "net_usd_1lot": -978.0,
+        "max_dd_R": -30.37,
+        "max_dd_usd_1lot": -6075.0,
+        "exit_reasons": {
+          "stop": 154,
+          "target": 108,
+          "time": 25
+        },
+        "avg_risk_pips": 20.0
+      },
+      "oos": {
+        "label": "tp30_win_15_18_A_fixed20_OOS_ge2016",
+        "n": 56,
+        "win_rate": 0.4286,
+        "expectancy_R": -0.0275,
+        "gross_PF": 1.087,
+        "net_PF": 0.953,
+        "expectancy_pips": -0.55,
+        "net_pips_total": -30.8,
+        "net_usd_1lot": -308.0,
+        "max_dd_R": -10.17,
+        "max_dd_usd_1lot": -2033.0,
+        "exit_reasons": {
+          "stop": 30,
+          "target": 20,
+          "time": 6
+        },
+        "avg_risk_pips": 20.0
+      },
+      "guard": {
+        "signals": 343,
+        "boundary_stop_too_tight": 0,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": 30.0,
+        "win_start_hr": 15,
+        "win_end_hr": 18,
+        "stop_mode": "fixed",
+        "fixed_pips": 20.0
+      }
+    },
+    "tp30_win_15_18_B_boundary": {
+      "full": {
+        "label": "tp30_win_15_18_B_boundary",
+        "n": 364,
+        "win_rate": 0.3764,
+        "expectancy_R": 0.1027,
+        "gross_PF": 1.353,
+        "net_PF": 1.144,
+        "expectancy_pips": 1.254,
+        "net_pips_total": 456.3,
+        "net_usd_1lot": 4563.0,
+        "max_dd_R": -23.83,
+        "max_dd_usd_1lot": -3995.0,
+        "exit_reasons": {
+          "stop": 215,
+          "target": 119,
+          "time": 30
+        },
+        "avg_risk_pips": 21.12
+      },
+      "is": {
+        "label": "tp30_win_15_18_B_boundary_IS_lt2016",
+        "n": 315,
+        "win_rate": 0.3714,
+        "expectancy_R": 0.0993,
+        "gross_PF": 1.38,
+        "net_PF": 1.161,
+        "expectancy_pips": 1.359,
+        "net_pips_total": 428.1,
+        "net_usd_1lot": 4281.0,
+        "max_dd_R": -23.83,
+        "max_dd_usd_1lot": -3995.0,
+        "exit_reasons": {
+          "stop": 188,
+          "target": 101,
+          "time": 26
+        },
+        "avg_risk_pips": 18.76
+      },
+      "oos": {
+        "label": "tp30_win_15_18_B_boundary_OOS_ge2016",
+        "n": 49,
+        "win_rate": 0.4082,
+        "expectancy_R": 0.1244,
+        "gross_PF": 1.217,
+        "net_PF": 1.055,
+        "expectancy_pips": 0.576,
+        "net_pips_total": 28.2,
+        "net_usd_1lot": 282.0,
+        "max_dd_R": -6.59,
+        "max_dd_usd_1lot": -1674.0,
+        "exit_reasons": {
+          "stop": 27,
+          "target": 18,
+          "time": 4
+        },
+        "avg_risk_pips": 36.29
+      },
+      "guard": {
+        "signals": 364,
+        "boundary_stop_too_tight": 100,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": 30.0,
+        "win_start_hr": 15,
+        "win_end_hr": 18,
+        "stop_mode": "boundary"
+      }
+    },
+    "tp_to_open_win_09_10_A_fixed20": {
+      "full": {
+        "label": "tp_to_open_win_09_10_A_fixed20",
+        "n": 19,
+        "win_rate": 0.4211,
+        "expectancy_R": 0.3108,
+        "gross_PF": 1.721,
+        "net_PF": 1.537,
+        "expectancy_pips": 6.216,
+        "net_pips_total": 118.1,
+        "net_usd_1lot": 1181.0,
+        "max_dd_R": -5.24,
+        "max_dd_usd_1lot": -1048.0,
+        "exit_reasons": {
+          "stop": 10,
+          "time": 9
+        },
+        "avg_risk_pips": 20.0
+      },
+      "is": {
+        "label": "tp_to_open_win_09_10_A_fixed20_IS_lt2016",
+        "n": 13,
+        "win_rate": 0.4615,
+        "expectancy_R": 0.3462,
+        "gross_PF": 1.782,
+        "net_PF": 1.598,
+        "expectancy_pips": 6.923,
+        "net_pips_total": 90.0,
+        "net_usd_1lot": 900.0,
+        "max_dd_R": -4.25,
+        "max_dd_usd_1lot": -850.0,
+        "exit_reasons": {
+          "stop": 7,
+          "time": 6
+        },
+        "avg_risk_pips": 20.0
+      },
+      "oos": {
+        "label": "tp_to_open_win_09_10_A_fixed20_OOS_ge2016",
+        "n": 6,
+        "win_rate": 0.3333,
+        "expectancy_R": 0.2342,
+        "gross_PF": 1.586,
+        "net_PF": 1.405,
+        "expectancy_pips": 4.683,
+        "net_pips_total": 28.1,
+        "net_usd_1lot": 281.0,
+        "max_dd_R": -1.31,
+        "max_dd_usd_1lot": -263.0,
+        "exit_reasons": {
+          "stop": 3,
+          "time": 3
+        },
+        "avg_risk_pips": 20.0
+      },
+      "guard": {
+        "signals": 19,
+        "boundary_stop_too_tight": 0,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": null,
+        "win_start_hr": 9,
+        "win_end_hr": 10,
+        "stop_mode": "fixed",
+        "fixed_pips": 20.0
+      }
+    },
+    "tp_to_open_win_09_10_B_boundary": {
+      "full": {
+        "label": "tp_to_open_win_09_10_B_boundary",
+        "n": 20,
+        "win_rate": 0.35,
+        "expectancy_R": 0.3314,
+        "gross_PF": 2.468,
+        "net_PF": 2.059,
+        "expectancy_pips": 7.595,
+        "net_pips_total": 151.9,
+        "net_usd_1lot": 1519.0,
+        "max_dd_R": -9.93,
+        "max_dd_usd_1lot": -974.0,
+        "exit_reasons": {
+          "stop": 11,
+          "time": 9
+        },
+        "avg_risk_pips": 24.21
+      },
+      "is": {
+        "label": "tp_to_open_win_09_10_B_boundary_IS_lt2016",
+        "n": 15,
+        "win_rate": 0.3333,
+        "expectancy_R": 0.2629,
+        "gross_PF": 1.72,
+        "net_PF": 1.452,
+        "expectancy_pips": 3.733,
+        "net_pips_total": 56.0,
+        "net_usd_1lot": 560.0,
+        "max_dd_R": -7.38,
+        "max_dd_usd_1lot": -860.0,
+        "exit_reasons": {
+          "stop": 9,
+          "time": 6
+        },
+        "avg_risk_pips": 23.39
+      },
+      "oos": {
+        "label": "tp_to_open_win_09_10_B_boundary_OOS_ge2016",
+        "n": 5,
+        "win_rate": 0.4,
+        "expectancy_R": 0.5368,
+        "gross_PF": 7.94,
+        "net_PF": 5.943,
+        "expectancy_pips": 19.18,
+        "net_pips_total": 95.9,
+        "net_usd_1lot": 959.0,
+        "max_dd_R": -1.39,
+        "max_dd_usd_1lot": -113.0,
+        "exit_reasons": {
+          "time": 3,
+          "stop": 2
+        },
+        "avg_risk_pips": 26.66
+      },
+      "guard": {
+        "signals": 20,
+        "boundary_stop_too_tight": 5,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": null,
+        "win_start_hr": 9,
+        "win_end_hr": 10,
+        "stop_mode": "boundary"
+      }
+    },
+    "tp_to_open_win_15_18_A_fixed20": {
+      "full": {
+        "label": "tp_to_open_win_15_18_A_fixed20",
+        "n": 280,
+        "win_rate": 0.3893,
+        "expectancy_R": 0.1796,
+        "gross_PF": 1.443,
+        "net_PF": 1.289,
+        "expectancy_pips": 3.593,
+        "net_pips_total": 1006.0,
+        "net_usd_1lot": 10060.0,
+        "max_dd_R": -21.32,
+        "max_dd_usd_1lot": -4265.0,
+        "exit_reasons": {
+          "stop": 157,
+          "time": 121,
+          "target": 2
+        },
+        "avg_risk_pips": 20.0
+      },
+      "is": {
+        "label": "tp_to_open_win_15_18_A_fixed20_IS_lt2016",
+        "n": 240,
+        "win_rate": 0.3917,
+        "expectancy_R": 0.1364,
+        "gross_PF": 1.369,
+        "net_PF": 1.221,
+        "expectancy_pips": 2.729,
+        "net_pips_total": 654.9,
+        "net_usd_1lot": 6549.0,
+        "max_dd_R": -21.32,
+        "max_dd_usd_1lot": -4265.0,
+        "exit_reasons": {
+          "stop": 134,
+          "time": 104,
+          "target": 2
+        },
+        "avg_risk_pips": 20.0
+      },
+      "oos": {
+        "label": "tp_to_open_win_15_18_A_fixed20_OOS_ge2016",
+        "n": 40,
+        "win_rate": 0.375,
+        "expectancy_R": 0.4389,
+        "gross_PF": 1.874,
+        "net_PF": 1.691,
+        "expectancy_pips": 8.777,
+        "net_pips_total": 351.1,
+        "net_usd_1lot": 3511.0,
+        "max_dd_R": -8.06,
+        "max_dd_usd_1lot": -1612.0,
+        "exit_reasons": {
+          "stop": 23,
+          "time": 17
+        },
+        "avg_risk_pips": 20.0
+      },
+      "guard": {
+        "signals": 280,
+        "boundary_stop_too_tight": 0,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": null,
+        "win_start_hr": 15,
+        "win_end_hr": 18,
+        "stop_mode": "fixed",
+        "fixed_pips": 20.0
+      }
+    },
+    "tp_to_open_win_15_18_B_boundary": {
+      "full": {
+        "label": "tp_to_open_win_15_18_B_boundary",
+        "n": 336,
+        "win_rate": 0.3036,
+        "expectancy_R": 0.3661,
+        "gross_PF": 1.682,
+        "net_PF": 1.434,
+        "expectancy_pips": 3.859,
+        "net_pips_total": 1296.7,
+        "net_usd_1lot": 12967.0,
+        "max_dd_R": -22.36,
+        "max_dd_usd_1lot": -2935.0,
+        "exit_reasons": {
+          "stop": 218,
+          "time": 115,
+          "target": 3
+        },
+        "avg_risk_pips": 17.9
+      },
+      "is": {
+        "label": "tp_to_open_win_15_18_B_boundary_IS_lt2016",
+        "n": 293,
+        "win_rate": 0.3038,
+        "expectancy_R": 0.3996,
+        "gross_PF": 1.659,
+        "net_PF": 1.403,
+        "expectancy_pips": 3.443,
+        "net_pips_total": 1008.9,
+        "net_usd_1lot": 10089.0,
+        "max_dd_R": -22.36,
+        "max_dd_usd_1lot": -2935.0,
+        "exit_reasons": {
+          "stop": 190,
+          "time": 100,
+          "target": 3
+        },
+        "avg_risk_pips": 16.71
+      },
+      "oos": {
+        "label": "tp_to_open_win_15_18_B_boundary_OOS_ge2016",
+        "n": 43,
+        "win_rate": 0.3023,
+        "expectancy_R": 0.1377,
+        "gross_PF": 1.796,
+        "net_PF": 1.59,
+        "expectancy_pips": 6.693,
+        "net_pips_total": 287.8,
+        "net_usd_1lot": 2878.0,
+        "max_dd_R": -11.47,
+        "max_dd_usd_1lot": -1667.0,
+        "exit_reasons": {
+          "stop": 28,
+          "time": 15
+        },
+        "avg_risk_pips": 26.07
+      },
+      "guard": {
+        "signals": 336,
+        "boundary_stop_too_tight": 99,
+        "closed_at_day_end": 0
+      },
+      "params": {
+        "tp_pips": null,
+        "win_start_hr": 15,
+        "win_end_hr": 18,
+        "stop_mode": "boundary"
+      }
+    }
+  },
+  "cost_sensitivity": [
+    {
+      "scenario": "tp30_win_09_10_A_fixed20",
+      "cost_pips": 0.5,
+      "n": 20,
+      "net_PF": 1.029,
+      "expectancy_R": 0.0168,
+      "net_pips_total": 6.7
+    },
+    {
+      "scenario": "tp30_win_09_10_A_fixed20",
+      "cost_pips": 1.0,
+      "n": 20,
+      "net_PF": 0.986,
+      "expectancy_R": -0.0083,
+      "net_pips_total": -3.3
+    },
+    {
+      "scenario": "tp30_win_09_10_A_fixed20",
+      "cost_pips": 1.5,
+      "n": 20,
+      "net_PF": 0.945,
+      "expectancy_R": -0.0332,
+      "net_pips_total": -13.3
+    },
+    {
+      "scenario": "tp30_win_09_10_A_fixed20",
+      "cost_pips": 2.0,
+      "n": 20,
+      "net_PF": 0.906,
+      "expectancy_R": -0.0583,
+      "net_pips_total": -23.3
+    },
+    {
+      "scenario": "tp30_win_09_10_A_fixed20",
+      "cost_pips": 3.0,
+      "n": 20,
+      "net_PF": 0.833,
+      "expectancy_R": -0.1082,
+      "net_pips_total": -43.3
+    },
+    {
+      "scenario": "tp30_win_15_18_A_fixed20",
+      "cost_pips": 0.5,
+      "n": 343,
+      "net_PF": 1.056,
+      "expectancy_R": 0.0313,
+      "net_pips_total": 214.4
+    },
+    {
+      "scenario": "tp30_win_15_18_A_fixed20",
+      "cost_pips": 1.0,
+      "n": 343,
+      "net_PF": 1.011,
+      "expectancy_R": 0.0063,
+      "net_pips_total": 42.9
+    },
+    {
+      "scenario": "tp30_win_15_18_A_fixed20",
+      "cost_pips": 1.5,
+      "n": 343,
+      "net_PF": 0.968,
+      "expectancy_R": -0.0187,
+      "net_pips_total": -128.6
+    },
+    {
+      "scenario": "tp30_win_15_18_A_fixed20",
+      "cost_pips": 2.0,
+      "n": 343,
+      "net_PF": 0.927,
+      "expectancy_R": -0.0437,
+      "net_pips_total": -300.1
+    },
+    {
+      "scenario": "tp30_win_15_18_A_fixed20",
+      "cost_pips": 3.0,
+      "n": 343,
+      "net_PF": 0.851,
+      "expectancy_R": -0.0937,
+      "net_pips_total": -643.1
+    },
+    {
+      "scenario": "tp_to_open_win_09_10_A_fixed20",
+      "cost_pips": 0.5,
+      "n": 19,
+      "net_PF": 1.657,
+      "expectancy_R": 0.3608,
+      "net_pips_total": 137.1
+    },
+    {
+      "scenario": "tp_to_open_win_09_10_A_fixed20",
+      "cost_pips": 1.0,
+      "n": 19,
+      "net_PF": 1.595,
+      "expectancy_R": 0.3358,
+      "net_pips_total": 127.6
+    },
+    {
+      "scenario": "tp_to_open_win_09_10_A_fixed20",
+      "cost_pips": 1.5,
+      "n": 19,
+      "net_PF": 1.537,
+      "expectancy_R": 0.3108,
+      "net_pips_total": 118.1
+    },
+    {
+      "scenario": "tp_to_open_win_09_10_A_fixed20",
+      "cost_pips": 2.0,
+      "n": 19,
+      "net_PF": 1.482,
+      "expectancy_R": 0.2858,
+      "net_pips_total": 108.6
+    },
+    {
+      "scenario": "tp_to_open_win_09_10_A_fixed20",
+      "cost_pips": 3.0,
+      "n": 19,
+      "net_PF": 1.379,
+      "expectancy_R": 0.2358,
+      "net_pips_total": 89.6
+    },
+    {
+      "scenario": "tp_to_open_win_15_18_A_fixed20",
+      "cost_pips": 0.5,
+      "n": 280,
+      "net_PF": 1.389,
+      "expectancy_R": 0.2296,
+      "net_pips_total": 1286.0
+    },
+    {
+      "scenario": "tp_to_open_win_15_18_A_fixed20",
+      "cost_pips": 1.0,
+      "n": 280,
+      "net_PF": 1.338,
+      "expectancy_R": 0.2046,
+      "net_pips_total": 1146.0
+    },
+    {
+      "scenario": "tp_to_open_win_15_18_A_fixed20",
+      "cost_pips": 1.5,
+      "n": 280,
+      "net_PF": 1.289,
+      "expectancy_R": 0.1796,
+      "net_pips_total": 1006.0
+    },
+    {
+      "scenario": "tp_to_open_win_15_18_A_fixed20",
+      "cost_pips": 2.0,
+      "n": 280,
+      "net_PF": 1.243,
+      "expectancy_R": 0.1546,
+      "net_pips_total": 866.0
+    },
+    {
+      "scenario": "tp_to_open_win_15_18_A_fixed20",
+      "cost_pips": 3.0,
+      "n": 280,
+      "net_PF": 1.157,
+      "expectancy_R": 0.1046,
+      "net_pips_total": 586.0
+    }
+  ]
+}
