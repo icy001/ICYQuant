@@ -1,0 +1,1089 @@
+{
+  "spec": {
+    "purpose": "exp02: lower the trigger threshold on the to-O + 15-18 + A combo to test whether the 1.0% edge is real mean-reversion or a 2-hour drift effect.",
+    "frozen": {
+      "window": "Beijing 15:00-18:00",
+      "stop": "A: fixed 20.0 pips",
+      "target": "revert to day open O",
+      "cost_pips": 1.5,
+      "time_stop_bars": 24
+    },
+    "variable": "trigger threshold pct in {0.3%, 0.5%, 1.0%}",
+    "1.0%_is_baseline": "re-run on this code path; not the exp01 number carried over. exp01 numbers: 280 trades, OOS expR +0.439; this run is the in-script apples-to-apples control.",
+    "trigger_counting": "triggers_in_window counts every 5m bar in the configured window whose high >= O*(1+pct) or low <= O*(1-pct), regardless of position state. entries = positions actually opened."
+  },
+  "data_quality": {
+    "m1_rows": 8999734,
+    "m5_bars": 1906107,
+    "m5_range": [
+      "2000-05-31 06:25:00",
+      "2026-10-03 05:55:00"
+    ],
+    "window_15_18": {
+      "total_days": 6867,
+      "kept": 6709,
+      "window_not_populated": 158,
+      "win_start_hr": 15,
+      "win_end_hr": 18,
+      "min_window_bars": 20
+    }
+  },
+  "results": {
+    "0.3%": {
+      "pct": 0.003,
+      "full": {
+        "label": "0.3%",
+        "n": 5916,
+        "win_rate": 0.429,
+        "expectancy_R": -0.0627,
+        "expectancy_pips": -1.254,
+        "gross_PF": 1.027,
+        "net_PF": 0.875,
+        "net_pips_total": -7421.2,
+        "net_usd_1lot": -74212.0,
+        "max_dd_R": -375.48,
+        "max_dd_usd_1lot": -75097.0,
+        "exit_reasons": {
+          "time": 2879,
+          "stop": 2459,
+          "target": 578
+        },
+        "target_hit_rate": 0.0977,
+        "stop_hit_rate": 0.4157,
+        "time_hit_rate": 0.4866,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 53.8,
+        "holding_bars": {
+          "mean": 16.77,
+          "median": 23,
+          "p25": 9,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 5916,
+          "signals": 5916,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 578,
+          "mean": 13.7,
+          "median": 14,
+          "min": 1,
+          "max": 24
+        }
+      },
+      "is": {
+        "label": "0.3%_IS",
+        "n": 4400,
+        "win_rate": 0.4207,
+        "expectancy_R": -0.0627,
+        "expectancy_pips": -1.253,
+        "gross_PF": 1.025,
+        "net_PF": 0.882,
+        "net_pips_total": -5513.7,
+        "net_usd_1lot": -55137.0,
+        "max_dd_R": -300.19,
+        "max_dd_usd_1lot": -60038.0,
+        "exit_reasons": {
+          "stop": 1992,
+          "time": 1931,
+          "target": 477
+        },
+        "target_hit_rate": 0.1084,
+        "stop_hit_rate": 0.4527,
+        "time_hit_rate": 0.4389,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 57.0,
+        "holding_bars": {
+          "mean": 15.87,
+          "median": 19,
+          "p25": 7,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 5916,
+          "signals": 5916,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 477,
+          "mean": 13.61,
+          "median": 14,
+          "min": 1,
+          "max": 24
+        }
+      },
+      "oos": {
+        "label": "0.3%_OOS",
+        "n": 1516,
+        "win_rate": 0.4532,
+        "expectancy_R": -0.0629,
+        "expectancy_pips": -1.258,
+        "gross_PF": 1.032,
+        "net_PF": 0.849,
+        "net_pips_total": -1907.5,
+        "net_usd_1lot": -19075.0,
+        "max_dd_R": -116.78,
+        "max_dd_usd_1lot": -23355.0,
+        "exit_reasons": {
+          "time": 948,
+          "stop": 467,
+          "target": 101
+        },
+        "target_hit_rate": 0.0666,
+        "stop_hit_rate": 0.308,
+        "time_hit_rate": 0.6253,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 44.4,
+        "holding_bars": {
+          "mean": 19.37,
+          "median": 24,
+          "p25": 14,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 5916,
+          "signals": 5916,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 101,
+          "mean": 14.15,
+          "median": 14,
+          "min": 2,
+          "max": 24
+        }
+      },
+      "yearly": [
+        {
+          "year": 2000,
+          "n": 201,
+          "net_pips": -24.5,
+          "net_usd_1lot": -245.0,
+          "win_rate": 0.473
+        },
+        {
+          "year": 2001,
+          "n": 303,
+          "net_pips": -681.5,
+          "net_usd_1lot": -6815.0,
+          "win_rate": 0.449
+        },
+        {
+          "year": 2002,
+          "n": 163,
+          "net_pips": -425.5,
+          "net_usd_1lot": -4255.0,
+          "win_rate": 0.423
+        },
+        {
+          "year": 2003,
+          "n": 290,
+          "net_pips": -348.0,
+          "net_usd_1lot": -3480.0,
+          "win_rate": 0.483
+        },
+        {
+          "year": 2004,
+          "n": 265,
+          "net_pips": -427.5,
+          "net_usd_1lot": -4275.0,
+          "win_rate": 0.438
+        },
+        {
+          "year": 2005,
+          "n": 243,
+          "net_pips": -241.5,
+          "net_usd_1lot": -2415.0,
+          "win_rate": 0.469
+        },
+        {
+          "year": 2006,
+          "n": 154,
+          "net_pips": -303.0,
+          "net_usd_1lot": -3030.0,
+          "win_rate": 0.448
+        },
+        {
+          "year": 2007,
+          "n": 122,
+          "net_pips": -291.0,
+          "net_usd_1lot": -2910.0,
+          "win_rate": 0.41
+        },
+        {
+          "year": 2008,
+          "n": 516,
+          "net_pips": -1399.0,
+          "net_usd_1lot": -13990.0,
+          "win_rate": 0.333
+        },
+        {
+          "year": 2009,
+          "n": 479,
+          "net_pips": -500.5,
+          "net_usd_1lot": -5005.0,
+          "win_rate": 0.388
+        },
+        {
+          "year": 2010,
+          "n": 419,
+          "net_pips": -425.5,
+          "net_usd_1lot": -4255.0,
+          "win_rate": 0.396
+        },
+        {
+          "year": 2011,
+          "n": 424,
+          "net_pips": 331.9,
+          "net_usd_1lot": 3319.0,
+          "win_rate": 0.399
+        },
+        {
+          "year": 2012,
+          "n": 231,
+          "net_pips": -162.7,
+          "net_usd_1lot": -1627.0,
+          "win_rate": 0.455
+        },
+        {
+          "year": 2013,
+          "n": 127,
+          "net_pips": 122.3,
+          "net_usd_1lot": 1223.0,
+          "win_rate": 0.48
+        },
+        {
+          "year": 2014,
+          "n": 77,
+          "net_pips": -230.4,
+          "net_usd_1lot": -2304.0,
+          "win_rate": 0.442
+        },
+        {
+          "year": 2015,
+          "n": 386,
+          "net_pips": -507.3,
+          "net_usd_1lot": -5073.0,
+          "win_rate": 0.438
+        },
+        {
+          "year": 2016,
+          "n": 184,
+          "net_pips": 217.5,
+          "net_usd_1lot": 2175.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2017,
+          "n": 136,
+          "net_pips": 47.5,
+          "net_usd_1lot": 475.0,
+          "win_rate": 0.515
+        },
+        {
+          "year": 2018,
+          "n": 170,
+          "net_pips": -85.5,
+          "net_usd_1lot": -855.0,
+          "win_rate": 0.506
+        },
+        {
+          "year": 2019,
+          "n": 40,
+          "net_pips": -86.9,
+          "net_usd_1lot": -869.0,
+          "win_rate": 0.375
+        },
+        {
+          "year": 2020,
+          "n": 174,
+          "net_pips": -173.6,
+          "net_usd_1lot": -1736.0,
+          "win_rate": 0.437
+        },
+        {
+          "year": 2021,
+          "n": 82,
+          "net_pips": -488.6,
+          "net_usd_1lot": -4886.0,
+          "win_rate": 0.366
+        },
+        {
+          "year": 2022,
+          "n": 290,
+          "net_pips": -404.7,
+          "net_usd_1lot": -4047.0,
+          "win_rate": 0.441
+        },
+        {
+          "year": 2023,
+          "n": 116,
+          "net_pips": -350.6,
+          "net_usd_1lot": -3506.0,
+          "win_rate": 0.431
+        },
+        {
+          "year": 2024,
+          "n": 78,
+          "net_pips": 27.5,
+          "net_usd_1lot": 275.0,
+          "win_rate": 0.513
+        },
+        {
+          "year": 2025,
+          "n": 183,
+          "net_pips": -495.6,
+          "net_usd_1lot": -4956.0,
+          "win_rate": 0.388
+        },
+        {
+          "year": 2026,
+          "n": 63,
+          "net_pips": -114.5,
+          "net_usd_1lot": -1145.0,
+          "win_rate": 0.46
+        }
+      ]
+    },
+    "0.5%": {
+      "pct": 0.005,
+      "full": {
+        "label": "0.5%",
+        "n": 2308,
+        "win_rate": 0.3912,
+        "expectancy_R": -0.094,
+        "expectancy_pips": -1.879,
+        "gross_PF": 0.964,
+        "net_PF": 0.836,
+        "net_pips_total": -4337.3,
+        "net_usd_1lot": -43373.0,
+        "max_dd_R": -221.06,
+        "max_dd_usd_1lot": -44213.0,
+        "exit_reasons": {
+          "stop": 1143,
+          "time": 1094,
+          "target": 71
+        },
+        "target_hit_rate": 0.0308,
+        "stop_hit_rate": 0.4952,
+        "time_hit_rate": 0.474,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 80.4,
+        "holding_bars": {
+          "mean": 15.87,
+          "median": 21,
+          "p25": 6,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 2308,
+          "signals": 2308,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 71,
+          "mean": 14.94,
+          "median": 15,
+          "min": 1,
+          "max": 24
+        }
+      },
+      "is": {
+        "label": "0.5%_IS",
+        "n": 1873,
+        "win_rate": 0.3839,
+        "expectancy_R": -0.1012,
+        "expectancy_pips": -2.024,
+        "gross_PF": 0.952,
+        "net_PF": 0.828,
+        "net_pips_total": -3791.2,
+        "net_usd_1lot": -37912.0,
+        "max_dd_R": -199.48,
+        "max_dd_usd_1lot": -39897.0,
+        "exit_reasons": {
+          "stop": 961,
+          "time": 850,
+          "target": 62
+        },
+        "target_hit_rate": 0.0331,
+        "stop_hit_rate": 0.5131,
+        "time_hit_rate": 0.4538,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 82.9,
+        "holding_bars": {
+          "mean": 15.43,
+          "median": 20,
+          "p25": 6,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 2308,
+          "signals": 2308,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 62,
+          "mean": 14.98,
+          "median": 15,
+          "min": 1,
+          "max": 24
+        }
+      },
+      "oos": {
+        "label": "0.5%_OOS",
+        "n": 435,
+        "win_rate": 0.423,
+        "expectancy_R": -0.0628,
+        "expectancy_pips": -1.255,
+        "gross_PF": 1.026,
+        "net_PF": 0.876,
+        "net_pips_total": -546.1,
+        "net_usd_1lot": -5461.0,
+        "max_dd_R": -45.71,
+        "max_dd_usd_1lot": -9142.0,
+        "exit_reasons": {
+          "time": 244,
+          "stop": 182,
+          "target": 9
+        },
+        "target_hit_rate": 0.0207,
+        "stop_hit_rate": 0.4184,
+        "time_hit_rate": 0.5609,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 69.7,
+        "holding_bars": {
+          "mean": 17.75,
+          "median": 24,
+          "p25": 10,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 2308,
+          "signals": 2308,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 9,
+          "mean": 14.67,
+          "median": 11,
+          "min": 9,
+          "max": 24
+        }
+      },
+      "yearly": [
+        {
+          "year": 2000,
+          "n": 77,
+          "net_pips": 39.5,
+          "net_usd_1lot": 395.0,
+          "win_rate": 0.481
+        },
+        {
+          "year": 2001,
+          "n": 136,
+          "net_pips": -125.0,
+          "net_usd_1lot": -1250.0,
+          "win_rate": 0.434
+        },
+        {
+          "year": 2002,
+          "n": 58,
+          "net_pips": -313.0,
+          "net_usd_1lot": -3130.0,
+          "win_rate": 0.362
+        },
+        {
+          "year": 2003,
+          "n": 112,
+          "net_pips": -70.0,
+          "net_usd_1lot": -700.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2004,
+          "n": 106,
+          "net_pips": -325.0,
+          "net_usd_1lot": -3250.0,
+          "win_rate": 0.434
+        },
+        {
+          "year": 2005,
+          "n": 92,
+          "net_pips": -215.0,
+          "net_usd_1lot": -2150.0,
+          "win_rate": 0.478
+        },
+        {
+          "year": 2006,
+          "n": 44,
+          "net_pips": -256.0,
+          "net_usd_1lot": -2560.0,
+          "win_rate": 0.318
+        },
+        {
+          "year": 2007,
+          "n": 26,
+          "net_pips": -129.0,
+          "net_usd_1lot": -1290.0,
+          "win_rate": 0.308
+        },
+        {
+          "year": 2008,
+          "n": 307,
+          "net_pips": -1281.5,
+          "net_usd_1lot": -12815.0,
+          "win_rate": 0.287
+        },
+        {
+          "year": 2009,
+          "n": 231,
+          "net_pips": -505.5,
+          "net_usd_1lot": -5055.0,
+          "win_rate": 0.342
+        },
+        {
+          "year": 2010,
+          "n": 205,
+          "net_pips": -229.5,
+          "net_usd_1lot": -2295.0,
+          "win_rate": 0.366
+        },
+        {
+          "year": 2011,
+          "n": 200,
+          "net_pips": -27.0,
+          "net_usd_1lot": -270.0,
+          "win_rate": 0.36
+        },
+        {
+          "year": 2012,
+          "n": 55,
+          "net_pips": 44.9,
+          "net_usd_1lot": 449.0,
+          "win_rate": 0.509
+        },
+        {
+          "year": 2013,
+          "n": 30,
+          "net_pips": -37.3,
+          "net_usd_1lot": -373.0,
+          "win_rate": 0.4
+        },
+        {
+          "year": 2014,
+          "n": 18,
+          "net_pips": -61.9,
+          "net_usd_1lot": -619.0,
+          "win_rate": 0.444
+        },
+        {
+          "year": 2015,
+          "n": 176,
+          "net_pips": -299.9,
+          "net_usd_1lot": -2999.0,
+          "win_rate": 0.409
+        },
+        {
+          "year": 2016,
+          "n": 48,
+          "net_pips": 248.4,
+          "net_usd_1lot": 2484.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2017,
+          "n": 28,
+          "net_pips": -18.5,
+          "net_usd_1lot": -185.0,
+          "win_rate": 0.429
+        },
+        {
+          "year": 2018,
+          "n": 38,
+          "net_pips": -80.7,
+          "net_usd_1lot": -807.0,
+          "win_rate": 0.395
+        },
+        {
+          "year": 2019,
+          "n": 5,
+          "net_pips": -38.0,
+          "net_usd_1lot": -380.0,
+          "win_rate": 0.2
+        },
+        {
+          "year": 2020,
+          "n": 54,
+          "net_pips": 249.5,
+          "net_usd_1lot": 2495.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2021,
+          "n": 12,
+          "net_pips": -72.0,
+          "net_usd_1lot": -720.0,
+          "win_rate": 0.25
+        },
+        {
+          "year": 2022,
+          "n": 114,
+          "net_pips": -265.3,
+          "net_usd_1lot": -2653.0,
+          "win_rate": 0.43
+        },
+        {
+          "year": 2023,
+          "n": 27,
+          "net_pips": -173.8,
+          "net_usd_1lot": -1738.0,
+          "win_rate": 0.37
+        },
+        {
+          "year": 2024,
+          "n": 16,
+          "net_pips": 1.8,
+          "net_usd_1lot": 18.0,
+          "win_rate": 0.562
+        },
+        {
+          "year": 2025,
+          "n": 72,
+          "net_pips": -333.1,
+          "net_usd_1lot": -3331.0,
+          "win_rate": 0.333
+        },
+        {
+          "year": 2026,
+          "n": 21,
+          "net_pips": -64.4,
+          "net_usd_1lot": -644.0,
+          "win_rate": 0.476
+        }
+      ]
+    },
+    "1.0%": {
+      "pct": 0.01,
+      "full": {
+        "label": "1.0%",
+        "n": 280,
+        "win_rate": 0.3893,
+        "expectancy_R": 0.1796,
+        "expectancy_pips": 3.593,
+        "gross_PF": 1.443,
+        "net_PF": 1.289,
+        "net_pips_total": 1006.0,
+        "net_usd_1lot": 10060.0,
+        "max_dd_R": -21.32,
+        "max_dd_usd_1lot": -4265.0,
+        "exit_reasons": {
+          "stop": 157,
+          "time": 121,
+          "target": 2
+        },
+        "target_hit_rate": 0.0071,
+        "stop_hit_rate": 0.5607,
+        "time_hit_rate": 0.4321,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 148.5,
+        "holding_bars": {
+          "mean": 14.02,
+          "median": 14,
+          "p25": 3,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 280,
+          "signals": 280,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 2,
+          "mean": 9.0,
+          "median": 9,
+          "min": 1,
+          "max": 17
+        }
+      },
+      "is": {
+        "label": "1.0%_IS",
+        "n": 240,
+        "win_rate": 0.3917,
+        "expectancy_R": 0.1364,
+        "expectancy_pips": 2.729,
+        "gross_PF": 1.369,
+        "net_PF": 1.221,
+        "net_pips_total": 654.9,
+        "net_usd_1lot": 6549.0,
+        "max_dd_R": -21.32,
+        "max_dd_usd_1lot": -4265.0,
+        "exit_reasons": {
+          "stop": 134,
+          "time": 104,
+          "target": 2
+        },
+        "target_hit_rate": 0.0083,
+        "stop_hit_rate": 0.5583,
+        "time_hit_rate": 0.4333,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 148.1,
+        "holding_bars": {
+          "mean": 13.95,
+          "median": 15,
+          "p25": 3,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 280,
+          "signals": 280,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        },
+        "holding_bars_when_target": {
+          "n": 2,
+          "mean": 9.0,
+          "median": 9,
+          "min": 1,
+          "max": 17
+        }
+      },
+      "oos": {
+        "label": "1.0%_OOS",
+        "n": 40,
+        "win_rate": 0.375,
+        "expectancy_R": 0.4389,
+        "expectancy_pips": 8.777,
+        "gross_PF": 1.874,
+        "net_PF": 1.691,
+        "net_pips_total": 351.1,
+        "net_usd_1lot": 3511.0,
+        "max_dd_R": -8.06,
+        "max_dd_usd_1lot": -1612.0,
+        "exit_reasons": {
+          "stop": 23,
+          "time": 17
+        },
+        "target_hit_rate": 0.0,
+        "stop_hit_rate": 0.575,
+        "time_hit_rate": 0.425,
+        "day_end_rate": 0.0,
+        "avg_distance_to_O_pips": 150.4,
+        "holding_bars": {
+          "mean": 14.43,
+          "median": 14,
+          "p25": 4,
+          "p75": 24,
+          "max": 24
+        },
+        "guard": {
+          "triggers_in_window": 280,
+          "signals": 280,
+          "boundary_stop_too_tight": 0,
+          "closed_at_day_end": 0
+        }
+      },
+      "yearly": [
+        {
+          "year": 2000,
+          "n": 6,
+          "net_pips": -72.0,
+          "net_usd_1lot": -720.0,
+          "win_rate": 0.167
+        },
+        {
+          "year": 2001,
+          "n": 19,
+          "net_pips": 20.5,
+          "net_usd_1lot": 205.0,
+          "win_rate": 0.526
+        },
+        {
+          "year": 2002,
+          "n": 15,
+          "net_pips": -128.5,
+          "net_usd_1lot": -1285.0,
+          "win_rate": 0.267
+        },
+        {
+          "year": 2003,
+          "n": 5,
+          "net_pips": -4.5,
+          "net_usd_1lot": -45.0,
+          "win_rate": 0.6
+        },
+        {
+          "year": 2004,
+          "n": 10,
+          "net_pips": 76.0,
+          "net_usd_1lot": 760.0,
+          "win_rate": 0.6
+        },
+        {
+          "year": 2005,
+          "n": 2,
+          "net_pips": 15.0,
+          "net_usd_1lot": 150.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2006,
+          "n": 2,
+          "net_pips": -43.0,
+          "net_usd_1lot": -430.0,
+          "win_rate": 0.0
+        },
+        {
+          "year": 2007,
+          "n": 1,
+          "net_pips": 2.5,
+          "net_usd_1lot": 25.0,
+          "win_rate": 1.0
+        },
+        {
+          "year": 2008,
+          "n": 77,
+          "net_pips": 131.5,
+          "net_usd_1lot": 1315.0,
+          "win_rate": 0.299
+        },
+        {
+          "year": 2009,
+          "n": 45,
+          "net_pips": 217.5,
+          "net_usd_1lot": 2175.0,
+          "win_rate": 0.378
+        },
+        {
+          "year": 2010,
+          "n": 19,
+          "net_pips": -15.5,
+          "net_usd_1lot": -155.0,
+          "win_rate": 0.316
+        },
+        {
+          "year": 2011,
+          "n": 17,
+          "net_pips": 174.5,
+          "net_usd_1lot": 1745.0,
+          "win_rate": 0.471
+        },
+        {
+          "year": 2012,
+          "n": 2,
+          "net_pips": 10.1,
+          "net_usd_1lot": 101.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2013,
+          "n": 1,
+          "net_pips": 76.1,
+          "net_usd_1lot": 761.0,
+          "win_rate": 1.0
+        },
+        {
+          "year": 2015,
+          "n": 19,
+          "net_pips": 194.7,
+          "net_usd_1lot": 1947.0,
+          "win_rate": 0.632
+        },
+        {
+          "year": 2016,
+          "n": 6,
+          "net_pips": 239.3,
+          "net_usd_1lot": 2393.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2020,
+          "n": 6,
+          "net_pips": 131.7,
+          "net_usd_1lot": 1317.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2022,
+          "n": 4,
+          "net_pips": 2.6,
+          "net_usd_1lot": 26.0,
+          "win_rate": 0.5
+        },
+        {
+          "year": 2023,
+          "n": 3,
+          "net_pips": -11.4,
+          "net_usd_1lot": -114.0,
+          "win_rate": 0.333
+        },
+        {
+          "year": 2024,
+          "n": 3,
+          "net_pips": 90.5,
+          "net_usd_1lot": 905.0,
+          "win_rate": 0.667
+        },
+        {
+          "year": 2025,
+          "n": 18,
+          "net_pips": -101.6,
+          "net_usd_1lot": -1016.0,
+          "win_rate": 0.222
+        }
+      ]
+    }
+  },
+  "cost_sensitivity": [
+    {
+      "label": "0.3%",
+      "cost_pips": 0.5,
+      "n": 5916,
+      "net_PF": 0.973,
+      "expectancy_R": -0.0127,
+      "net_pips_total": -1505.2,
+      "target_hit_rate": 0.0977
+    },
+    {
+      "label": "0.3%",
+      "cost_pips": 1.0,
+      "n": 5916,
+      "net_PF": 0.922,
+      "expectancy_R": -0.0377,
+      "net_pips_total": -4463.2,
+      "target_hit_rate": 0.0977
+    },
+    {
+      "label": "0.3%",
+      "cost_pips": 1.5,
+      "n": 5916,
+      "net_PF": 0.875,
+      "expectancy_R": -0.0627,
+      "net_pips_total": -7421.2,
+      "target_hit_rate": 0.0977
+    },
+    {
+      "label": "0.3%",
+      "cost_pips": 2.0,
+      "n": 5916,
+      "net_PF": 0.83,
+      "expectancy_R": -0.0877,
+      "net_pips_total": -10379.2,
+      "target_hit_rate": 0.0977
+    },
+    {
+      "label": "0.3%",
+      "cost_pips": 3.0,
+      "n": 5916,
+      "net_PF": 0.747,
+      "expectancy_R": -0.1377,
+      "net_pips_total": -16295.2,
+      "target_hit_rate": 0.0977
+    },
+    {
+      "label": "0.5%",
+      "cost_pips": 0.5,
+      "n": 2308,
+      "net_PF": 0.919,
+      "expectancy_R": -0.044,
+      "net_pips_total": -2029.3,
+      "target_hit_rate": 0.0308
+    },
+    {
+      "label": "0.5%",
+      "cost_pips": 1.0,
+      "n": 2308,
+      "net_PF": 0.876,
+      "expectancy_R": -0.069,
+      "net_pips_total": -3183.3,
+      "target_hit_rate": 0.0308
+    },
+    {
+      "label": "0.5%",
+      "cost_pips": 1.5,
+      "n": 2308,
+      "net_PF": 0.836,
+      "expectancy_R": -0.094,
+      "net_pips_total": -4337.3,
+      "target_hit_rate": 0.0308
+    },
+    {
+      "label": "0.5%",
+      "cost_pips": 2.0,
+      "n": 2308,
+      "net_PF": 0.797,
+      "expectancy_R": -0.119,
+      "net_pips_total": -5491.3,
+      "target_hit_rate": 0.0308
+    },
+    {
+      "label": "0.5%",
+      "cost_pips": 3.0,
+      "n": 2308,
+      "net_PF": 0.726,
+      "expectancy_R": -0.169,
+      "net_pips_total": -7799.3,
+      "target_hit_rate": 0.0308
+    },
+    {
+      "label": "1.0%",
+      "cost_pips": 0.5,
+      "n": 280,
+      "net_PF": 1.389,
+      "expectancy_R": 0.2296,
+      "net_pips_total": 1286.0,
+      "target_hit_rate": 0.0071
+    },
+    {
+      "label": "1.0%",
+      "cost_pips": 1.0,
+      "n": 280,
+      "net_PF": 1.338,
+      "expectancy_R": 0.2046,
+      "net_pips_total": 1146.0,
+      "target_hit_rate": 0.0071
+    },
+    {
+      "label": "1.0%",
+      "cost_pips": 1.5,
+      "n": 280,
+      "net_PF": 1.289,
+      "expectancy_R": 0.1796,
+      "net_pips_total": 1006.0,
+      "target_hit_rate": 0.0071
+    },
+    {
+      "label": "1.0%",
+      "cost_pips": 2.0,
+      "n": 280,
+      "net_PF": 1.243,
+      "expectancy_R": 0.1546,
+      "net_pips_total": 866.0,
+      "target_hit_rate": 0.0071
+    },
+    {
+      "label": "1.0%",
+      "cost_pips": 3.0,
+      "n": 280,
+      "net_PF": 1.157,
+      "expectancy_R": 0.1046,
+      "net_pips_total": 586.0,
+      "target_hit_rate": 0.0071
+    }
+  ]
+}
