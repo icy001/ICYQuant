@@ -81,3 +81,6 @@ integrations/lean/paper/backtests/
 # stay tracked; only the bulk binary payloads are excluded.
 artifacts/histdata_v9/parsed/*.parquet
 artifacts/histdata_v9/derived/*.parquet
+
+# World Bank raw workbook (cleaned CSV is committed instead)
+data/real/worldbank_commodities/*.xlsx
