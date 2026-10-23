@@ -1,0 +1,715 @@
+{
+  "experiment": "exp06_eurusd_tsmom",
+  "type": "directionality test (time-series momentum), not a finished strategy",
+  "rationale": "Exp01-05 measured event-triggered direction prediction, where cost dominates because signals are frequent and small. Trend following is persistent exposure with rare position changes, so its cost ratio is qualitatively different.",
+  "data": {
+    "bars_total": 8126,
+    "bars_dropped_incomplete": 284,
+    "bars_kept": 7842,
+    "min_bars_per_day": 300,
+    "bars_per_day_median": 1273.0,
+    "bars_per_day_p10": 413.0,
+    "range": [
+      "2000-05-31",
+      "2026-10-02"
+    ],
+    "years": 26.34
+  },
+  "method": {
+    "signal": "sign(close[i] - close[i-L])",
+    "lookbacks_preregistered": [
+      252,
+      63
+    ],
+    "primary_lookback": 252,
+    "execution": "decided on close[i], flips at open[i+1]; bar i holds sig[i-2] overnight and sig[i-1] intraday",
+    "lookahead": "none",
+    "cost_pips_per_position_change": 0.75,
+    "round_trip_on_flip_pips": 1.5,
+    "swap_per_night_sweep": [
+      0.0,
+      0.3,
+      0.5,
+      1.0
+    ],
+    "decision_basis_swap": 0.5,
+    "is_oos": "IS year < 2016 (same as exp01-05)",
+    "uncertainty": "year-block bootstrap (daily returns are serially correlated and positions persist for weeks)",
+    "verdict_rule": {
+      "WORTH CONTINUING": "net Sharpe >= 0.5 AND IS/OOS same sign AND majority of years positive",
+      "INSUFFICIENT EVIDENCE": "fewer than 15 years usable",
+      "NOT ESTABLISHED": "otherwise"
+    },
+    "not_scanned": [
+      "lookback is fixed at the two pre-declared values",
+      "no stop/target/vol-target parameters exist"
+    ]
+  },
+  "results": {
+    "L252": {
+      "lookback_bars": 252,
+      "base_no_swap": {
+        "n_days": 7588,
+        "years": 25.33,
+        "trades": 187,
+        "trades_per_year": 7.4,
+        "exposure_share": 0.9999,
+        "gross_pips_total": 1351.6,
+        "spread_pips_total": 279.0,
+        "swap_pips_total": 0.0,
+        "net_pips_total": 1072.6,
+        "net_pips_per_year": 42.4,
+        "mean_daily_pips": 0.14135,
+        "sd_daily_pips": 64.3468,
+        "sharpe_ann": 0.035,
+        "max_drawdown_pips": -4635.6,
+        "win_days": 0.4962,
+        "cost_share_of_gross": 0.2064,
+        "yearly": {
+          "2001": {
+            "n": 122,
+            "pips": -1044.5
+          },
+          "2002": {
+            "n": 199,
+            "pips": 421.0
+          },
+          "2003": {
+            "n": 287,
+            "pips": 2082.0
+          },
+          "2004": {
+            "n": 291,
+            "pips": 929.0
+          },
+          "2005": {
+            "n": 291,
+            "pips": -1727.5
+          },
+          "2006": {
+            "n": 286,
+            "pips": 515.5
+          },
+          "2007": {
+            "n": 277,
+            "pips": 1388.0
+          },
+          "2008": {
+            "n": 304,
+            "pips": -136.5
+          },
+          "2009": {
+            "n": 310,
+            "pips": -271.5
+          },
+          "2010": {
+            "n": 310,
+            "pips": -454.5
+          },
+          "2011": {
+            "n": 311,
+            "pips": 58.7
+          },
+          "2012": {
+            "n": 312,
+            "pips": -1187.4
+          },
+          "2013": {
+            "n": 312,
+            "pips": -785.0
+          },
+          "2014": {
+            "n": 312,
+            "pips": 1072.4
+          },
+          "2015": {
+            "n": 312,
+            "pips": 999.9
+          },
+          "2016": {
+            "n": 312,
+            "pips": -746.4
+          },
+          "2017": {
+            "n": 310,
+            "pips": 625.8
+          },
+          "2018": {
+            "n": 313,
+            "pips": -513.6
+          },
+          "2019": {
+            "n": 312,
+            "pips": 256.8
+          },
+          "2020": {
+            "n": 313,
+            "pips": 682.8
+          },
+          "2021": {
+            "n": 311,
+            "pips": -246.0
+          },
+          "2022": {
+            "n": 312,
+            "pips": 663.2
+          },
+          "2023": {
+            "n": 307,
+            "pips": -1939.2
+          },
+          "2024": {
+            "n": 314,
+            "pips": 358.9
+          },
+          "2025": {
+            "n": 313,
+            "pips": 277.1
+          },
+          "2026": {
+            "n": 235,
+            "pips": -206.4
+          }
+        },
+        "years_positive": 14,
+        "years_counted": 26
+      },
+      "swap_sweep": {
+        "0.0": {
+          "net_pips_total": 1072.6,
+          "net_pips_per_year": 42.4,
+          "sharpe_ann": 0.035,
+          "max_drawdown_pips": -4635.6,
+          "cost_share_of_gross": 0.2064
+        },
+        "0.3": {
+          "net_pips_total": -1203.5,
+          "net_pips_per_year": -47.5,
+          "sharpe_ann": -0.039,
+          "max_drawdown_pips": -5369.0,
+          "cost_share_of_gross": 1.8904
+        },
+        "0.5": {
+          "net_pips_total": -2720.9,
+          "net_pips_per_year": -107.4,
+          "sharpe_ann": -0.088,
+          "max_drawdown_pips": -6371.6,
+          "cost_share_of_gross": 3.0131
+        },
+        "1.0": {
+          "net_pips_total": -6514.4,
+          "net_pips_per_year": -257.2,
+          "sharpe_ann": -0.212,
+          "max_drawdown_pips": -8914.8,
+          "cost_share_of_gross": 5.8198
+        }
+      },
+      "decision_basis_swap_0_5": {
+        "n_days": 7588,
+        "years": 25.33,
+        "trades": 187,
+        "trades_per_year": 7.4,
+        "exposure_share": 0.9999,
+        "gross_pips_total": 1351.6,
+        "spread_pips_total": 279.0,
+        "swap_pips_total": 3793.5,
+        "net_pips_total": -2720.9,
+        "net_pips_per_year": -107.4,
+        "mean_daily_pips": -0.35858,
+        "sd_daily_pips": 64.3469,
+        "sharpe_ann": -0.088,
+        "max_drawdown_pips": -6371.6,
+        "win_days": 0.4938,
+        "cost_share_of_gross": 3.0131,
+        "yearly": {
+          "2001": {
+            "n": 122,
+            "pips": -1105.5
+          },
+          "2002": {
+            "n": 199,
+            "pips": 321.5
+          },
+          "2003": {
+            "n": 287,
+            "pips": 1938.5
+          },
+          "2004": {
+            "n": 291,
+            "pips": 783.5
+          },
+          "2005": {
+            "n": 291,
+            "pips": -1872.5
+          },
+          "2006": {
+            "n": 286,
+            "pips": 372.5
+          },
+          "2007": {
+            "n": 277,
+            "pips": 1249.5
+          },
+          "2008": {
+            "n": 304,
+            "pips": -288.5
+          },
+          "2009": {
+            "n": 310,
+            "pips": -426.5
+          },
+          "2010": {
+            "n": 310,
+            "pips": -609.5
+          },
+          "2011": {
+            "n": 311,
+            "pips": -96.8
+          },
+          "2012": {
+            "n": 312,
+            "pips": -1343.4
+          },
+          "2013": {
+            "n": 312,
+            "pips": -941.0
+          },
+          "2014": {
+            "n": 312,
+            "pips": 916.4
+          },
+          "2015": {
+            "n": 312,
+            "pips": 843.9
+          },
+          "2016": {
+            "n": 312,
+            "pips": -902.4
+          },
+          "2017": {
+            "n": 310,
+            "pips": 470.8
+          },
+          "2018": {
+            "n": 313,
+            "pips": -670.1
+          },
+          "2019": {
+            "n": 312,
+            "pips": 100.8
+          },
+          "2020": {
+            "n": 313,
+            "pips": 526.3
+          },
+          "2021": {
+            "n": 311,
+            "pips": -401.5
+          },
+          "2022": {
+            "n": 312,
+            "pips": 507.2
+          },
+          "2023": {
+            "n": 307,
+            "pips": -2092.7
+          },
+          "2024": {
+            "n": 314,
+            "pips": 201.9
+          },
+          "2025": {
+            "n": 313,
+            "pips": 120.6
+          },
+          "2026": {
+            "n": 235,
+            "pips": -323.9
+          }
+        },
+        "years_positive": 13,
+        "years_counted": 26
+      },
+      "is_oos": {
+        "IS": {
+          "n_days": 4236,
+          "years": 14.57,
+          "net_pips_total": -257.9,
+          "net_pips_per_year": -17.7,
+          "sharpe_ann": -0.013
+        },
+        "OOS": {
+          "n_days": 3352,
+          "years": 10.75,
+          "net_pips_total": -2463.0,
+          "net_pips_per_year": -229.2,
+          "sharpe_ann": -0.25
+        }
+      },
+      "bootstrap": {
+        "n_year_blocks": 26,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_daily_ci95": [
+          -1.6541,
+          0.84869
+        ],
+        "ann_pips_ci95": [
+          -416.8,
+          213.9
+        ]
+      },
+      "verdict": {
+        "verdict": "暂不成立 / NOT ESTABLISHED",
+        "reason": [
+          "net Sharpe -0.088 < 0.5",
+          "positive years 13/26"
+        ],
+        "sharpe_gate": 0.5,
+        "sharpe": -0.088,
+        "is_oos_same_sign": true,
+        "majority_years_positive": false
+      }
+    },
+    "L63": {
+      "lookback_bars": 63,
+      "base_no_swap": {
+        "n_days": 7777,
+        "years": 26.09,
+        "trades": 456,
+        "trades_per_year": 17.5,
+        "exposure_share": 0.9995,
+        "gross_pips_total": 4849.2,
+        "spread_pips_total": 678.0,
+        "swap_pips_total": 0.0,
+        "net_pips_total": 4171.2,
+        "net_pips_per_year": 159.9,
+        "mean_daily_pips": 0.53635,
+        "sd_daily_pips": 64.6211,
+        "sharpe_ann": 0.132,
+        "max_drawdown_pips": -5900.0,
+        "win_days": 0.4979,
+        "cost_share_of_gross": 0.1398,
+        "yearly": {
+          "2000": {
+            "n": 86,
+            "pips": 566.5
+          },
+          "2001": {
+            "n": 225,
+            "pips": -194.5
+          },
+          "2002": {
+            "n": 199,
+            "pips": 1499.5
+          },
+          "2003": {
+            "n": 287,
+            "pips": 1723.0
+          },
+          "2004": {
+            "n": 291,
+            "pips": -228.0
+          },
+          "2005": {
+            "n": 291,
+            "pips": -1144.5
+          },
+          "2006": {
+            "n": 286,
+            "pips": 87.5
+          },
+          "2007": {
+            "n": 277,
+            "pips": 928.0
+          },
+          "2008": {
+            "n": 304,
+            "pips": 1091.0
+          },
+          "2009": {
+            "n": 310,
+            "pips": -2412.5
+          },
+          "2010": {
+            "n": 310,
+            "pips": 1591.0
+          },
+          "2011": {
+            "n": 311,
+            "pips": 405.9
+          },
+          "2012": {
+            "n": 312,
+            "pips": -716.8
+          },
+          "2013": {
+            "n": 312,
+            "pips": 234.2
+          },
+          "2014": {
+            "n": 312,
+            "pips": 1391.8
+          },
+          "2015": {
+            "n": 312,
+            "pips": 608.0
+          },
+          "2016": {
+            "n": 312,
+            "pips": -540.3
+          },
+          "2017": {
+            "n": 310,
+            "pips": 348.8
+          },
+          "2018": {
+            "n": 313,
+            "pips": -35.0
+          },
+          "2019": {
+            "n": 312,
+            "pips": -596.5
+          },
+          "2020": {
+            "n": 313,
+            "pips": -119.7
+          },
+          "2021": {
+            "n": 311,
+            "pips": -149.0
+          },
+          "2022": {
+            "n": 312,
+            "pips": 2007.5
+          },
+          "2023": {
+            "n": 307,
+            "pips": -2102.9
+          },
+          "2024": {
+            "n": 314,
+            "pips": -313.1
+          },
+          "2025": {
+            "n": 313,
+            "pips": 802.9
+          },
+          "2026": {
+            "n": 235,
+            "pips": -561.6
+          }
+        },
+        "years_positive": 14,
+        "years_counted": 27
+      },
+      "swap_sweep": {
+        "0.0": {
+          "net_pips_total": 4171.2,
+          "net_pips_per_year": 159.9,
+          "sharpe_ann": 0.132,
+          "max_drawdown_pips": -5900.0,
+          "cost_share_of_gross": 0.1398
+        },
+        "0.3": {
+          "net_pips_total": 1839.3,
+          "net_pips_per_year": 70.5,
+          "sharpe_ann": 0.058,
+          "max_drawdown_pips": -5945.0,
+          "cost_share_of_gross": 0.6207
+        },
+        "0.5": {
+          "net_pips_total": 284.7,
+          "net_pips_per_year": 10.9,
+          "sharpe_ann": 0.009,
+          "max_drawdown_pips": -5975.0,
+          "cost_share_of_gross": 0.9413
+        },
+        "1.0": {
+          "net_pips_total": -3601.8,
+          "net_pips_per_year": -138.1,
+          "sharpe_ann": -0.114,
+          "max_drawdown_pips": -7807.4,
+          "cost_share_of_gross": 1.7428
+        }
+      },
+      "decision_basis_swap_0_5": {
+        "n_days": 7777,
+        "years": 26.09,
+        "trades": 456,
+        "trades_per_year": 17.5,
+        "exposure_share": 0.9995,
+        "gross_pips_total": 4849.2,
+        "spread_pips_total": 678.0,
+        "swap_pips_total": 3886.5,
+        "net_pips_total": 284.7,
+        "net_pips_per_year": 10.9,
+        "mean_daily_pips": 0.03661,
+        "sd_daily_pips": 64.6211,
+        "sharpe_ann": 0.009,
+        "max_drawdown_pips": -5975.0,
+        "win_days": 0.4947,
+        "cost_share_of_gross": 0.9413,
+        "yearly": {
+          "2000": {
+            "n": 86,
+            "pips": 523.5
+          },
+          "2001": {
+            "n": 225,
+            "pips": -307.0
+          },
+          "2002": {
+            "n": 199,
+            "pips": 1400.0
+          },
+          "2003": {
+            "n": 287,
+            "pips": 1579.5
+          },
+          "2004": {
+            "n": 291,
+            "pips": -373.5
+          },
+          "2005": {
+            "n": 291,
+            "pips": -1290.0
+          },
+          "2006": {
+            "n": 286,
+            "pips": -54.0
+          },
+          "2007": {
+            "n": 277,
+            "pips": 789.5
+          },
+          "2008": {
+            "n": 304,
+            "pips": 939.0
+          },
+          "2009": {
+            "n": 310,
+            "pips": -2567.5
+          },
+          "2010": {
+            "n": 310,
+            "pips": 1436.0
+          },
+          "2011": {
+            "n": 311,
+            "pips": 250.4
+          },
+          "2012": {
+            "n": 312,
+            "pips": -872.8
+          },
+          "2013": {
+            "n": 312,
+            "pips": 78.2
+          },
+          "2014": {
+            "n": 312,
+            "pips": 1235.8
+          },
+          "2015": {
+            "n": 312,
+            "pips": 452.0
+          },
+          "2016": {
+            "n": 312,
+            "pips": -696.3
+          },
+          "2017": {
+            "n": 310,
+            "pips": 193.8
+          },
+          "2018": {
+            "n": 313,
+            "pips": -191.5
+          },
+          "2019": {
+            "n": 312,
+            "pips": -752.5
+          },
+          "2020": {
+            "n": 313,
+            "pips": -276.2
+          },
+          "2021": {
+            "n": 311,
+            "pips": -304.5
+          },
+          "2022": {
+            "n": 312,
+            "pips": 1851.5
+          },
+          "2023": {
+            "n": 307,
+            "pips": -2255.9
+          },
+          "2024": {
+            "n": 314,
+            "pips": -470.1
+          },
+          "2025": {
+            "n": 313,
+            "pips": 646.4
+          },
+          "2026": {
+            "n": 235,
+            "pips": -679.1
+          }
+        },
+        "years_positive": 13,
+        "years_counted": 27
+      },
+      "is_oos": {
+        "IS": {
+          "n_days": 4425,
+          "years": 15.33,
+          "net_pips_total": 3219.1,
+          "net_pips_per_year": 210.0,
+          "sharpe_ann": 0.153
+        },
+        "OOS": {
+          "n_days": 3352,
+          "years": 10.75,
+          "net_pips_total": -2934.4,
+          "net_pips_per_year": -273.1,
+          "sharpe_ann": -0.297
+        }
+      },
+      "bootstrap": {
+        "n_year_blocks": 27,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_daily_ci95": [
+          -1.35367,
+          1.41143
+        ],
+        "ann_pips_ci95": [
+          -341.1,
+          355.7
+        ]
+      },
+      "verdict": {
+        "verdict": "暂不成立 / NOT ESTABLISHED",
+        "reason": [
+          "net Sharpe 0.009 < 0.5",
+          "IS/OOS opposite sign (IS 210.0, OOS -273.1)",
+          "positive years 13/27"
+        ],
+        "sharpe_gate": 0.5,
+        "sharpe": 0.009,
+        "is_oos_same_sign": false,
+        "majority_years_positive": false
+      }
+    }
+  },
+  "caveats": [
+    "Fixed +1/-1 units; no position sizing, stops or vol targeting.",
+    "Spread is assumed, not measured; swap is swept, not assumed.",
+    "Single-pair trend following has a low Sharpe ceiling by construction.",
+    "Passing the gate means the drift survives cost, not that a deployable strategy exists."
+  ]
+}
