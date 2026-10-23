@@ -1,0 +1,164 @@
+{
+  "commit": "P0-02",
+  "suite": "lean-paper",
+  "gate": "PARTIAL",
+  "passed": 7,
+  "failed": 0,
+  "pending": 1,
+  "total": 8,
+  "generated_at": "2026-09-30T06:41:54.221168+00:00",
+  "project_dir": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
+  "gates": [
+    {
+      "gate": "P02-G01",
+      "name": "deploy_paper 不再 TypeError",
+      "status": "PASS",
+      "passed": true,
+      "detail": "deploy_paper built and dispatched a legal live deploy argv",
+      "duration_ms": 0.342,
+      "data": {
+        "command": [
+          "lean",
+          "live",
+          "deploy",
+          "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
+          "--brokerage",
+          "Paper Trading",
+          "--data-provider-live",
+          "Custom data only"
+        ]
+      }
+    },
+    {
+      "gate": "P02-G02",
+      "name": "live command 无 --parameter",
+      "status": "PASS",
+      "passed": true,
+      "detail": "live command contains no --parameter flag",
+      "duration_ms": 0.002,
+      "data": {
+        "command": [
+          "lean",
+          "live",
+          "deploy",
+          "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/integrations/lean/paper",
+          "--brokerage",
+          "Paper Trading",
+          "--data-provider-live",
+          "Custom data only"
+        ]
+      }
+    },
+    {
+      "gate": "P02-G03",
+      "name": "live command data-provider 合法",
+      "status": "PASS",
+      "passed": true,
+      "detail": "live data provider='Custom data only'",
+      "duration_ms": 0.003,
+      "data": {
+        "data_provider": "Custom data only"
+      }
+    },
+    {
+      "gate": "P02-G04",
+      "name": "contract filename protocol",
+      "status": "PASS",
+      "passed": true,
+      "detail": "adapter / runtime / algorithm all name 'strategy_contract.json'",
+      "duration_ms": 0.678,
+      "data": {
+        "names": {
+          "runtime": "strategy_contract.json",
+          "adapter": "strategy_contract.json",
+          "algorithm": "strategy_contract.json"
+        }
+      }
+    },
+    {
+      "gate": "P02-G05",
+      "name": "lean.json 无 fake contract field",
+      "status": "PASS",
+      "passed": true,
+      "detail": "lean.json holds only LEAN project-level fields; no fake contract parameter",
+      "duration_ms": 0.053,
+      "data": {
+        "keys": [
+          "algorithm-language",
+          "api-handler",
+          "brokerage",
+          "command-handler",
+          "data-channel-provider",
+          "data-folder",
+          "data-provider",
+          "description",
+          "factor-file-provider",
+          "file-database-last-update",
+          "history-provider",
+          "id",
+          "job-queue-handler",
+          "map-file-provider",
+          "messaging-handler",
+          "object-store",
+          "organization-id",
+          "results-destination-handler",
+          "setup-handler",
+          "transaction-handler"
+        ]
+      }
+    },
+    {
+      "gate": "P02-G06",
+      "name": "lean.json 无 user-specific local-id",
+      "status": "PASS",
+      "passed": true,
+      "detail": "no user-specific local-id / cloud-id / organization-id (all-zero placeholders are the CLI's null state, not an identity)",
+      "duration_ms": 0.032,
+      "data": {
+        "keys": [
+          "algorithm-language",
+          "api-handler",
+          "brokerage",
+          "command-handler",
+          "data-channel-provider",
+          "data-folder",
+          "data-provider",
+          "description",
+          "factor-file-provider",
+          "file-database-last-update",
+          "history-provider",
+          "id",
+          "job-queue-handler",
+          "map-file-provider",
+          "messaging-handler",
+          "object-store",
+          "organization-id",
+          "results-destination-handler",
+          "setup-handler",
+          "transaction-handler"
+        ]
+      }
+    },
+    {
+      "gate": "P02-G07",
+      "name": "main.py 从磁盘读取 contract",
+      "status": "PASS",
+      "passed": true,
+      "detail": "_load_contract() resolves the contract from the project directory",
+      "duration_ms": 0.557,
+      "data": {
+        "contract_filename": "strategy_contract.json"
+      }
+    },
+    {
+      "gate": "P02-G08",
+      "name": "Order → Fill → Ledger",
+      "status": "PENDING",
+      "passed": false,
+      "detail": "real LEAN paper Order → Fill → Ledger evidence required; P0-02 does not fabricate an offline fill",
+      "duration_ms": 0.0,
+      "data": {}
+    }
+  ],
+  "next_action": "P02-G08 (real Order → Fill → Ledger) needs a real LEAN paper deployment: pip install lean, `lean init`, then `python -m apps.runtime lean-paper --deploy`, or grade an existing run with `--events <lean log or events.json>`."
+}

@@ -1,0 +1,47 @@
+schema_version: histdata_v9_validation_gates_v1
+gates:
+- id: G00_baseline_tracked
+  applies_to: 00_baseline_snapshot
+  pre:
+  - repo has .git
+  - raw input dir OR warn-only
+  post:
+  - all 3 baseline CSVs TRACKED
+  - snapshot/baseline.json exists
+  - snapshot/csv_hashes.json has 3 entries
+  failure_codes:
+    2: baseline_not_tracked
+    4: git_unavailable
+- id: G01_contracts_generated
+  applies_to: 01_generate_artifacts
+  pre:
+  - snapshot/baseline.json exists
+  post:
+  - manifest.yaml has outputs.{snapshot,contract,parsed,acceptance,verify}
+  - schema.json defines Bar + ErrorRecord
+  - ledger.json has 4 entries
+  - quality_contract.yaml has 14 items
+  - validation_gates.yaml has 4 gates
+  failure_codes:
+    1: baseline_missing
+- id: G02_executed
+  applies_to: 02_execute
+  pre:
+  - manifest.yaml
+  - schema.json
+  - quality_contract.yaml exist
+  post:
+  - parsed/eurusd_2000-2026_bars.parquet non-empty (if raw available)
+  - parsed/eurusd_2000-2026_errors.jsonl exists
+  - parsed/parse_stats.json has per-file stats
+  - acceptance/run_acceptance.json has 14 results
+  failure_codes: {}
+- id: G03_verified
+  applies_to: 03_verify
+  pre:
+  - all prior scripts' outputs present
+  post:
+  - 'verify/final_report.json: overall PASS/FAIL'
+  - 'verify/interface_check.json: all inter-script paths resolve'
+  - 'verify/coverage_audit.json: 14/14 items re-evaluated'
+  failure_codes: {}

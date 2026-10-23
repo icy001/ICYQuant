@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "issues": [],
+  "checked_paths": 16,
+  "checked_hashes": 3,
+  "parsed_refs": {
+    "declared": [
+      "parsed/eurusd_2000-2026_bars.parquet",
+      "parsed/eurusd_2000-2026_errors.jsonl",
+      "parsed/parse_stats.json"
+    ],
+    "references": [
+      "parsed/eurusd_2000-2026_bars.parquet",
+      "parsed/eurusd_2000-2026_errors.jsonl",
+      "parsed/parse_stats.json"
+    ],
+    "duplicates": []
+  }
+}

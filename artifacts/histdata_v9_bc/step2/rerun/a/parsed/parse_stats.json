@@ -1,0 +1,30 @@
+{
+  "stats": {
+    "files_readable": 0,
+    "total_lines": 0,
+    "rows_emitted": 0,
+    "errors_emitted": 0,
+    "streaming_events_per_file": 0,
+    "parquet_path": null,
+    "errors_path": "artifacts/histdata_v9_bc/step2/rerun/a/parsed/xauusd_2024_errors.jsonl",
+    "errors_bytes": 0
+  },
+  "per_file": [],
+  "ts_format_variants": [
+    "%Y%m%d %H%M%S",
+    "%Y%m%d %H:%M:%S.%f",
+    "%Y%m%d %H:%M",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y.%m.%d %H:%M:%S",
+    "%Y.%m.%d %H:%M"
+  ],
+  "expected_core": [
+    "date",
+    "time",
+    "open",
+    "high",
+    "low",
+    "close"
+  ]
+}

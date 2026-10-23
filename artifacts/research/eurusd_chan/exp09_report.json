@@ -1,0 +1,346 @@
+{
+  "experiment": "exp09_chan_third_point",
+  "type": "event study of Chan third-type buy/sell points",
+  "question": "after a confirmed third-type point, does price continue in the implied direction by more than the execution cost?",
+  "cost_pips": 1.0,
+  "cost_derivation": "5 USD per lot per side; EURUSD 1 pip = 10 USD/lot; round trip = 1.0 pip",
+  "definition": {
+    "merge": "direction-aware containment merge",
+    "fenxing": "3-bar top/bottom, confirmed at the third bar",
+    "bi": "new-bi, opposite fenxing >= MIN_GAP merged bars apart",
+    "zhongshu": "overlap of 3 consecutive strokes, ZG/ZD",
+    "third_point": "break out -> pull back without re-entering -> break out again",
+    "excluded": [
+      "beichi",
+      "duan"
+    ],
+    "excluded_reason": "cannot be decided without hindsight"
+  },
+  "look_ahead_control": "every structure carries a confirm index; entry at open[confirm+1]",
+  "params": {
+    "MIN_GAP": 4,
+    "MAX_WAIT": 200,
+    "HORIZONS": [
+      5,
+      10,
+      20
+    ],
+    "OOS_YEAR": 2016,
+    "FX_DAY_START": 6,
+    "SEED": 20240416,
+    "N_BOOT": 2000
+  },
+  "scales": {
+    "M5": {
+      "structure": {
+        "merged_bars": 1252098,
+        "fenxing": 601615,
+        "bi": 138485,
+        "zhongshu": 94588,
+        "signals": 30211
+      },
+      "years": 26.34,
+      "cells": {
+        "H5_buy": {
+          "n": 15165,
+          "mean_pips": -0.3481,
+          "median_pips": -0.9,
+          "std_pips": 11.5757,
+          "pos_share": 0.4372,
+          "mean_net_pips": -1.3481,
+          "pos_share_net": 0.3755,
+          "total_pips": -5278.9,
+          "total_net_pips": -20443.9,
+          "naive_se": 0.094,
+          "naive_ci95": [
+            -0.5323,
+            -0.1639
+          ],
+          "trades_per_year": 575.8,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -0.6054,
+              -0.0852
+            ],
+            "boot_se": 0.1297
+          },
+          "nonoverlap": {
+            "n": 12007,
+            "mean": -0.331,
+            "net": -1.331
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 5,
+            "years_negative": 22,
+            "total_pips": -5278.9,
+            "best_year": 4,
+            "best_year_pips": 782.0,
+            "worst_year": 9,
+            "worst_year_pips": -1017.0,
+            "best_year_abs_share": 0.0847,
+            "top3_abs_share": 0.1964,
+            "ex_best_year_pips": -6060.9,
+            "ex_worst_year_pips": -4261.9
+          },
+          "is_mean": -0.341,
+          "oos_mean": -0.358
+        },
+        "H5_sell": {
+          "n": 15046,
+          "mean_pips": -0.3764,
+          "median_pips": -0.8,
+          "std_pips": 11.2804,
+          "pos_share": 0.4379,
+          "mean_net_pips": -1.3764,
+          "pos_share_net": 0.375,
+          "total_pips": -5663.5,
+          "total_net_pips": -20709.5,
+          "naive_se": 0.092,
+          "naive_ci95": [
+            -0.5567,
+            -0.1962
+          ],
+          "trades_per_year": 571.3,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -0.582,
+              -0.1648
+            ],
+            "boot_se": 0.1069
+          },
+          "nonoverlap": {
+            "n": 11962,
+            "mean": -0.437,
+            "net": -1.437
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 7,
+            "years_negative": 20,
+            "total_pips": -5663.5,
+            "best_year": 11,
+            "best_year_pips": 274.7,
+            "worst_year": 8,
+            "worst_year_pips": -1031.0,
+            "best_year_abs_share": 0.0362,
+            "top3_abs_share": 0.0954,
+            "ex_best_year_pips": -5938.2,
+            "ex_worst_year_pips": -4632.5
+          },
+          "is_mean": -0.405,
+          "oos_mean": -0.334
+        },
+        "H10_buy": {
+          "n": 15165,
+          "mean_pips": -0.2583,
+          "median_pips": -1.0,
+          "std_pips": 15.2009,
+          "pos_share": 0.4469,
+          "mean_net_pips": -1.2583,
+          "pos_share_net": 0.3988,
+          "total_pips": -3916.7,
+          "total_net_pips": -19081.7,
+          "naive_se": 0.1234,
+          "naive_ci95": [
+            -0.5002,
+            -0.0163
+          ],
+          "trades_per_year": 575.8,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -0.6087,
+              0.0866
+            ],
+            "boot_se": 0.1744
+          },
+          "nonoverlap": {
+            "n": 11259,
+            "mean": -0.335,
+            "net": -1.335
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 10,
+            "years_negative": 17,
+            "total_pips": -3916.7,
+            "best_year": 4,
+            "best_year_pips": 945.0,
+            "worst_year": 13,
+            "worst_year_pips": -1108.3,
+            "best_year_abs_share": 0.0875,
+            "top3_abs_share": 0.1963,
+            "ex_best_year_pips": -4861.7,
+            "ex_worst_year_pips": -2808.4
+          },
+          "is_mean": -0.246,
+          "oos_mean": -0.276
+        },
+        "H10_sell": {
+          "n": 15046,
+          "mean_pips": -0.5093,
+          "median_pips": -1.0,
+          "std_pips": 15.113,
+          "pos_share": 0.4443,
+          "mean_net_pips": -1.5093,
+          "pos_share_net": 0.3975,
+          "total_pips": -7663.0,
+          "total_net_pips": -22709.0,
+          "naive_se": 0.1232,
+          "naive_ci95": [
+            -0.7508,
+            -0.2678
+          ],
+          "trades_per_year": 571.3,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -0.8255,
+              -0.1908
+            ],
+            "boot_se": 0.1635
+          },
+          "nonoverlap": {
+            "n": 11138,
+            "mean": -0.577,
+            "net": -1.577
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 7,
+            "years_negative": 20,
+            "total_pips": -7663.0,
+            "best_year": 11,
+            "best_year_pips": 701.6,
+            "worst_year": 8,
+            "worst_year_pips": -1486.0,
+            "best_year_abs_share": 0.0628,
+            "top3_abs_share": 0.1257,
+            "ex_best_year_pips": -8364.6,
+            "ex_worst_year_pips": -6177.0
+          },
+          "is_mean": -0.585,
+          "oos_mean": -0.396
+        },
+        "H20_buy": {
+          "n": 15165,
+          "mean_pips": -0.3369,
+          "median_pips": -1.0,
+          "std_pips": 20.0885,
+          "pos_share": 0.4579,
+          "mean_net_pips": -1.3369,
+          "pos_share_net": 0.4227,
+          "total_pips": -5108.6,
+          "total_net_pips": -20273.6,
+          "naive_se": 0.1631,
+          "naive_ci95": [
+            -0.6566,
+            -0.0171
+          ],
+          "trades_per_year": 575.8,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -0.7329,
+              0.0765
+            ],
+            "boot_se": 0.2125
+          },
+          "nonoverlap": {
+            "n": 10251,
+            "mean": -0.475,
+            "net": -1.475
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 11,
+            "years_negative": 16,
+            "total_pips": -5108.6,
+            "best_year": 4,
+            "best_year_pips": 1145.0,
+            "worst_year": 13,
+            "worst_year_pips": -1361.7,
+            "best_year_abs_share": 0.0766,
+            "top3_abs_share": 0.1561,
+            "ex_best_year_pips": -6253.6,
+            "ex_worst_year_pips": -3746.9
+          },
+          "is_mean": -0.282,
+          "oos_mean": -0.419
+        },
+        "H20_sell": {
+          "n": 15046,
+          "mean_pips": -0.6178,
+          "median_pips": -1.1,
+          "std_pips": 20.9677,
+          "pos_share": 0.4488,
+          "mean_net_pips": -1.6178,
+          "pos_share_net": 0.414,
+          "total_pips": -9294.7,
+          "total_net_pips": -24340.7,
+          "naive_se": 0.1709,
+          "naive_ci95": [
+            -0.9528,
+            -0.2827
+          ],
+          "trades_per_year": 571.3,
+          "block_ci95": {
+            "method": "calendar-month block bootstrap",
+            "n_month_blocks": 318,
+            "n_boot": 2000,
+            "seed": 20240416,
+            "mean_ci95": [
+              -1.046,
+              -0.1675
+            ],
+            "boot_se": 0.2252
+          },
+          "nonoverlap": {
+            "n": 10145,
+            "mean": -0.766,
+            "net": -1.766
+          },
+          "concentration": {
+            "years_counted": 27,
+            "years_positive": 8,
+            "years_negative": 19,
+            "total_pips": -9294.7,
+            "best_year": 24,
+            "best_year_pips": 844.8,
+            "worst_year": 13,
+            "worst_year_pips": -1411.1,
+            "best_year_abs_share": 0.0655,
+            "top3_abs_share": 0.0998,
+            "ex_best_year_pips": -10139.5,
+            "ex_worst_year_pips": -7883.6
+          },
+          "is_mean": -0.659,
+          "oos_mean": -0.557
+        }
+      }
+    }
+  },
+  "caveats": [
+    "Single fixed formalisation; other Chan variants may differ.",
+    "Excludes beichi and duan by design.",
+    "Pre-slippage, fixed +1 unit, no stops or sizing."
+  ]
+}

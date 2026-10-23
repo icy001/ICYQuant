@@ -1,0 +1,13 @@
+HistData.com (c) 2012
+File: DAT_ASCII_EURUSD_M1_202610.csv Status Report
+
+Gap of 236s found between 20261001165959 and 20261001170401.
+Gap of 76s found between 20261001172954 and 20261001173116.
+Gap of 64s found between 20261001173350 and 20261001173500.
+Gap of 71s found between 20261001181833 and 20261001181950.
+Gap of 62s found between 20261001184847 and 20261001184955.
+Gap of 74s found between 20261001190712 and 20261001190832.
+Gap of 104s found between 20261001192202 and 20261001192352.
+
+Average tick interval: 1682 miliseconds.
+Maximum tick interval found: 236000 miliseconds.

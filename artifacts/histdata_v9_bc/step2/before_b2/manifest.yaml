@@ -1,0 +1,61 @@
+schema_version: histdata_v9_manifest_v1
+generated_at: '2026-10-13T09:00:15.404470+00:00'
+git:
+  commit: 15eec64bc745d51e9f6c758dce6aaf8e95ead235
+  branch: develop
+  dirty: true
+scripts:
+- id: '00'
+  name: 00_baseline_snapshot.py
+  role: snapshot
+  stage: '01'
+- id: '01'
+  name: 01_generate_artifacts.py
+  role: generate
+  stage: '01'
+- id: '02'
+  name: 02_execute.py
+  role: execute
+  stage: '01'
+- id: '03'
+  name: 03_verify.py
+  role: verify
+  stage: '01'
+inputs:
+- path: data/real/histdata
+  kind: raw_histdata_m1_dir
+  glob: '**/*.csv'
+  required: false
+  note: May be absent if not yet downloaded; Script 02 will warn.
+baselines:
+- path: research/discovery/output/factor-paper-d1/summary.csv
+  kind: research_discovery_output
+  required_tracked: true
+- path: research/discovery/output/factor-v1/csv/alpha_ranking.csv
+  kind: research_discovery_output
+  required_tracked: true
+- path: research/discovery/output/factor-v1/csv/convergence.csv
+  kind: research_discovery_output
+  required_tracked: true
+outputs:
+  snapshot:
+  - artifacts/histdata_v9/snapshot/baseline.json
+  - artifacts/histdata_v9/snapshot/csv_hashes.json
+  - artifacts/histdata_v9/snapshot/env.json
+  contract:
+  - artifacts/histdata_v9/manifest.yaml
+  - artifacts/histdata_v9/schema.json
+  - artifacts/histdata_v9/ledger.json
+  - artifacts/histdata_v9/quality_contract.yaml
+  - artifacts/histdata_v9/validation_gates.yaml
+  parsed:
+  - artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet
+  - artifacts/histdata_v9/parsed/eurusd_2000-2026_errors.jsonl
+  - artifacts/histdata_v9/parsed/parse_stats.json
+  acceptance:
+  - artifacts/histdata_v9/acceptance/run_acceptance.json
+  - artifacts/histdata_v9/acceptance/coverage_audit.json
+  verify:
+  - artifacts/histdata_v9/verify/final_report.json
+  - artifacts/histdata_v9/verify/interface_check.json
+  - artifacts/histdata_v9/verify/coverage_audit.json

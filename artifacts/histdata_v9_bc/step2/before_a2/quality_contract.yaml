@@ -1,0 +1,89 @@
+schema_version: histdata_v9_quality_contract_v1
+version: '9.1'
+acceptance_items:
+- id: G01
+  kind: data
+  name: raw_file_integrity
+  desc: Raw histdata CSV files are readable, non-empty.
+  tolerance:
+    min_files: 1
+- id: G02
+  kind: data
+  name: parsed_row_count
+  desc: rows_emitted + errors_emitted == total_lines (per file).
+  tolerance:
+    max_skipped_pct: 1.0
+- id: G03
+  kind: data
+  name: naive_timestamp_semantics
+  desc: Timestamps are naive (no tzinfo), ISO 8601, UTC-anchored.
+  tolerance: {}
+- id: G04
+  kind: data
+  name: no_future_timestamps
+  desc: max(ts) <= now_utc + 1 day (grace for clock skew).
+  tolerance:
+    future_grace_days: 1
+- id: G05
+  kind: data
+  name: monotonic_time_order
+  desc: Within each file, timestamps are non-decreasing.
+  tolerance:
+    allow_equal: true
+- id: G06
+  kind: data
+  name: ohlc_integrity
+  desc: H >= max(O,C) and L <= min(O,C) for every bar.
+  tolerance:
+    max_violation_pct: 0.0
+- id: G07
+  kind: data
+  name: non_negative_volume
+  desc: Volume >= 0 for every bar.
+  tolerance:
+    max_negative_pct: 0.0
+- id: G08
+  kind: data
+  name: no_duplicate_timestamps
+  desc: No two rows share the same (ts) within a file.
+  tolerance:
+    max_dup_pct: 0.0
+- id: G09
+  kind: data
+  name: error_record_emitted
+  desc: Malformed rows produce ErrorRecord with {file, line, code, raw_excerpt}.
+  tolerance: {}
+- id: G10
+  kind: data
+  name: parquet_roundtrip
+  desc: Read-back parquet matches in-memory bars (rows + required columns).
+  tolerance:
+    dtypes_strict: false
+- id: K01
+  kind: process
+  name: streaming_stats_cli
+  desc: Script 02 emits per-file JSON Lines to stdout as it processes.
+  tolerance:
+    min_events_per_file: 2
+- id: K02
+  kind: process
+  name: quality_contract_bounds
+  desc: Error rate <= 0.01 AND completeness >= 0.99.
+  tolerance:
+    max_error_rate: 0.01
+    min_completeness: 0.99
+- id: K03
+  kind: process
+  name: snapshot_csv_immutability
+  desc: Baseline CSVs SHA-256 match Script 0's csv_hashes.json.
+  tolerance:
+    hash_algorithm: sha256
+    strict: true
+- id: K04
+  kind: process
+  name: manifest_path_resolution
+  desc: Every path in manifest.yaml exists or has explicit 'generated_by' parent.
+  tolerance:
+    allow_generated_by: true
+denominator: 14
+pass_rule: all 14 items pass; any FAIL -> overall FAIL

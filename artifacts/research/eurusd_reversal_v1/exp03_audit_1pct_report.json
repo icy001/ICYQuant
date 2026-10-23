@@ -1,0 +1,619 @@
+{
+  "audit_scope": {
+    "trades_csv": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/research/eurusd_reversal_v1/exp02_pct1_0pct_trades.csv",
+    "n_trades": 280,
+    "rules": {
+      "trigger_pct": 0.01,
+      "window": "Beijing 15-18",
+      "stop": "A fixed 20.0 pips",
+      "target": "day open O",
+      "time_stop_bars": 24,
+      "cost_pips": 1.5
+    },
+    "method": "each trade recomputed from raw 5m bars on a separate code path from the simulator that wrote the CSV"
+  },
+  "per_field_agreement": {
+    "entry_px": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "stop_px": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "exit_px": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "exit_reason": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "gross_pips": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "net_pips": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "net_R": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "holding_bars": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    },
+    "exit_bar": {
+      "compared": 280,
+      "agree": 280,
+      "disagree": 0
+    }
+  },
+  "rule_checks": {
+    "entry_is_trigger_bar_close": [
+      280,
+      280
+    ],
+    "entry_bar_touched_band": [
+      280,
+      280
+    ],
+    "entry_bar_in_window": [
+      280,
+      280
+    ],
+    "stop_is_entry_minus_fixed": [
+      280,
+      280
+    ],
+    "target_equals_day_open": [
+      280,
+      280
+    ],
+    "cost_deducted_exactly": [
+      280,
+      280
+    ],
+    "same_bar_stop_target_ties": 0
+  },
+  "is_oos_reconciliation": {
+    "oos_year": 2016,
+    "is_trades": 240,
+    "oos_trades": 40,
+    "target_exits_total": 2,
+    "target_exits_in_is": 2,
+    "target_exits_in_oos": 0,
+    "oos_target_hit_rate": 0.0,
+    "full_target_hit_rate": 0.007142857142857143
+  },
+  "aggregates": {
+    "csv_net_pips_total": 1006.0,
+    "recomputed_net_pips_total": 1005.9999999999739,
+    "recomputed_expectancy_R": 0.17964285714285225,
+    "is_expectancy_R": 0.13643749999999516,
+    "oos_expectancy_R": 0.43887499999999513,
+    "oos_expectancy_R_stderr": 0.37010157508636643,
+    "oos_ci95": [
+      -0.286524087169283,
+      1.1642740871692734
+    ],
+    "is_net_pips": 654.8999999999774,
+    "oos_net_pips": 351.0999999999964,
+    "net_PF": 1.2893631709141036,
+    "gross_PF": 1.442705907919646,
+    "max_dd_R": -21.325000000000074,
+    "max_dd_usd_1lot": -4265.000000000019,
+    "exit_reasons": {
+      "stop": 157,
+      "time": 121,
+      "target": 2
+    }
+  },
+  "structure": {
+    "entry_dist_O_pips": {
+      "mean": 148.46392857142854,
+      "median": 138.00000000000034,
+      "p25": 118.75000000000024,
+      "p75": 164.32500000000127,
+      "max": 384.9999999999998
+    },
+    "overshoot_past_1pct_band_pips": {
+      "mean": 26.038453571428565,
+      "median": 10.500000000000945
+    },
+    "max_gross_win_pips": 142.29999999999964,
+    "max_gross_loss_pips": -20.000000000000018
+  },
+  "oos_trades": [
+    {
+      "date": "2016-06-24",
+      "side": "long",
+      "csv_entry_px": 1.10128,
+      "rec_exit_px": 1.11506,
+      "rec_reason": "time",
+      "csv_gross": 137.8,
+      "rec_net": 136.29999999999902,
+      "rec_net_R": 6.814999999999944,
+      "rec_hold": 24,
+      "dist_O_pips": 372.6000000000007
+    },
+    {
+      "date": "2016-06-24",
+      "side": "long",
+      "csv_entry_px": 1.11447,
+      "rec_exit_px": 1.11247,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 2,
+      "dist_O_pips": 240.70000000000036
+    },
+    {
+      "date": "2016-06-24",
+      "side": "long",
+      "csv_entry_px": 1.11329,
+      "rec_exit_px": 1.11129,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 10,
+      "dist_O_pips": 252.50000000000216
+    },
+    {
+      "date": "2016-11-09",
+      "side": "short",
+      "csv_entry_px": 1.11896,
+      "rec_exit_px": 1.12096,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 4,
+      "dist_O_pips": 165.29999999999933
+    },
+    {
+      "date": "2016-11-09",
+      "side": "short",
+      "csv_entry_px": 1.12111,
+      "rec_exit_px": 1.10688,
+      "rec_reason": "time",
+      "csv_gross": 142.3,
+      "rec_net": 140.79999999999964,
+      "rec_net_R": 7.039999999999976,
+      "rec_hold": 24,
+      "dist_O_pips": 186.8000000000003
+    },
+    {
+      "date": "2016-11-14",
+      "side": "long",
+      "csv_entry_px": 1.07337,
+      "rec_exit_px": 1.07619,
+      "rec_reason": "time",
+      "csv_gross": 28.2,
+      "rec_net": 26.700000000000447,
+      "rec_net_R": 1.335000000000021,
+      "rec_hold": 24,
+      "dist_O_pips": 104.10000000000029
+    },
+    {
+      "date": "2020-03-09",
+      "side": "short",
+      "csv_entry_px": 1.14615,
+      "rec_exit_px": 1.13692,
+      "rec_reason": "time",
+      "csv_gross": 92.3,
+      "rec_net": 90.80000000000071,
+      "rec_net_R": 4.540000000000031,
+      "rec_hold": 24,
+      "dist_O_pips": 114.60000000000025
+    },
+    {
+      "date": "2020-03-20",
+      "side": "short",
+      "csv_entry_px": 1.07824,
+      "rec_exit_px": 1.08024,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 3,
+      "dist_O_pips": 120.99999999999999
+    },
+    {
+      "date": "2020-03-20",
+      "side": "short",
+      "csv_entry_px": 1.08157,
+      "rec_exit_px": 1.07188,
+      "rec_reason": "time",
+      "csv_gross": 96.9,
+      "rec_net": 95.39999999999976,
+      "rec_net_R": 4.769999999999984,
+      "rec_hold": 24,
+      "dist_O_pips": 154.2999999999983
+    },
+    {
+      "date": "2020-03-24",
+      "side": "short",
+      "csv_entry_px": 1.08333,
+      "rec_exit_px": 1.08218,
+      "rec_reason": "time",
+      "csv_gross": 11.5,
+      "rec_net": 9.999999999999844,
+      "rec_net_R": 0.49999999999999173,
+      "rec_hold": 24,
+      "dist_O_pips": 108.99999999999909
+    },
+    {
+      "date": "2020-03-24",
+      "side": "short",
+      "csv_entry_px": 1.08266,
+      "rec_exit_px": 1.08466,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 4,
+      "dist_O_pips": 102.29999999999961
+    },
+    {
+      "date": "2020-03-24",
+      "side": "short",
+      "csv_entry_px": 1.08479,
+      "rec_exit_px": 1.08679,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 4,
+      "dist_O_pips": 123.59999999999926
+    },
+    {
+      "date": "2022-07-05",
+      "side": "long",
+      "csv_entry_px": 1.03102,
+      "rec_exit_px": 1.02902,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 12,
+      "dist_O_pips": 109.90000000000055
+    },
+    {
+      "date": "2022-07-19",
+      "side": "short",
+      "csv_entry_px": 1.02412,
+      "rec_exit_px": 1.02414,
+      "rec_reason": "time",
+      "csv_gross": -0.2,
+      "rec_net": -1.7000000000013102,
+      "rec_net_R": -0.08500000000006544,
+      "rec_hold": 24,
+      "dist_O_pips": 100.00000000000009
+    },
+    {
+      "date": "2022-09-09",
+      "side": "short",
+      "csv_entry_px": 1.01006,
+      "rec_exit_px": 1.00915,
+      "rec_reason": "time",
+      "csv_gross": 9.1,
+      "rec_net": 7.599999999999664,
+      "rec_net_R": 0.37999999999998285,
+      "rec_hold": 24,
+      "dist_O_pips": 105.59999999999903
+    },
+    {
+      "date": "2022-11-07",
+      "side": "short",
+      "csv_entry_px": 1.00009,
+      "rec_exit_px": 0.99812,
+      "rec_reason": "time",
+      "csv_gross": 19.7,
+      "rec_net": 18.19999999999916,
+      "rec_net_R": 0.9099999999999573,
+      "rec_hold": 24,
+      "dist_O_pips": 97.29999999999905
+    },
+    {
+      "date": "2023-01-03",
+      "side": "long",
+      "csv_entry_px": 1.05646,
+      "rec_exit_px": 1.05446,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 6,
+      "dist_O_pips": 100.00000000000009
+    },
+    {
+      "date": "2023-01-03",
+      "side": "long",
+      "csv_entry_px": 1.05422,
+      "rec_exit_px": 1.05318,
+      "rec_reason": "time",
+      "csv_gross": -10.4,
+      "rec_net": -11.899999999999299,
+      "rec_net_R": -0.5949999999999644,
+      "rec_hold": 24,
+      "dist_O_pips": 122.40000000000028
+    },
+    {
+      "date": "2023-03-24",
+      "side": "long",
+      "csv_entry_px": 1.07256,
+      "rec_exit_px": 1.07491,
+      "rec_reason": "time",
+      "csv_gross": 23.5,
+      "rec_net": 22.000000000000743,
+      "rec_net_R": 1.100000000000036,
+      "rec_hold": 24,
+      "dist_O_pips": 105.99999999999942
+    },
+    {
+      "date": "2024-11-06",
+      "side": "long",
+      "csv_entry_px": 1.07317,
+      "rec_exit_px": 1.0764,
+      "rec_reason": "time",
+      "csv_gross": 32.3,
+      "rec_net": 30.800000000000658,
+      "rec_net_R": 1.5400000000000316,
+      "rec_hold": 24,
+      "dist_O_pips": 191.79999999999973
+    },
+    {
+      "date": "2024-11-06",
+      "side": "long",
+      "csv_entry_px": 1.07663,
+      "rec_exit_px": 1.07463,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 12,
+      "dist_O_pips": 157.19999999999956
+    },
+    {
+      "date": "2024-11-22",
+      "side": "long",
+      "csv_entry_px": 1.03398,
+      "rec_exit_px": 1.04225,
+      "rec_reason": "time",
+      "csv_gross": 82.7,
+      "rec_net": 81.19999999999999,
+      "rec_net_R": 4.059999999999996,
+      "rec_hold": 24,
+      "dist_O_pips": 133.70000000000104
+    },
+    {
+      "date": "2025-04-03",
+      "side": "short",
+      "csv_entry_px": 1.09459,
+      "rec_exit_px": 1.09659,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 7,
+      "dist_O_pips": 107.69999999999946
+    },
+    {
+      "date": "2025-04-03",
+      "side": "short",
+      "csv_entry_px": 1.09778,
+      "rec_exit_px": 1.09978,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 23,
+      "dist_O_pips": 139.5999999999997
+    },
+    {
+      "date": "2025-04-03",
+      "side": "short",
+      "csv_entry_px": 1.10088,
+      "rec_exit_px": 1.10288,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 5,
+      "dist_O_pips": 170.60000000000073
+    },
+    {
+      "date": "2025-04-07",
+      "side": "short",
+      "csv_entry_px": 1.10137,
+      "rec_exit_px": 1.10337,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 14,
+      "dist_O_pips": 124.2999999999994
+    },
+    {
+      "date": "2025-04-07",
+      "side": "short",
+      "csv_entry_px": 1.10274,
+      "rec_exit_px": 1.09739,
+      "rec_reason": "time",
+      "csv_gross": 53.5,
+      "rec_net": 51.99999999999966,
+      "rec_net_R": 2.5999999999999805,
+      "rec_hold": 24,
+      "dist_O_pips": 138.00000000000034
+    },
+    {
+      "date": "2025-04-09",
+      "side": "short",
+      "csv_entry_px": 1.10592,
+      "rec_exit_px": 1.10792,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 10,
+      "dist_O_pips": 107.80000000000011
+    },
+    {
+      "date": "2025-04-09",
+      "side": "short",
+      "csv_entry_px": 1.10734,
+      "rec_exit_px": 1.10271,
+      "rec_reason": "time",
+      "csv_gross": 46.3,
+      "rec_net": 44.799999999999116,
+      "rec_net_R": 2.239999999999954,
+      "rec_hold": 24,
+      "dist_O_pips": 121.99999999999989
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.13132,
+      "rec_exit_px": 1.13332,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 1,
+      "dist_O_pips": 115.60000000000014
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.13338,
+      "rec_exit_px": 1.13538,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 3,
+      "dist_O_pips": 136.19999999999965
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.13586,
+      "rec_exit_px": 1.13786,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 6,
+      "dist_O_pips": 161.00000000000003
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.13537,
+      "rec_exit_px": 1.13737,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 1,
+      "dist_O_pips": 156.099999999999
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.13787,
+      "rec_exit_px": 1.13987,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 3,
+      "dist_O_pips": 181.0999999999985
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.14036,
+      "rec_exit_px": 1.14236,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 1,
+      "dist_O_pips": 205.99999999999952
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.14436,
+      "rec_exit_px": 1.14636,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 1,
+      "dist_O_pips": 245.99999999999955
+    },
+    {
+      "date": "2025-04-11",
+      "side": "short",
+      "csv_entry_px": 1.14269,
+      "rec_exit_px": 1.13365,
+      "rec_reason": "time",
+      "csv_gross": 90.4,
+      "rec_net": 88.89999999999937,
+      "rec_net_R": 4.444999999999965,
+      "rec_hold": 24,
+      "dist_O_pips": 229.29999999999893
+    },
+    {
+      "date": "2025-04-14",
+      "side": "short",
+      "csv_entry_px": 1.1419,
+      "rec_exit_px": 1.14038,
+      "rec_reason": "time",
+      "csv_gross": 15.2,
+      "rec_net": 13.699999999999658,
+      "rec_net_R": 0.6849999999999823,
+      "rec_hold": 24,
+      "dist_O_pips": 108.1999999999983
+    },
+    {
+      "date": "2025-04-21",
+      "side": "short",
+      "csv_entry_px": 1.15318,
+      "rec_exit_px": 1.15518,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 23,
+      "dist_O_pips": 137.20000000000175
+    },
+    {
+      "date": "2025-04-21",
+      "side": "short",
+      "csv_entry_px": 1.15513,
+      "rec_exit_px": 1.15713,
+      "rec_reason": "stop",
+      "csv_gross": -20.0,
+      "rec_net": -21.500000000000018,
+      "rec_net_R": -1.075,
+      "rec_hold": 14,
+      "dist_O_pips": 156.70000000000073
+    }
+  ]
+}

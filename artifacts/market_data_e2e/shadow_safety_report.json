@@ -1,0 +1,27 @@
+{
+  "commit": "017",
+  "verdict": "PASS",
+  "broker_order_api_calls": 0,
+  "broker_order_modules": [],
+  "broker_adapter_order_surface": [],
+  "shadow_broker_imports": [],
+  "shadow_order_symbols": [],
+  "gate_mode": "SHADOW",
+  "rejected_gate_modes": [
+    "LIVE",
+    "PAPER"
+  ],
+  "cli_flags_rejected": [
+    "--live",
+    "--real-order",
+    "--broker-order"
+  ],
+  "id_namespaces": {
+    "intent": "SHIN-5B63E5644C8F",
+    "order": "SHD-20260908-000001",
+    "fill": "SHDF-20260908-000002"
+  },
+  "broker_objects_reachable": [],
+  "real_orders_enabled": false,
+  "problems": []
+}

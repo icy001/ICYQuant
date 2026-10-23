@@ -1,0 +1,427 @@
+{
+  "experiment": "exp08_cost_at_your_terms",
+  "type": "re-pricing of exp04-06 at stated execution terms; no new signal",
+  "stated_terms": {
+    "spread_pips": 0.0,
+    "commission_per_lot": 5.0,
+    "swap_pips_per_night": 0.0,
+    "commission_unit_ambiguous": true
+  },
+  "conversion": {
+    "pip_usd_per_lot": 10.0,
+    "formula": "round_trip_pips = spread + (2 if per_side else 1) * comm / 10",
+    "usdcny_assumption": 7.1
+  },
+  "scenarios": {
+    "USD 5/side": {
+      "commission_usd": 5.0,
+      "per_side": true,
+      "round_trip_pips": 1.0
+    },
+    "USD 5/round": {
+      "commission_usd": 5.0,
+      "per_side": false,
+      "round_trip_pips": 0.5
+    },
+    "CNY 5/side": {
+      "commission_usd": 0.7042253521126761,
+      "per_side": true,
+      "round_trip_pips": 0.1408
+    },
+    "CNY 5/round": {
+      "commission_usd": 0.7042253521126761,
+      "per_side": false,
+      "round_trip_pips": 0.0704
+    }
+  },
+  "effect_of_zero_swap": "removes the overnight penalty previously charged to Exp05 H4/D1 and Exp06; both re-priced rather than inherited from Exp07",
+  "gate_sharpe": 0.5,
+  "exp04_m5_reversal": {
+    "M5_H12_down": {
+      "gross_pips": 0.3328,
+      "trades_per_year": 1961.9,
+      "zero_cost_sharpe": 0.969,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -1.942,
+          "net_pips_per_year": -1309.0
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.487,
+          "net_pips_per_year": -328.0
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.559,
+          "net_pips_per_year": 376.6
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.764,
+          "net_pips_per_year": 514.7
+        }
+      }
+    },
+    "M5_H12_up": {
+      "gross_pips": 0.2919,
+      "trades_per_year": 1953.8,
+      "zero_cost_sharpe": 0.846,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -2.052,
+          "net_pips_per_year": -1383.5
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.603,
+          "net_pips_per_year": -406.6
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.438,
+          "net_pips_per_year": 295.2
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.642,
+          "net_pips_per_year": 432.8
+        }
+      }
+    },
+    "M5_H48_down": {
+      "gross_pips": 0.4546,
+      "trades_per_year": 915.7,
+      "zero_cost_sharpe": 0.459,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.551,
+          "net_pips_per_year": -499.5
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.046,
+          "net_pips_per_year": -41.6
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.317,
+          "net_pips_per_year": 287.3
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.388,
+          "net_pips_per_year": 351.7
+        }
+      }
+    },
+    "M5_H48_up": {
+      "gross_pips": 0.2688,
+      "trades_per_year": 906.4,
+      "zero_cost_sharpe": 0.271,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.738,
+          "net_pips_per_year": -662.8
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.233,
+          "net_pips_per_year": -209.6
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.129,
+          "net_pips_per_year": 116.0
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.2,
+          "net_pips_per_year": 179.8
+        }
+      }
+    }
+  },
+  "exp05_h4_d1_breakout": {
+    "D1_H12_down": {
+      "gross_pips": 18.2171,
+      "trades_per_year": 6.0,
+      "mean_nights": 15.44,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": 0.201,
+          "net_pips_per_year": 102.9
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": 0.207,
+          "net_pips_per_year": 105.9
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.211,
+          "net_pips_per_year": 108.0
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.212,
+          "net_pips_per_year": 108.5
+        }
+      }
+    },
+    "D1_H12_up": {
+      "gross_pips": -15.019,
+      "trades_per_year": 5.7,
+      "mean_nights": 15.49,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.151,
+          "net_pips_per_year": -91.3
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.146,
+          "net_pips_per_year": -88.4
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": -0.143,
+          "net_pips_per_year": -86.4
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": -0.142,
+          "net_pips_per_year": -86.0
+        }
+      }
+    },
+    "D1_H48_down": {
+      "gross_pips": 35.0019,
+      "trades_per_year": 2.4,
+      "mean_nights": 65.93,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": 0.111,
+          "net_pips_per_year": 80.3
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": 0.113,
+          "net_pips_per_year": 81.5
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.114,
+          "net_pips_per_year": 82.3
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.115,
+          "net_pips_per_year": 82.5
+        }
+      }
+    },
+    "D1_H48_up": {
+      "gross_pips": 34.6786,
+      "trades_per_year": 2.4,
+      "mean_nights": 66.07,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": 0.124,
+          "net_pips_per_year": 81.1
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": 0.125,
+          "net_pips_per_year": 82.4
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.127,
+          "net_pips_per_year": 83.2
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.127,
+          "net_pips_per_year": 83.4
+        }
+      }
+    },
+    "H4_H12_down": {
+      "gross_pips": 0.7968,
+      "trades_per_year": 41.1,
+      "mean_nights": 2.66,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.013,
+          "net_pips_per_year": -8.4
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": 0.019,
+          "net_pips_per_year": 12.2
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.043,
+          "net_pips_per_year": 27.0
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.048,
+          "net_pips_per_year": 29.9
+        }
+      }
+    },
+    "H4_H12_up": {
+      "gross_pips": -2.987,
+      "trades_per_year": 38.7,
+      "mean_nights": 2.66,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.252,
+          "net_pips_per_year": -154.4
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.221,
+          "net_pips_per_year": -135.1
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": -0.198,
+          "net_pips_per_year": -121.2
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": -0.194,
+          "net_pips_per_year": -118.4
+        }
+      }
+    },
+    "H4_H48_down": {
+      "gross_pips": 7.8358,
+      "trades_per_year": 17.7,
+      "mean_nights": 11.1,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": 0.155,
+          "net_pips_per_year": 120.9
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": 0.166,
+          "net_pips_per_year": 129.8
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": 0.174,
+          "net_pips_per_year": 136.1
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": 0.176,
+          "net_pips_per_year": 137.4
+        }
+      }
+    },
+    "H4_H48_up": {
+      "gross_pips": -1.0674,
+      "trades_per_year": 18.4,
+      "mean_nights": 11.1,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_pips": 1.0,
+          "sharpe": -0.045,
+          "net_pips_per_year": -38.0
+        },
+        "USD 5/round": {
+          "cost_pips": 0.5,
+          "sharpe": -0.034,
+          "net_pips_per_year": -28.8
+        },
+        "CNY 5/side": {
+          "cost_pips": 0.1408,
+          "sharpe": -0.026,
+          "net_pips_per_year": -22.2
+        },
+        "CNY 5/round": {
+          "cost_pips": 0.0704,
+          "sharpe": -0.025,
+          "net_pips_per_year": -20.9
+        }
+      }
+    }
+  },
+  "exp06_trend_following": {
+    "L63": {
+      "gross_pips_per_year": 185.9,
+      "trades": 904,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_per_change_pips": 0.5,
+          "sharpe": 0.139,
+          "net_pips_per_year": 168.6
+        },
+        "USD 5/round": {
+          "cost_per_change_pips": 0.25,
+          "sharpe": 0.146,
+          "net_pips_per_year": 177.2
+        },
+        "CNY 5/side": {
+          "cost_per_change_pips": 0.0704,
+          "sharpe": 0.151,
+          "net_pips_per_year": 183.5
+        },
+        "CNY 5/round": {
+          "cost_per_change_pips": 0.0352,
+          "sharpe": 0.152,
+          "net_pips_per_year": 184.7
+        }
+      }
+    },
+    "L252": {
+      "gross_pips_per_year": 53.4,
+      "trades": 372,
+      "by_scenario": {
+        "USD 5/side": {
+          "cost_per_change_pips": 0.5,
+          "sharpe": 0.038,
+          "net_pips_per_year": 46.0
+        },
+        "USD 5/round": {
+          "cost_per_change_pips": 0.25,
+          "sharpe": 0.041,
+          "net_pips_per_year": 49.7
+        },
+        "CNY 5/side": {
+          "cost_per_change_pips": 0.0704,
+          "sharpe": 0.043,
+          "net_pips_per_year": 52.3
+        },
+        "CNY 5/round": {
+          "cost_per_change_pips": 0.0352,
+          "sharpe": 0.044,
+          "net_pips_per_year": 52.9
+        }
+      }
+    }
+  },
+  "caveats": [
+    "Commission unit is ambiguous; four readings are priced, not guessed.",
+    "Non-overlapping subset is the capacity-honest convention.",
+    "Pre-slippage; slippage adds on top of every line.",
+    "Per-line Sharpe at fixed +1 unit, no stops or sizing."
+  ]
+}

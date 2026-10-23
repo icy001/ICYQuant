@@ -1,0 +1,12 @@
+{
+  "ok": false,
+  "issues": [
+    {
+      "kind": "missing_output",
+      "category": "parsed",
+      "path": "artifacts/histdata_v9_bc/after_a/parsed/xauusd_2024_bars.parquet"
+    }
+  ],
+  "checked_paths": 16,
+  "checked_hashes": 3
+}

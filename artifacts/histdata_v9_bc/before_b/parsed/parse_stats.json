@@ -1,0 +1,248 @@
+{
+  "stats": {
+    "files_readable": 36,
+    "total_lines": 9000099,
+    "rows_emitted": 8999734,
+    "errors_emitted": 365,
+    "streaming_events_per_file": 2,
+    "parquet_path": "artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet",
+    "parquet_bytes": 157152066,
+    "errors_path": "artifacts/histdata_v9/parsed/eurusd_2000-2026_errors.jsonl",
+    "errors_bytes": 74835
+  },
+  "per_file": [
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12000/DAT_ASCII_EURUSD_M1_2000.csv",
+      "rows_emitted": 143167,
+      "errors": 0,
+      "lines": 143167
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12001/DAT_ASCII_EURUSD_M1_2001.csv",
+      "rows_emitted": 230766,
+      "errors": 1,
+      "lines": 230767
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12002/DAT_ASCII_EURUSD_M1_2002.csv",
+      "rows_emitted": 213000,
+      "errors": 0,
+      "lines": 213000
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12003/DAT_ASCII_EURUSD_M1_2003.csv",
+      "rows_emitted": 316351,
+      "errors": 0,
+      "lines": 316351
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12004/DAT_ASCII_EURUSD_M1_2004.csv",
+      "rows_emitted": 328426,
+      "errors": 0,
+      "lines": 328426
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12005/DAT_ASCII_EURUSD_M1_2005.csv",
+      "rows_emitted": 315635,
+      "errors": 0,
+      "lines": 315635
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12006/DAT_ASCII_EURUSD_M1_2006.csv",
+      "rows_emitted": 307176,
+      "errors": 0,
+      "lines": 307176
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12007/DAT_ASCII_EURUSD_M1_2007.csv",
+      "rows_emitted": 299782,
+      "errors": 0,
+      "lines": 299782
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12008/DAT_ASCII_EURUSD_M1_2008.csv",
+      "rows_emitted": 347355,
+      "errors": 0,
+      "lines": 347355
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12009/DAT_ASCII_EURUSD_M1_2009.csv",
+      "rows_emitted": 355880,
+      "errors": 0,
+      "lines": 355880
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12010/DAT_ASCII_EURUSD_M1_2010.csv",
+      "rows_emitted": 352320,
+      "errors": 0,
+      "lines": 352320
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12011/DAT_ASCII_EURUSD_M1_2011.csv",
+      "rows_emitted": 358369,
+      "errors": 0,
+      "lines": 358369
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12012/DAT_ASCII_EURUSD_M1_2012.csv",
+      "rows_emitted": 372161,
+      "errors": 0,
+      "lines": 372161
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12013/DAT_ASCII_EURUSD_M1_2013.csv",
+      "rows_emitted": 370611,
+      "errors": 0,
+      "lines": 370611
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12014/DAT_ASCII_EURUSD_M1_2014.csv",
+      "rows_emitted": 366477,
+      "errors": 0,
+      "lines": 366477
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12015/DAT_ASCII_EURUSD_M1_2015.csv",
+      "rows_emitted": 372210,
+      "errors": 0,
+      "lines": 372210
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12016/DAT_ASCII_EURUSD_M1_2016.csv",
+      "rows_emitted": 372679,
+      "errors": 0,
+      "lines": 372679
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12017/DAT_ASCII_EURUSD_M1_2017.csv",
+      "rows_emitted": 371635,
+      "errors": 0,
+      "lines": 371635
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12018/DAT_ASCII_EURUSD_M1_2018.csv",
+      "rows_emitted": 372607,
+      "errors": 0,
+      "lines": 372607
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12019/DAT_ASCII_EURUSD_M1_2019.csv",
+      "rows_emitted": 372470,
+      "errors": 60,
+      "lines": 372530
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12020/DAT_ASCII_EURUSD_M1_2020.csv",
+      "rows_emitted": 372275,
+      "errors": 60,
+      "lines": 372335
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12021/DAT_ASCII_EURUSD_M1_2021.csv",
+      "rows_emitted": 369442,
+      "errors": 60,
+      "lines": 369502
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12022/DAT_ASCII_EURUSD_M1_2022.csv",
+      "rows_emitted": 372805,
+      "errors": 60,
+      "lines": 372865
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12023/DAT_ASCII_EURUSD_M1_2023.csv",
+      "rows_emitted": 322578,
+      "errors": 60,
+      "lines": 322638
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12024/DAT_ASCII_EURUSD_M1_2024.csv",
+      "rows_emitted": 372379,
+      "errors": 0,
+      "lines": 372379
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M12025/DAT_ASCII_EURUSD_M1_2025.csv",
+      "rows_emitted": 372024,
+      "errors": 60,
+      "lines": 372084
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202601/DAT_ASCII_EURUSD_M1_202601.csv",
+      "rows_emitted": 30149,
+      "errors": 0,
+      "lines": 30149
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202602/DAT_ASCII_EURUSD_M1_202602.csv",
+      "rows_emitted": 28703,
+      "errors": 0,
+      "lines": 28703
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202603/DAT_ASCII_EURUSD_M1_202603.csv",
+      "rows_emitted": 31979,
+      "errors": 0,
+      "lines": 31979
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202604/DAT_ASCII_EURUSD_M1_202604.csv",
+      "rows_emitted": 31531,
+      "errors": 0,
+      "lines": 31531
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202605/DAT_ASCII_EURUSD_M1_202605.csv",
+      "rows_emitted": 29545,
+      "errors": 0,
+      "lines": 29545
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202606/DAT_ASCII_EURUSD_M1_202606.csv",
+      "rows_emitted": 31520,
+      "errors": 0,
+      "lines": 31520
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202607/DAT_ASCII_EURUSD_M1_202607.csv",
+      "rows_emitted": 32533,
+      "errors": 4,
+      "lines": 32537
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202608/DAT_ASCII_EURUSD_M1_202608.csv",
+      "rows_emitted": 30496,
+      "errors": 0,
+      "lines": 30496
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202609/DAT_ASCII_EURUSD_M1_202609.csv",
+      "rows_emitted": 30245,
+      "errors": 0,
+      "lines": 30245
+    },
+    {
+      "path": "data/real/histdata/HISTDATA_COM_ASCII_EURUSD_M1202610/DAT_ASCII_EURUSD_M1_202610.csv",
+      "rows_emitted": 2453,
+      "errors": 0,
+      "lines": 2453
+    }
+  ],
+  "ts_format_variants": [
+    "%Y%m%d %H%M%S",
+    "%Y%m%d %H:%M:%S.%f",
+    "%Y%m%d %H:%M",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y.%m.%d %H:%M:%S",
+    "%Y.%m.%d %H:%M"
+  ],
+  "expected_core": [
+    "date",
+    "time",
+    "open",
+    "high",
+    "low",
+    "close"
+  ]
+}

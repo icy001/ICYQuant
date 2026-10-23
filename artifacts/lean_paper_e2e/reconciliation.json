@@ -1,0 +1,28 @@
+{
+  "commit": "P0-01",
+  "event_source": "lean-native-json",
+  "expected": {
+    "p0_buy_spy": "100"
+  },
+  "matched": [
+    {
+      "signal_id": "p0_buy_spy",
+      "signed_quantity": "100"
+    }
+  ],
+  "journals": [
+    {
+      "order_id": "1",
+      "symbol": "SPY",
+      "quantity": "100.0",
+      "price": "144.78172417",
+      "amount": "14478.172417000",
+      "commission": "1.0",
+      "balanced": true
+    }
+  ],
+  "unexpected_fills": {},
+  "problems": [],
+  "reconciled": true,
+  "note": "LedgerPostingEngine posts position-vs-cash without a direction; the sign is verified here, in reconciliation, not in the journal"
+}

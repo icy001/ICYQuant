@@ -1,0 +1,91 @@
+{
+  "schema_version": "histdata_v9_final_report_v1",
+  "generated_at": "2026-10-14T02:27:22.218369+00:00",
+  "overall": "FAIL",
+  "components": {
+    "interfaces": false,
+    "snapshot": true,
+    "acceptance": true,
+    "coverage": true
+  },
+  "details": {
+    "interfaces": {
+      "ok": false,
+      "issues": [
+        {
+          "kind": "missing_output",
+          "category": "parsed",
+          "path": "artifacts/histdata_v9_bc/step2/rerun/a/parsed/xauusd_2024_bars.parquet"
+        }
+      ],
+      "checked_paths": 16,
+      "checked_hashes": 3,
+      "parsed_refs": {
+        "declared": [
+          "parsed/parse_stats.json",
+          "parsed/xauusd_2024_bars.parquet",
+          "parsed/xauusd_2024_errors.jsonl"
+        ],
+        "references": [
+          "parsed/parse_stats.json",
+          "parsed/xauusd_2024_bars.parquet",
+          "parsed/xauusd_2024_errors.jsonl"
+        ],
+        "duplicates": []
+      }
+    },
+    "snapshot": {
+      "ok": true,
+      "csv_diffs": {},
+      "git_head_snap": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
+      "git_head_now": "15eec64bc745d51e9f6c758dce6aaf8e95ead235",
+      "head_drift": false
+    },
+    "acceptance": {
+      "ok": true,
+      "denominator_claimed": 14,
+      "denominator_actual": 14,
+      "missing": [],
+      "pass_count": 12,
+      "fail_count": 2,
+      "overall_claimed": "FAIL"
+    },
+    "coverage": {
+      "expected": [
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "K01",
+        "K02",
+        "K03",
+        "K04"
+      ],
+      "covered": [
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "K01",
+        "K02",
+        "K03",
+        "K04"
+      ],
+      "missing": [],
+      "denominator": 14,
+      "complete": true
+    }
+  }
+}

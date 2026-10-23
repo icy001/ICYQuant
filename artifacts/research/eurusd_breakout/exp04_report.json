@@ -1,0 +1,483 @@
+{
+  "study": {
+    "name": "EXP04 EURUSD breakout continuation",
+    "type": "event study, NOT a trading strategy",
+    "question": "after close breaks the prior 12 completed M5 bars' extreme, does price continue in that direction?"
+  },
+  "data": {
+    "source_m1": "/Users/xuehairong/CodeBuddy/20260817155030/ICYQuant/artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet",
+    "m1_rows": 8999734,
+    "m5_bars": 1906107,
+    "m5_range": [
+      "2000-05-31 06:25:00",
+      "2026-10-03 05:55:00"
+    ],
+    "timezone": "stored EST(UTC-5) fixed; Beijing = stored + 0 days 13:00:00h; no DST, verified off the FX calendar in exp01/eurusd_m1_audit.py",
+    "missing_data_policy": "M1 -> M5 resample drops empty 5-minute buckets (.dropna()); any step between consecutive M5 bars that is not exactly 5 minutes is treated as a time gap. Events whose lookback window or holding window spans a gap are excluded and counted.",
+    "is_oos_split": {
+      "is": "year < 2016",
+      "oos": "year >= 2016",
+      "source": "reused from exp01-exp03"
+    }
+  },
+  "signal_definition": {
+    "up_breakout": "close[i] > max(high[i-12 .. i-1])  (strict)",
+    "down_breakout": "close[i] < min(low[i-12 .. i-1])  (strict)",
+    "current_bar_in_boundary": false,
+    "entry": "open of bar i+1 (next bar, never the signal close)",
+    "exit": "close of bar i+H",
+    "directional_return_up": "(exit - entry) / PIP",
+    "directional_return_down": "(entry - exit) / PIP",
+    "positive_means": "price continued in the breakout direction",
+    "lookahead": "none — signal and entry use bars <= i+1 only"
+  },
+  "fixed_parameters": {
+    "lookback_bars": 12,
+    "horizon_bars": [
+      12,
+      48
+    ],
+    "cost_pips_rt": 1.5,
+    "note": "fixed by design; the script never sweeps them and a poor result is not used here to change them"
+  },
+  "signal_counts_and_exclusions": {
+    "lookback_bars": 12,
+    "total_signals_considered": 257051,
+    "up_raw": 128443,
+    "down_raw": 128608,
+    "bars": 1906107,
+    "gap_bars_total": 12088,
+    "H12": {
+      "up": {
+        "raw": 128443,
+        "after_lookback_gap": 122365,
+        "after_position": 122365,
+        "after_holding_gap": 119201,
+        "dropped_lookback_gap": 6078,
+        "dropped_position": 0,
+        "dropped_holding_gap": 3164
+      },
+      "down": {
+        "raw": 128608,
+        "after_lookback_gap": 122773,
+        "after_position": 122772,
+        "after_holding_gap": 119790,
+        "dropped_lookback_gap": 5835,
+        "dropped_position": 1,
+        "dropped_holding_gap": 2982
+      }
+    },
+    "H48": {
+      "up": {
+        "raw": 128443,
+        "after_lookback_gap": 122365,
+        "after_position": 122362,
+        "after_holding_gap": 110690,
+        "dropped_lookback_gap": 6078,
+        "dropped_position": 3,
+        "dropped_holding_gap": 11672
+      },
+      "down": {
+        "raw": 128608,
+        "after_lookback_gap": 122773,
+        "after_position": 122770,
+        "after_holding_gap": 111978,
+        "dropped_lookback_gap": 5835,
+        "dropped_position": 3,
+        "dropped_holding_gap": 10792
+      }
+    }
+  },
+  "full_sample": {
+    "up|12": {
+      "n": 119201,
+      "mean_pips": -0.3684,
+      "median_pips": -0.7,
+      "std_pips": 15.2536,
+      "pos_share": 0.457,
+      "mean_net_pips": -1.8684,
+      "pos_share_net": 0.3929,
+      "total_pips": -43912.1,
+      "total_net_pips": -222713.6,
+      "naive_se": 0.0442,
+      "naive_ci95": [
+        -0.455,
+        -0.2818
+      ]
+    },
+    "down|12": {
+      "n": 119790,
+      "mean_pips": -0.3595,
+      "median_pips": -0.8,
+      "std_pips": 15.1806,
+      "pos_share": 0.456,
+      "mean_net_pips": -1.8595,
+      "pos_share_net": 0.3936,
+      "total_pips": -43067.4,
+      "total_net_pips": -222752.4,
+      "naive_se": 0.0439,
+      "naive_ci95": [
+        -0.4455,
+        -0.2736
+      ]
+    },
+    "up|48": {
+      "n": 110690,
+      "mean_pips": -0.4678,
+      "median_pips": -0.7,
+      "std_pips": 29.6837,
+      "pos_share": 0.4815,
+      "mean_net_pips": -1.9678,
+      "pos_share_net": 0.4491,
+      "total_pips": -51776.7,
+      "total_net_pips": -217811.7,
+      "naive_se": 0.0892,
+      "naive_ci95": [
+        -0.6426,
+        -0.2929
+      ]
+    },
+    "down|48": {
+      "n": 111978,
+      "mean_pips": -0.3269,
+      "median_pips": -0.8,
+      "std_pips": 30.3728,
+      "pos_share": 0.4789,
+      "mean_net_pips": -1.8269,
+      "pos_share_net": 0.4465,
+      "total_pips": -36609.1,
+      "total_net_pips": -204576.1,
+      "naive_se": 0.0908,
+      "naive_ci95": [
+        -0.5048,
+        -0.149
+      ]
+    }
+  },
+  "uncertainty": {
+    "up|12": {
+      "stats": {
+        "n": 119201,
+        "mean_pips": -0.3684,
+        "median_pips": -0.7,
+        "std_pips": 15.2536,
+        "pos_share": 0.457,
+        "mean_net_pips": -1.8684,
+        "pos_share_net": 0.3929,
+        "total_pips": -43912.1,
+        "total_net_pips": -222713.6,
+        "naive_se": 0.0442,
+        "naive_ci95": [
+          -0.455,
+          -0.2818
+        ]
+      },
+      "block_bootstrap": {
+        "method": "calendar-month block bootstrap",
+        "n_month_blocks": 318,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_ci95": [
+          -0.5062,
+          -0.2285
+        ],
+        "boot_se": 0.0701
+      },
+      "nonoverlap": {
+        "n": 50089,
+        "mean_pips": -0.3067,
+        "mean_net_pips": -1.8067
+      }
+    },
+    "down|12": {
+      "stats": {
+        "n": 119790,
+        "mean_pips": -0.3595,
+        "median_pips": -0.8,
+        "std_pips": 15.1806,
+        "pos_share": 0.456,
+        "mean_net_pips": -1.8595,
+        "pos_share_net": 0.3936,
+        "total_pips": -43067.4,
+        "total_net_pips": -222752.4,
+        "naive_se": 0.0439,
+        "naive_ci95": [
+          -0.4455,
+          -0.2736
+        ]
+      },
+      "block_bootstrap": {
+        "method": "calendar-month block bootstrap",
+        "n_month_blocks": 318,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_ci95": [
+          -0.5039,
+          -0.211
+        ],
+        "boot_se": 0.0732
+      },
+      "nonoverlap": {
+        "n": 50249,
+        "mean_pips": -0.3176,
+        "mean_net_pips": -1.8176
+      }
+    },
+    "up|48": {
+      "stats": {
+        "n": 110690,
+        "mean_pips": -0.4678,
+        "median_pips": -0.7,
+        "std_pips": 29.6837,
+        "pos_share": 0.4815,
+        "mean_net_pips": -1.9678,
+        "pos_share_net": 0.4491,
+        "total_pips": -51776.7,
+        "total_net_pips": -217811.7,
+        "naive_se": 0.0892,
+        "naive_ci95": [
+          -0.6426,
+          -0.2929
+        ]
+      },
+      "block_bootstrap": {
+        "method": "calendar-month block bootstrap",
+        "n_month_blocks": 317,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_ci95": [
+          -0.8426,
+          -0.0973
+        ],
+        "boot_se": 0.1936
+      },
+      "nonoverlap": {
+        "n": 23561,
+        "mean_pips": -0.2857,
+        "mean_net_pips": -1.7857
+      }
+    },
+    "down|48": {
+      "stats": {
+        "n": 111978,
+        "mean_pips": -0.3269,
+        "median_pips": -0.8,
+        "std_pips": 30.3728,
+        "pos_share": 0.4789,
+        "mean_net_pips": -1.8269,
+        "pos_share_net": 0.4465,
+        "total_pips": -36609.1,
+        "total_net_pips": -204576.1,
+        "naive_se": 0.0908,
+        "naive_ci95": [
+          -0.5048,
+          -0.149
+        ]
+      },
+      "block_bootstrap": {
+        "method": "calendar-month block bootstrap",
+        "n_month_blocks": 317,
+        "n_boot": 2000,
+        "seed": 20240416,
+        "mean_ci95": [
+          -0.7316,
+          0.0692
+        ],
+        "boot_se": 0.2036
+      },
+      "nonoverlap": {
+        "n": 23786,
+        "mean_pips": -0.5338,
+        "mean_net_pips": -2.0338
+      }
+    }
+  },
+  "is_oos": {
+    "up|12|IS": {
+      "n": 60637,
+      "mean_pips": -0.3604,
+      "median_pips": -1.0,
+      "std_pips": 18.3708,
+      "pos_share": 0.4471,
+      "mean_net_pips": -1.8604,
+      "pos_share_net": 0.4032,
+      "total_pips": -21854.0,
+      "total_net_pips": -112809.5,
+      "naive_se": 0.0746,
+      "naive_ci95": [
+        -0.5066,
+        -0.2142
+      ]
+    },
+    "up|12|OOS": {
+      "n": 58564,
+      "mean_pips": -0.3766,
+      "median_pips": -0.5,
+      "std_pips": 11.1422,
+      "pos_share": 0.4672,
+      "mean_net_pips": -1.8766,
+      "pos_share_net": 0.3822,
+      "total_pips": -22058.1,
+      "total_net_pips": -109904.1,
+      "naive_se": 0.046,
+      "naive_ci95": [
+        -0.4669,
+        -0.2864
+      ]
+    },
+    "down|12|IS": {
+      "n": 61623,
+      "mean_pips": -0.3896,
+      "median_pips": -1.0,
+      "std_pips": 18.202,
+      "pos_share": 0.4434,
+      "mean_net_pips": -1.8896,
+      "pos_share_net": 0.4002,
+      "total_pips": -24009.5,
+      "total_net_pips": -116444.0,
+      "naive_se": 0.0733,
+      "naive_ci95": [
+        -0.5333,
+        -0.2459
+      ]
+    },
+    "down|12|OOS": {
+      "n": 58167,
+      "mean_pips": -0.3276,
+      "median_pips": -0.5,
+      "std_pips": 11.1175,
+      "pos_share": 0.4694,
+      "mean_net_pips": -1.8276,
+      "pos_share_net": 0.3866,
+      "total_pips": -19057.9,
+      "total_net_pips": -106308.4,
+      "naive_se": 0.0461,
+      "naive_ci95": [
+        -0.418,
+        -0.2373
+      ]
+    },
+    "up|48|IS": {
+      "n": 54047,
+      "mean_pips": -0.5555,
+      "median_pips": -1.0,
+      "std_pips": 36.1276,
+      "pos_share": 0.4771,
+      "mean_net_pips": -2.0555,
+      "pos_share_net": 0.4554,
+      "total_pips": -30021.0,
+      "total_net_pips": -111091.5,
+      "naive_se": 0.1554,
+      "naive_ci95": [
+        -0.86,
+        -0.2509
+      ]
+    },
+    "up|48|OOS": {
+      "n": 56643,
+      "mean_pips": -0.3841,
+      "median_pips": -0.4,
+      "std_pips": 21.8283,
+      "pos_share": 0.4857,
+      "mean_net_pips": -1.8841,
+      "pos_share_net": 0.4431,
+      "total_pips": -21755.7,
+      "total_net_pips": -106720.2,
+      "naive_se": 0.0917,
+      "naive_ci95": [
+        -0.5638,
+        -0.2043
+      ]
+    },
+    "down|48|IS": {
+      "n": 55520,
+      "mean_pips": -0.2883,
+      "median_pips": -1.0,
+      "std_pips": 36.9937,
+      "pos_share": 0.4738,
+      "mean_net_pips": -1.7883,
+      "pos_share_net": 0.452,
+      "total_pips": -16004.7,
+      "total_net_pips": -99284.7,
+      "naive_se": 0.157,
+      "naive_ci95": [
+        -0.596,
+        0.0195
+      ]
+    },
+    "down|48|OOS": {
+      "n": 56458,
+      "mean_pips": -0.365,
+      "median_pips": -0.5,
+      "std_pips": 21.9979,
+      "pos_share": 0.484,
+      "mean_net_pips": -1.865,
+      "pos_share_net": 0.4411,
+      "total_pips": -20604.4,
+      "total_net_pips": -105291.4,
+      "naive_se": 0.0926,
+      "naive_ci95": [
+        -0.5464,
+        -0.1835
+      ]
+    }
+  },
+  "concentration": {
+    "up|12": {
+      "years_counted": 27,
+      "years_positive": 7,
+      "years_negative": 20,
+      "total_pips": -43912.1,
+      "best_year": 3,
+      "best_year_pips": 3031.0,
+      "worst_year": 9,
+      "worst_year_pips": -7157.0,
+      "best_year_abs_share": 0.0483,
+      "top3_abs_share": 0.0949,
+      "ex_best_year_pips": -46943.1,
+      "ex_worst_year_pips": -36755.1
+    },
+    "down|12": {
+      "years_counted": 27,
+      "years_positive": 4,
+      "years_negative": 23,
+      "total_pips": -43067.4,
+      "best_year": 1,
+      "best_year_pips": 383.0,
+      "worst_year": 9,
+      "worst_year_pips": -4713.0,
+      "best_year_abs_share": 0.0085,
+      "top3_abs_share": 0.0236,
+      "ex_best_year_pips": -43450.4,
+      "ex_worst_year_pips": -38354.4
+    },
+    "up|48": {
+      "years_counted": 27,
+      "years_positive": 9,
+      "years_negative": 18,
+      "total_pips": -51776.7,
+      "best_year": 3,
+      "best_year_pips": 9427.0,
+      "worst_year": 14,
+      "worst_year_pips": -9117.2,
+      "best_year_abs_share": 0.0895,
+      "top3_abs_share": 0.1578,
+      "ex_best_year_pips": -61203.7,
+      "ex_worst_year_pips": -42659.5
+    },
+    "down|48": {
+      "years_counted": 27,
+      "years_positive": 9,
+      "years_negative": 18,
+      "total_pips": -36609.1,
+      "best_year": 14,
+      "best_year_pips": 5264.2,
+      "worst_year": 25,
+      "worst_year_pips": -11508.5,
+      "best_year_abs_share": 0.0602,
+      "top3_abs_share": 0.1526,
+      "ex_best_year_pips": -41873.3,
+      "ex_worst_year_pips": -25100.6
+    }
+  }
+}
