@@ -1,0 +1,103 @@
+{
+ "experiment": "exp13_m5_momentum_preregistered",
+ "design_frozen_before_results": true,
+ "direction": "momentum (long after a rise) — opposite of the M5 reversal line",
+ "expected_sign_declared_in_advance": "negative, if the reversal finding is genuine",
+ "data": "EURUSD M1 -> Beijing -> M5 (same construction as reversal_v1)",
+ "m5_bars": 1906106,
+ "range": [
+  "2000-05-31 01:25:00",
+  "2026-10-03 00:55:00"
+ ],
+ "is_window": [
+  "2000-05-30",
+  "2015-12-31"
+ ],
+ "oos_window": [
+  "2016-01-01",
+  "2026-10-02"
+ ],
+ "cost_pips": 1.0,
+ "grid": [
+  {
+   "n": 12,
+   "h": 12
+  },
+  {
+   "n": 12,
+   "h": 48
+  },
+  {
+   "n": 48,
+   "h": 12
+  },
+  {
+   "n": 48,
+   "h": 48
+  }
+ ],
+ "multiple_testing": {
+  "method": "Bonferroni, family alpha 0.05 over 4 tests",
+  "is_t_crit": 2.498,
+  "is_sharpe_min": 0.3,
+  "oos_t_crit": 1.96
+ },
+ "results": {
+  "N12_H12": {
+   "n": 12,
+   "h": 12,
+   "is": {
+    "trades": 162238,
+    "trades_per_year": 10412.5,
+    "gross_pips_per_trade": -0.0988,
+    "net_pips_per_trade": -1.0988,
+    "net_pips_per_year": -11441.6,
+    "ann_sharpe": -6.873,
+    "t_nw": -43.56,
+    "is_pass": false
+   }
+  },
+  "N12_H48": {
+   "n": 12,
+   "h": 48,
+   "is": {
+    "trades": 162238,
+    "trades_per_year": 10412.5,
+    "gross_pips_per_trade": -0.1597,
+    "net_pips_per_trade": -1.1597,
+    "net_pips_per_year": -12075.3,
+    "ann_sharpe": -3.63,
+    "t_nw": -32.01,
+    "is_pass": false
+   }
+  },
+  "N48_H12": {
+   "n": 48,
+   "h": 12,
+   "is": {
+    "trades": 83306,
+    "trades_per_year": 5346.6,
+    "gross_pips_per_trade": -0.0602,
+    "net_pips_per_trade": -1.0602,
+    "net_pips_per_year": -5668.2,
+    "ann_sharpe": -4.712,
+    "t_nw": -29.46,
+    "is_pass": false
+   }
+  },
+  "N48_H48": {
+   "n": 48,
+   "h": 48,
+   "is": {
+    "trades": 83306,
+    "trades_per_year": 5346.6,
+    "gross_pips_per_trade": -0.165,
+    "net_pips_per_trade": -1.165,
+    "net_pips_per_year": -6228.6,
+    "ann_sharpe": -2.609,
+    "t_nw": -20.29,
+    "is_pass": false
+   }
+  }
+ }
+}
