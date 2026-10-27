@@ -1,0 +1,140 @@
+{
+ "experiment": "exp12_eurusd_lowfreq_preregistered",
+ "design_frozen_before_results": true,
+ "data": "artifacts/histdata_v9/derived/eurusd_2000-2026_d1.parquet",
+ "bars": 8126,
+ "range": [
+  "2000-05-30 00:00:00",
+  "2026-10-02 00:00:00"
+ ],
+ "is_window": [
+  "2000-05-30",
+  "2015-12-31"
+ ],
+ "oos_window": [
+  "2016-01-01",
+  "2026-10-02"
+ ],
+ "cost_pips": 1.0,
+ "cost_basis": "account real round trip; charged on position change only",
+ "strategies": {
+  "donchian_20": {
+   "kind": "donchian",
+   "n": 20
+  },
+  "donchian_55": {
+   "kind": "donchian",
+   "n": 55
+  },
+  "donchian_120": {
+   "kind": "donchian",
+   "n": 120
+  },
+  "ma_20_50": {
+   "kind": "ma_cross",
+   "fast": 20,
+   "slow": 50
+  },
+  "atr_2.0": {
+   "kind": "atr",
+   "n": 20,
+   "k": 2.0
+  }
+ },
+ "multiple_testing": {
+  "method": "Bonferroni, family alpha 0.05 over 5 tests",
+  "per_test_alpha": 0.01,
+  "is_t_crit": 2.576,
+  "is_sharpe_min": 0.3,
+  "oos_t_crit": 1.96
+ },
+ "results": {
+  "donchian_20": {
+   "cfg": {
+    "kind": "donchian",
+    "n": 20
+   },
+   "is": {
+    "days": 4766,
+    "years": 18.91,
+    "mean_daily_pips": 0.79037,
+    "ann_sharpe": 0.174,
+    "t_nw": 0.757,
+    "total_net_pips": 3766.9,
+    "gross_pips": 3777.9,
+    "ann_return_pips": 199.2,
+    "is_pass": false
+   }
+  },
+  "donchian_55": {
+   "cfg": {
+    "kind": "donchian",
+    "n": 55
+   },
+   "is": {
+    "days": 4766,
+    "years": 18.91,
+    "mean_daily_pips": 1.36318,
+    "ann_sharpe": 0.306,
+    "t_nw": 1.328,
+    "total_net_pips": 6496.9,
+    "gross_pips": 6503.9,
+    "ann_return_pips": 343.5,
+    "is_pass": false
+   }
+  },
+  "donchian_120": {
+   "cfg": {
+    "kind": "donchian",
+    "n": 120
+   },
+   "is": {
+    "days": 4766,
+    "years": 18.91,
+    "mean_daily_pips": 1.32142,
+    "ann_sharpe": 0.3,
+    "t_nw": 1.297,
+    "total_net_pips": 6297.9,
+    "gross_pips": 6304.9,
+    "ann_return_pips": 333.0,
+    "is_pass": false
+   }
+  },
+  "ma_20_50": {
+   "cfg": {
+    "kind": "ma_cross",
+    "fast": 20,
+    "slow": 50
+   },
+   "is": {
+    "days": 4766,
+    "years": 18.91,
+    "mean_daily_pips": 0.944,
+    "ann_sharpe": 0.206,
+    "t_nw": 0.898,
+    "total_net_pips": 4499.1,
+    "gross_pips": 4710.1,
+    "ann_return_pips": 237.9,
+    "is_pass": false
+   }
+  },
+  "atr_2.0": {
+   "cfg": {
+    "kind": "atr",
+    "n": 20,
+    "k": 2.0
+   },
+   "is": {
+    "days": 4766,
+    "years": 18.91,
+    "mean_daily_pips": 0.83267,
+    "ann_sharpe": 0.182,
+    "t_nw": 0.802,
+    "total_net_pips": 3968.5,
+    "gross_pips": 4135.5,
+    "ann_return_pips": 209.8,
+    "is_pass": false
+   }
+  }
+ }
+}
