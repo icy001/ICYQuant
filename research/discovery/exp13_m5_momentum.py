@@ -56,6 +56,7 @@ import pandas as pd
 
 from research.analytics.metrics import calculate_newey_west_t
 from research.data.validators import validate_price_range
+from research.discovery.costs import ACCOUNT_EURUSD_RT_PIPS
 
 REPO = Path(__file__).resolve().parents[2]
 M1 = REPO / "artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet"
@@ -66,7 +67,11 @@ STORED_TO_BEIJING = pd.Timedelta(hours=8)  # matches eurusd_reversal_v1_m5
 IS_END = "2015-12-31"
 OOS_START = "2016-01-01"
 
-COST_PIPS = 1.0
+# Sourced from research.discovery.costs. The Discovery Lab engine charges
+# EURUSD 3.0 bps RT (~3.24 pip), which is a different and more conservative
+# convention; results must not be compared across the two without restating
+# the cost.
+COST_PIPS = ACCOUNT_EURUSD_RT_PIPS
 PIP = 1e-4
 
 BARS_PER_YEAR = 252 * 288          # M5 bars in a 24x5 FX week
