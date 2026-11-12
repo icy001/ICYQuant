@@ -63,7 +63,9 @@ class SessionCalendar:
     """
 
     # Default session definitions (UTC times, approximate)
-    _DEFAULT_SESSIONS: Dict[str, Dict[str, List[SessionWindow]]] = {
+    # (no type annotation: annotated names become dataclass fields, and a
+    #  mutable dict default is illegal for dataclass fields)
+    _DEFAULT_SESSIONS = {
         "CN": {
             TradingSession.PRE_MARKET: [
                 SessionWindow(time(1, 0), time(1, 30), "CN Pre-Market")

@@ -6,6 +6,7 @@ Architecture::
 """
 
 # ── Core Factor Engine ────────────────────────────────────────────────────
+from .factor_definition import Factor
 from .factor_engine import FactorEngine, FactorEngineState
 from .factor_manager import FactorManager, FactorManagerState
 from .factor_registry import FactorRegistry, FactorType

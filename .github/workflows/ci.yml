@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ① 收集闸门：任何新增的坏 import / 缺失符号都会在这里立刻失败，
+  #    防止测试套件悄悄退化成「收集即报错」而无人发现。
+  collect-guard:
+    name: Collection guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-ci.txt
+      - name: pytest --collect-only (must be error-free)
+        run: python -m pytest --collect-only -q
+
+  # ② 全量测试：11,289 passed / 7 skipped 为当前冻结基线。
+  test:
+    name: Full test suite
+    needs: collect-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-ci.txt
+      - name: Run full suite
+        run: python -m pytest -q -p no:cacheprovider
+
+  # ③ 冻结基线闸门：LEAN 执行链（P0-03-A）逐位回归
+  #    其中 test_lean_k03_regression.py 断言 fill_price == 144.78172417，
+  #    任何撮合/事件映射的漂移都会在这里被抓到。
+  frozen-baseline:
+    name: Frozen baseline (LEAN P0-03-A)
+    needs: collect-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-ci.txt
+      - name: LEAN execution chain (90 tests, bit-exact regression)
+        run: python -m pytest tests/lean -q
+      - name: Research pipeline (costs / validators / metrics / HAC)
+        run: python -m pytest tests/research/execution tests/research -q

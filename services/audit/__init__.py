@@ -7,3 +7,6 @@ from .collector import AuditCollector
 from .rule import ComplianceRule
 from .monitor import ComplianceMonitor
 from .service import AuditService
+
+# -- auto-restored exports (test-collection repair) --
+from services.audit.sqlite_store import SQLiteAuditStore

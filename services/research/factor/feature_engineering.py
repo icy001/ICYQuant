@@ -95,11 +95,11 @@ class FundamentalFeature:
     """Fundamental-derived features: PE, PB, ROE, growth, quality scores."""
 
     name: str
-    field: str = ""  # e.g., pe_ttm, pb, roe, revenue_growth
+    field_name: str = ""  # e.g., pe_ttm, pb, roe, revenue_growth
     params: Dict[str, Any] = field(default_factory=dict)
 
     def compute(self, values: Dict[str, float]) -> float:
-        return values.get(self.field, 0.0)
+        return values.get(self.field_name, 0.0)
 
 
 @dataclass
@@ -206,7 +206,7 @@ class FeatureEngine:
         field: str = "",
         **params,
     ) -> FundamentalFeature:
-        feature = FundamentalFeature(name=name, field=field, params=params)
+        feature = FundamentalFeature(name=name, field_name=field, params=params)
         self.register_feature(name, feature)
         return feature
 
