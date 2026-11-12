@@ -57,13 +57,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from research.discovery.costs import ACCOUNT_EURUSD_RT_PIPS
+
 DATA = Path("artifacts/histdata_v9/derived/eurusd_2000-2026_d1.parquet")
 OUT = Path("artifacts/research/eurusd_lowfreq")
 
 IS_END = "2015-12-31"
 OOS_START = "2016-01-01"
 
-COST_PIPS = 1.0          # account real round-trip cost
+# Sourced from research.discovery.costs so the assumption has one home.
+# NOTE: spec.COST_CONFIG (Discovery Lab engine) charges EURUSD 3.0 bps
+# round trip, which is ~3.24 pip -- about 3.2x this account figure. Numbers
+# from the two engines are NOT comparable without restating the cost.
+COST_PIPS = ACCOUNT_EURUSD_RT_PIPS
 PIP = 1e-4               # EURUSD: 1 pip = 0.0001
 
 TRADING_DAYS = 252

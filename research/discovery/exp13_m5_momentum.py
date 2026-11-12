@@ -54,6 +54,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from research.analytics.metrics import calculate_newey_west_t
+from research.data.validators import validate_price_range
+from research.discovery.costs import ACCOUNT_EURUSD_RT_PIPS
+
 REPO = Path(__file__).resolve().parents[2]
 M1 = REPO / "artifacts/histdata_v9/parsed/eurusd_2000-2026_bars.parquet"
 OUT = REPO / "artifacts/research/m5_momentum"
@@ -63,7 +67,11 @@ STORED_TO_BEIJING = pd.Timedelta(hours=8)  # matches eurusd_reversal_v1_m5
 IS_END = "2015-12-31"
 OOS_START = "2016-01-01"
 
-COST_PIPS = 1.0
+# Sourced from research.discovery.costs. The Discovery Lab engine charges
+# EURUSD 3.0 bps RT (~3.24 pip), which is a different and more conservative
+# convention; results must not be compared across the two without restating
+# the cost.
+COST_PIPS = ACCOUNT_EURUSD_RT_PIPS
 PIP = 1e-4
 
 BARS_PER_YEAR = 252 * 288          # M5 bars in a 24x5 FX week
@@ -90,26 +98,25 @@ def load_m5() -> pd.DataFrame:
             .agg(open=("open", "first"), high=("high", "max"),
                  low=("low", "min"), close=("close", "last"))
             .dropna(subset=["open", "high", "low", "close"]))
-    good = ((m5["open"].between(PX_MIN, PX_MAX))
-            & (m5["high"].between(PX_MIN, PX_MAX))
-            & (m5["low"].between(PX_MIN, PX_MAX))
-            & (m5["close"].between(PX_MIN, PX_MAX)))
-    return m5.loc[good]
+    bad: set[int] = set()
+    for col in ("open", "high", "low", "close"):
+        bad.update(validate_price_range(m5[col].to_numpy(dtype=float),
+                                        (PX_MIN, PX_MAX)))
+    if not bad:
+        return m5
+    keep = np.ones(len(m5), dtype=bool)
+    keep[sorted(bad)] = False
+    return m5.loc[keep]
 
 
 def newey_west_t(x: np.ndarray, lag: int) -> float:
-    n = len(x)
-    if n < 10:
-        return float("nan")
-    mu = x.mean()
-    e = x - mu
-    var = (e @ e) / n
-    for L in range(1, lag + 1):
-        g = (e[L:] @ e[:-L]) / n
-        w = 1.0 - L / (lag + 1.0)
-        var += 2.0 * w * g
-    var = max(var, 1e-18)
-    return float(mu / np.sqrt(var / n))
+    """Thin wrapper over the shared implementation.
+
+    Kept in place so call sites and the published numbers are untouched;
+    the HAC routine itself now lives in research.analytics.metrics so that
+    four divergent copies cannot drift apart again.
+    """
+    return calculate_newey_west_t(x.tolist(), lag=lag)
 
 
 def run(m5: pd.DataFrame, n: int, h: int):
