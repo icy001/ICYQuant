@@ -36,3 +36,11 @@ __all__ = [
     "SnapshotManager",
     "StrategyRecovery",
 ]
+
+# -- auto-restored exports (test-collection repair) --
+from services.strategy.duplicate import DuplicateSignalValidator
+from services.strategy.order_mapper import OrderMapper
+from services.strategy.position_sizer import PositionSizer
+from services.strategy.generator import SignalGenerator
+from services.strategy.enums import SignalType
+from services.strategy.context import StrategyContext

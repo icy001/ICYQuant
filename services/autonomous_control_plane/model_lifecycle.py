@@ -2,7 +2,7 @@
 Model Lifecycle — Unified model state lifecycle management.
 
 Manages the full lifecycle of all models (Alpha, Strategy, Portfolio)
-from discovery through retirement with defined state transitions.
+from services.discovery through retirement with defined state transitions.
 """
 
 from __future__ import annotations

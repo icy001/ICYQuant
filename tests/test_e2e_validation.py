@@ -310,7 +310,7 @@ def test_e2e_ui_regression():
 
     # ① every NAV route has a real page implementation (no placeholder)
     nav_routes = re.findall(r'"#/([a-z/]+)": \{', app_js)
-    assert len(nav_routes) == 21, nav_routes
+    assert len(nav_routes) == 22, nav_routes
     framework_routes = set(re.findall(
         r'PAGE_FRAMEWORK\["([a-z/]+)"\] =', app_js))
     for route in nav_routes:

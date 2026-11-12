@@ -3,19 +3,15 @@ from .margin_rule import MarginRule
 from .max_order_size import MaxOrderSizeRule
 from .position_limit import PositionLimitRule
 
-
-# NOTE: RiskRule is defined in services/risk/rules.py
-# (the module file), but the rules/ directory package shadows it.
-# Forward-declared here so risk/limits.py can import it.
-from abc import ABC, abstractmethod
-
-
-class RiskRule(ABC):
-    """Base rule class — stub. Actual impl in services.risk.rules module."""
-
-    @abstractmethod
-    def check(self, order) -> bool:
-        ...
+# Legacy rules recovered from the shadowed services/risk/rules.py module;
+# services/risk/checker.py still depends on these four.
+from .legacy_rules import (
+    RiskRule,
+    PositionSizeRule,
+    CashBalanceRule,
+    OrderQuantityRule,
+    ExposureRule,
+)
 
 
 __all__ = [
@@ -24,4 +20,8 @@ __all__ = [
     "ExposureLimitRule",
     "MarginRule",
     "RiskRule",
+    "PositionSizeRule",
+    "CashBalanceRule",
+    "OrderQuantityRule",
+    "ExposureRule",
 ]

@@ -1,6 +1,5 @@
-"""
-Factor definition.
-"""
+"""Factor definition (moved from services/research/factor.py, which was
+shadowed by the factor/ package and therefore unreachable)."""
 
 from dataclasses import dataclass
 from datetime import datetime

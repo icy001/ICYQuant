@@ -3,7 +3,7 @@ Crypto factory for creating algorithm and KMS instances.
 
 Provides factory methods for instantiating
 crypto algorithms and KMS providers
-from configuration.
+from services.configuration.
 """
 
 from __future__ import annotations

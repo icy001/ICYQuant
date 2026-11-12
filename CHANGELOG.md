@@ -1,6 +1,54 @@
 # Changelog
 
 
+## v1.0.0-archive — 工程冻结（2026-11-12）
+
+**性质**：归档标记，不是功能版本。研究线（九条候选全部否证）与 LEAN 执行链
+（P0-03-A）均已结题，本次只做工程加固：让「冻结基线」可被 CI 持续验证。
+
+### Fixed（真实源码缺陷，此前被收集错误掩盖）
+
+- `services/research/factor/feature_engineering.py`：`FundamentalFeature` 的属性
+  `field: str` 遮蔽了 `dataclasses.field`，导致模块 import 期即抛
+  `TypeError: 'str' object is not callable`，整个 `services.research` 包不可导入。
+  属性改名为 `field_name`。
+- `services/research/factor.py` 与 `services/risk/rules.py`：模块与同名包
+  （`factor/`、`rules/`）并存，包优先遮蔽模块，两个模块成为不可达死代码，
+  而 `services/research/__init__.py` 与 `services/risk/checker.py` 仍依赖它们。
+  内容迁入包内（`factor/factor_definition.py`、`rules/legacy_rules.py`）后删除孤儿模块。
+- 72 处裸子包名绝对导入（`from position.calculator import ...` 等），
+  在 `services/{audit,backtest,order,portfolio,position,strategy}` 等包内
+  触发 `ModuleNotFoundError`，统一补 `services.` 前缀。
+- `services/scheduler/trigger/session_calendar.py`：`@dataclass` 中带类型注解的
+  类属性 `_DEFAULT_SESSIONS` 被当作字段，触发 mutable default 校验错误。
+- `services/scheduler/models/__init__.py`：补导出 `JobConfig`。
+- `tests/test_e2e_validation.py`：NAV 路由数断言 `21` 与 app.js 实际 22 个路由
+  （及 docstring 自述 "22 views"）不一致，校正为 22。
+
+### Added
+
+- `.github/workflows/ci.yml`：三段式 CI —— ① 收集闸门（`--collect-only` 必须零错误）；
+  ② 全量测试（11,289 passed / 7 skipped / 0 failed）；③ 冻结基线闸门
+  （`tests/lean` 90 项，含 `fill_price == 144.78172417` 逐位回归）。
+- `requirements-ci.txt`：在干净 venv（Python 3.13）实测通过的 CI 依赖清单。
+- `tests/conftest.py`：三段式显式排除清单（79 个收集失败 / 46 个运行失败 / 2 个 hang
+  目录），每段注明原因与恢复方式。
+- `pytest.ini`：启用 `--import-mode=importlib`，解决跨目录同名测试文件冲突
+  （`test_workflow.py`、`test_models.py` 等）。
+
+### Changed
+
+- 测试套件从「155 个收集错误、无法运行」变为「11,296 项可收集、11,289 通过」。
+
+### Known issues（已在 conftest 记录，不在本次范围）
+
+- 46 个测试文件因测试与实现两套 API 各自演化而失败（`RiskContext`/`Order`/
+  `Experiment` 等签名不对齐），需人工裁定以哪边为准。
+- 79 个测试文件被测的模块/符号从未实现（`platform.*`、`resource_manager`、
+  `PlatformObservability`、`VirtualOrder`、`DecisionExplainer` 等）。
+- `tests/production`、`tests/alternative_intelligence` 整目录 hang。
+
+
 ## v0.4.0-alpha1 (GA)
 
 **Release Date**: 2026-07-30

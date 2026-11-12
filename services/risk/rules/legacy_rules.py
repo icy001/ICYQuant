@@ -1,8 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Optional
+"""Legacy risk rules recovered from services/risk/rules.py, which was
+shadowed by this rules/ package and therefore unreachable (the checker
+still imports them, so they are preserved here)."""
 
-from .context import RiskContext
-from .result import RiskResult
+from abc import ABC, abstractmethod
+from typing import Dict
+
+from ..context import RiskContext
+from ..result import RiskResult
 
 
 class RiskRule(ABC):
@@ -36,7 +40,7 @@ class CashBalanceRule(RiskRule):
         has_enough_cash = portfolio.cash >= required_cash + self.min_balance
         return {
             "cash_balance": has_enough_cash,
-            "reason": f"Insufficient cash for order" if not has_enough_cash else "",
+            "reason": "Insufficient cash for order" if not has_enough_cash else "",
         }
 
     def evaluate(self, order, context: RiskContext) -> RiskResult:
