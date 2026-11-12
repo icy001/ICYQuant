@@ -39,6 +39,10 @@
 ### Changed
 
 - 测试套件从「155 个收集错误、无法运行」变为「11,296 项可收集、11,289 通过」。
+- 仓库卫生：`LICENSE (MIT)` 改名 `LICENSE`（GitHub 现在能识别许可证）；
+  根目录一次性脚本 `smoke_part13.py` / `smoke_part14.py` 移入 `scripts/smoke/`。
+- 新增 `ARCHITECTURE.md`：目录定位文档（哪些是活代码、哪些是脚手架层、
+  测试分层的真实现状、同名冲突的修法、复活项目的入口指引）。
 
 ### Known issues（已在 conftest 记录，不在本次范围）
 
