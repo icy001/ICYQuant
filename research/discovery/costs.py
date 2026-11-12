@@ -43,6 +43,12 @@ from dataclasses import dataclass
 # "is it tradable" decision was made against.
 ACCOUNT_EURUSD_RT_PIPS: float = 1.0
 
+# NEW account terms, negotiated 2026-11-12: EURUSD 0.15 pip round trip.
+# This crosses the 0.16 pip break-even threshold for the M5 reversal
+# (gross 0.3328 pip/trade), reopening that line for re-validation (Exp14).
+# Not a rewrite of history: pre-2026-11-12 results remain quoted at 1.0 pip.
+NEGOTIATED_EURUSD_RT_PIPS: float = 0.15
+
 # Legacy assumption used by exp01-exp05 and the reversal_v1 line, before the
 # real account terms were measured. Documented in those reports as
 # "ASSUMED; data is single-sided bid". Kept for reproducing history only --

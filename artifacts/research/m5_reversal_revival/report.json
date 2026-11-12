@@ -1,0 +1,94 @@
+{
+  "experiment": "exp14_m5_reversal_revival_preregistered",
+  "design_frozen_before_results": true,
+  "direction": "reversal (sell after a rise) \u2014 opposite sign of exp13",
+  "expected_sign_declared_in_advance": "positive IS Sharpe in the 0.3-0.6 band if the edge survived; negative or <0.30 Sharpe closes the line permanently",
+  "data": "EURUSD M1 -> Beijing -> M5 (same construction as exp13/reversal_v1)",
+  "sample": "2000-05-30 .. 2026-10-02",
+  "cost_pips_rt": 0.15,
+  "cost_source": "research/discovery/costs.py NEGOTIATED_EURUSD_RT_PIPS (2026-11-12)",
+  "split": {
+    "IS_end": "2015-12-31",
+    "OOS_start": "2016-01-01"
+  },
+  "grid": [
+    [
+      12,
+      12
+    ],
+    [
+      12,
+      48
+    ],
+    [
+      48,
+      12
+    ],
+    [
+      48,
+      48
+    ]
+  ],
+  "pass_rule": {
+    "IS": "|t_NW| > 2.498 AND Sharpe > 0.30",
+    "OOS": "|t_NW| > 1.96 AND same sign"
+  },
+  "results": {
+    "N12_H12": {
+      "n": 12,
+      "h": 12,
+      "is": {
+        "trades": 162238,
+        "trades_per_year": 10412.5,
+        "gross_pips_per_trade": 0.0988,
+        "net_pips_per_trade": -0.0512,
+        "net_pips_per_year": -532.7,
+        "ann_sharpe": -0.32,
+        "t_nw": -2.03,
+        "is_pass": false
+      }
+    },
+    "N12_H48": {
+      "n": 12,
+      "h": 48,
+      "is": {
+        "trades": 162238,
+        "trades_per_year": 10412.5,
+        "gross_pips_per_trade": 0.1597,
+        "net_pips_per_trade": 0.0097,
+        "net_pips_per_year": 101.0,
+        "ann_sharpe": 0.03,
+        "t_nw": 0.27,
+        "is_pass": false
+      }
+    },
+    "N48_H12": {
+      "n": 48,
+      "h": 12,
+      "is": {
+        "trades": 83306,
+        "trades_per_year": 5346.6,
+        "gross_pips_per_trade": 0.0602,
+        "net_pips_per_trade": -0.0898,
+        "net_pips_per_year": -480.4,
+        "ann_sharpe": -0.399,
+        "t_nw": -2.5,
+        "is_pass": false
+      }
+    },
+    "N48_H48": {
+      "n": 48,
+      "h": 48,
+      "is": {
+        "trades": 83306,
+        "trades_per_year": 5346.6,
+        "gross_pips_per_trade": 0.165,
+        "net_pips_per_trade": 0.015,
+        "net_pips_per_year": 80.0,
+        "ann_sharpe": 0.034,
+        "t_nw": 0.26,
+        "is_pass": false
+      }
+    }
+  }
+}
