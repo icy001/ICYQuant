@@ -38,6 +38,7 @@ from pathlib import Path
 
 from research.live.fx_calendar import can_hold, is_fx_closed
 from research.live.m5_reversal_signal import M5ReversalSignal, Bar
+from research.live import feeds as _feeds
 
 PIP = 1e-4
 COST_PIPS = 0.15            # negotiated terms; mirrors costs.py
@@ -55,8 +56,8 @@ class OpenTrade:
 
 
 class ShadowRunner:
-    def __init__(self, csv_path: str, log_path: str, server_offset_hours: int):
-        self.csv_path = Path(csv_path)
+    def __init__(self, feed, log_path: str, server_offset_hours: int):
+        self.feed = feed
         self.log_path = Path(log_path)
         self.offset = timedelta(hours=server_offset_hours + 8)  # server->Beijing
         self.gen = M5ReversalSignal(can_hold=can_hold)
@@ -81,27 +82,7 @@ class ShadowRunner:
 
     # ------------------------------------------------------------------
     def _read_new_m1(self) -> list[dict]:
-        if not self.csv_path.exists():
-            return []
-        size = self.csv_path.stat().st_size
-        if size < self._pos:                    # file rotated/truncated
-            self._pos = 0
-        rows = []
-        with self.csv_path.open() as f:
-            f.seek(self._pos)
-            reader = csv.reader(f)
-            for row in reader:
-                if not row or row[0] == "server_time":
-                    continue
-                try:
-                    ts = datetime.strptime(row[0], "%Y.%m.%d %H:%M")
-                except ValueError:
-                    continue
-                rows.append({"ts_server": ts,
-                             "open": float(row[1]), "high": float(row[2]),
-                             "low": float(row[3]), "close": float(row[4])})
-            self._pos = f.tell()
-        return rows
+        return self.feed.poll()
 
     # ------------------------------------------------------------------
     def _m5_bucket(self, ts_beijing: datetime) -> datetime:
@@ -197,8 +178,7 @@ class ShadowRunner:
 
     # ------------------------------------------------------------------
     def run(self) -> None:
-        self._log("START", datetime.now(),
-                  f"tailing {self.csv_path} (offset server+{self.offset})")
+        self._log("START", datetime.now(), f"feed={type(self.feed).__name__}")
         while True:
             try:
                 for row in self._read_new_m1():
@@ -213,12 +193,22 @@ class ShadowRunner:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--csv", required=True, help="MT5 exporter CSV path")
+    ap.add_argument("--csv", help="MT5 exporter CSV path (feed=csv)")
+    ap.add_argument("--oanda-token", help="OANDA practice API token (feed=oanda)")
     ap.add_argument("--log", default="artifacts/live_shadow/shadow_log.csv")
     ap.add_argument("--server-offset-hours", type=int, default=2,
-                    help="MT5 server time minus UTC (usually 2 or 3)")
+                    help="feed 时间源相对 UTC 的小时偏移：MT5 通常 2 或 3；"
+                         "OANDA 为 UTC 直出，用 0")
     args = ap.parse_args()
-    ShadowRunner(args.csv, args.log, args.server_offset_hours).run()
+    if args.oanda_token:
+        feed = _feeds.OandaFeed(args.oanda_token)
+        if args.server_offset_hours == 2:      # OANDA 是 UTC，覆盖默认值
+            args.server_offset_hours = 0
+    elif args.csv:
+        feed = _feeds.CsvFeed(args.csv)
+    else:
+        ap.error("需要 --csv（MT5 导出）或 --oanda-token（OANDA 备用源）")
+    ShadowRunner(feed, args.log, args.server_offset_hours).run()
     return 0
 
 
