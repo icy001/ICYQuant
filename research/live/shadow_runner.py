@@ -39,9 +39,10 @@ from pathlib import Path
 from research.live.fx_calendar import can_hold, is_fx_closed
 from research.live.m5_reversal_signal import M5ReversalSignal, Bar
 from research.live import feeds as _feeds
+from research.discovery.costs import NEGOTIATED_EURUSD_RT_PIPS
 
 PIP = 1e-4
-COST_PIPS = 0.15            # negotiated terms; mirrors costs.py
+COST_PIPS = NEGOTIATED_EURUSD_RT_PIPS  # single source of truth: costs.py
 EXPECTED_NET_PIPS = 0.1828  # revival verdict, full-sample
 M1_STALE_SECONDS = 7 * 60   # no M1 bar for 7 min in market hours = anomaly
 
